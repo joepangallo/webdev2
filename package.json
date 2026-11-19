@@ -1,0 +1,12 @@
+{
+  "name": "webdev2-course-site",
+  "private": true,
+  "description": "Interactive course site for Web Development II. No build step; this file only exists to run the tests.",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.mjs\"",
+    "test:unit": "node --test \"tests/unit/*.test.mjs\"",
+    "test:e2e": "node --test \"tests/e2e/*.test.mjs\""
+  }
+}
