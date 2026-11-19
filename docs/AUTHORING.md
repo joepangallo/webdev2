@@ -6,10 +6,8 @@ Two shared files do the heavy lifting:
 
 | File | What it does |
 |------|--------------|
-| `assets/css/course.css` | Fonts (self-hosted in `assets/fonts/`), design tokens (light + dark), page shell, and the styles for every component |
-| `assets/js/course.js` | Course manifest, progress storage, page shell (top bar, sidebar, section footers, favicon), syntax highlighter, and the interactive components |
-
-`tests/` holds the checks that keep pages and engine in step — see [Section 7](#7-tests). Run them before you push.
+| `assets/css/course.css` | Design tokens (light + dark), page shell, and the styles for every component |
+| `assets/js/course.js` | Course manifest, progress storage, page shell (top bar, sidebar, section footers), syntax highlighter, and the interactive components |
 
 Open [`docs/components.html`](components.html) in a browser to see every component live.
 
@@ -17,7 +15,7 @@ Open [`docs/components.html`](components.html) in a browser to see every compone
 
 ## 1. Page skeleton
 
-A lesson page lives in its own folder (`wk2/index.html`, etc.) and looks like this:
+A lesson page lives in its own folder (`ch2/index.html`, etc.) and looks like this:
 
 ```html
 <!DOCTYPE html>
@@ -25,23 +23,25 @@ A lesson page lives in its own folder (`wk2/index.html`, etc.) and looks like th
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Routing, Middleware & REST APIs · Web Dev II</title>
-  <meta name="description" content="One sentence that says what the page teaches.">
+  <title>How the Web Works · Web Dev I</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=JetBrains+Mono:wght@400;700&display=swap">
   <link rel="stylesheet" href="../assets/css/course.css">
   <script src="../assets/js/course.js"></script>   <!-- NOT deferred -->
   <style>
     /* page-specific styles only; use the tokens (var(--surface), var(--mod), ...) */
   </style>
 </head>
-<body data-module="wk2">
+<body data-module="ch2">
 <main id="main">
   <header class="module-hero">
-    <h1>Routing, Middleware & REST APIs</h1>
-    <p class="lede">One or two sentences that set up the week.</p>
+    <h1>How the Web Works</h1>
+    <p class="lede">One or two sentences that set up the chapter.</p>
   </header>
 
   <section class="lesson" id="s2-1">
-    <h2>Routing in Depth: Parameters and Query Strings</h2>
+    <h2>Internet Protocols</h2>
     <p>…</p>
   </section>
 
@@ -56,8 +56,6 @@ A lesson page lives in its own folder (`wk2/index.html`, etc.) and looks like th
 </html>
 ```
 
-The stylesheet and the script are the only two resources a page loads. Fonts are declared in `course.css` and served from `assets/fonts/`; do not add font or CDN `<link>` tags.
-
 What `course.js` adds automatically, so **do not** write these yourself:
 
 - the top bar, the sidebar table of contents, the site footer
@@ -66,7 +64,7 @@ What `course.js` adds automatically, so **do not** write these yourself:
 - the "Mark section complete" button and "Next" link at the end of each section
 - previous/next module links at the bottom
 
-`<body data-module>` must be one of `wk1`, `wk2`, `wk3`, `wk4`. Each section `id` must match the manifest in `course.js` (`s1-1` … `s1-6`, `s1-review`; `s2-1` … and so on), in the same order. Adding a section means adding it to `WD1.MODULES` too.
+`<body data-module>` must be one of `ch2`, `ch3`, `ch4`, `wk4`, `levelup`. Each section `id` must match the manifest in `course.js` (`s2-1` … `s2-6`, `s2-review`; `s1-1` … and so on; Level Up uses `sl-1` … `sl-6`, `sl-review`). Adding a section means adding it to `WD1.MODULES` too.
 
 ---
 
@@ -101,13 +99,13 @@ Write raw code inside a text script. It is dedented, highlighted and gets a copy
 </script>
 ```
 
-`data-lang` is `html`, `css`, `js` or `json` (anything else, such as `text`, is shown without highlighting). `data-title` overrides the label. A literal `</script>` inside the sample must be written `<\/script>`; it is displayed correctly.
+`data-lang` is `html`, `css` or `js`. `data-title` overrides the label. A literal `</script>` inside the sample must be written `<\/script>`; it is displayed correctly.
 
 ---
 
 ## 4. Interactive components
 
-All JSON-driven components treat text as **mini-markdown**: `` `code` `` (escaped, so `` `<p>` `` shows the tag), `**bold**`, `[text](url)`. Do not put raw HTML or HTML entities in JSON strings: the text is shown exactly as written, so `&amp;` appears as `&amp;`. Write the character itself (`&`, `<`).
+All JSON-driven components treat text as **mini-markdown**: `` `code` `` (escaped, so `` `<p>` `` shows the tag), `**bold**`, `[text](url)`. Do not put raw HTML in JSON strings.
 
 Every component accepts `data-title` (the widget heading) and `data-id` (a stable storage key; optional, auto-generated from the section otherwise).
 
@@ -129,8 +127,6 @@ Every component accepts `data-title` (the widget heading) and `data-id` (a stabl
 ```
 
 Add `"shuffle": true` to a question to shuffle its choices. Finishing a quiz with 70% or better (`data-pass="0.8"` to change) marks the enclosing section complete.
-
-**Write choices of similar length.** When the right answer is the only long, careful sentence among three short throwaways, students learn to pick the longest. Make each wrong choice a specific, plausible misconception written in the same shape as the answer. The tests fail a page when the keyed answer is the single longest choice in more than 30% of its questions, or when choice lengths in one question are very uneven.
 
 ### Flashcards
 
@@ -159,19 +155,9 @@ Add `"shuffle": true` to a question to shuffle its choices. Finishing a quiz wit
 
 - Include only the tabs you need. A JS tab adds a console panel (`data-console="false"` hides it; `"true"` forces it). For JavaScript-only exercises, `data-preview="false"` hides the rendered preview and gives the console the full column.
 - Textarea content is not parsed as HTML, so tags can be written literally. Entities **are** decoded, so write `&amp;copy;` to show `&copy;`.
+- Check tests are function bodies called with `doc`, `win`, `$` (querySelector), `$$` (querySelectorAll → array), `style(selectorOrNode, prop)` (computed value) and `code` (`{html, css, js}` strings). Computed colors come back as `rgb(r, g, b)`.
 - The preview intercepts form submits and shows exactly what the browser would send (method, URL/body, name/value table, and a warning for controls without `name`). Links do not navigate; `#id` links scroll.
 - Student edits persist in localStorage; **Reset** restores the original.
-
-**The preview is a sandbox.** Student code runs in an `<iframe sandbox="allow-scripts allow-forms allow-modals">` with its own throwaway origin. Scripts, forms and `alert()` work. `localStorage`, `sessionStorage`, `document.cookie` and same-site `fetch` do **not** — they throw or fail — so teach those ideas with in-page data (a cookie *string* to parse, an array standing in for an API). The sandbox is what makes share links and imported progress files safe to open: shared code cannot read this site's storage or touch the lesson page.
-
-**Loops are guarded.** The JS tab is rewritten so `while (c)` becomes `while (__wd2loop() && (c))` (three-part `for` loops likewise). A loop that spins for 1.5 seconds without giving the browser a turn throws "Loop stopped…" into the console instead of freezing the tab. Lines keep their numbers, and console errors cite the line in the JS tab.
-
-**Checks** (`<script type="application/json" class="checks">`) turn a playground into a challenge:
-
-- A test is a function body called with `doc`, `win`, `$` (querySelector), `$$` (querySelectorAll → array), `style(selectorOrNode, prop)` (computed value) and `code` (`{html, css, js}` strings). It runs **inside the preview**, about 60 ms after the page loads, and must `return` something truthy to pass. Throwing counts as a fail. Computed colors come back as `rgb(r, g, b)`.
-- **The starter must fail at least one check.** State one clear task in the prose, ship code that is working but incomplete, and let the checks go green when the task is done. A challenge only counts (toast, hub counter) after the student has changed the starter code. The tests fail a page whose starter already passes everything.
-- **Test behavior, not text.** Call the student's function with inputs it has not seen: `return win.parseUrl('/a?x=1&x=2').query.x.length === 2`. A check like `code.js.indexOf('/about') > -1` passes on a comment. Only top-level `function name() {}` declarations and `var`s are reachable as `win.name`, so write starters with function declarations.
-- Following the prose must never turn a passing check red. If the text says "now name the coupon field", no check may require it to stay unnamed.
 
 ### Match
 
@@ -273,9 +259,7 @@ Then wire it up in the page script inside `WD1.ready(() => { … })`.
 | `WD1.highlight(code, lang)` | Highlighted HTML string for `html`, `css`, `js` |
 | `WD1.codeBlock(code, lang)` | A ready-made code block element |
 | `WD1.editor(container, {value, lang, height, onInput})` | A highlighted code editor (`get`, `set`, `focus`) |
-| `WD1.previewFrame(title, lazy?)` | A sandboxed `<iframe>` for running student code. Always create preview frames with this |
-| `WD1.buildPreviewDoc({html, css, js}, id?, checks?)` | Full preview document string (for a preview frame's `srcdoc`), with the console bridge and loop guard |
-| `WD1.guardLoops(js)` | The loop-guard rewrite on its own (returns the input untouched if it does not parse) |
+| `WD1.buildPreviewDoc({html, css, js})` | Full preview document string (for an `iframe.srcdoc`) |
 | `WD1.flashcards(el, cards)` | Mount flashcards from an array |
 | `WD1.init(root)` | Mount components inside dynamically added markup |
 | `WD1.toast(msg, 'visited'?)` | Brief status message |
@@ -286,9 +270,7 @@ Then wire it up in the page script inside `WD1.ready(() => { … })`.
 | `WD1.MODULES`, `WD1.OBJECTIVES`, `WD1.section(id)`, `WD1.module(id)` | Course manifest |
 | `WD1.url(path)` | Absolute URL from the site root (works from any folder) |
 
-Events: `document` receives `wd2:progress` (`detail.id`, `detail.done`) and `wd2:refresh`. A quiz fires `quizdone`, a playground fires `checks` (`detail.passed`, `detail.total`, `detail.complete`), a stepper fires `stepchange`, and tabs fire `tabchange`.
-
-Saved state lives under the localStorage key `wd2:v1`. The engine namespace is `window.WD1` for historical reasons (the engine began in the Web Development I site, which shares this origin on GitHub Pages) — which is exactly why storage keys and events must say `wd2:`, never `wd1:`.
+Events: `document` receives `wd1:progress` and `wd1:refresh`. A quiz fires `quizdone`, a playground fires `checks`, a stepper fires `stepchange`, and tabs fire `tabchange`.
 
 ---
 
@@ -296,34 +278,18 @@ Saved state lives under the localStorage key `wd2:v1`. The engine namespace is `
 
 - Write to the student in second person, plain and direct. Short paragraphs. Explain *why*, then let them try it.
 - Every section has at least one interactive element and ends with a short quiz.
-- Use real, specific examples (real status codes, real headers, real driver result shapes) rather than placeholders.
+- Use real, specific examples (real status codes, real headers, real DNS record types) rather than placeholders.
 - Keep all links relative (`../project/index.html`) and point at `index.html` explicitly so pages also work when opened from disk.
-- Nothing the site itself loads may come from a third party, and nothing may require a server or a build tool. (A code *sample* may show students a CDN `<script>` for their own page — pin its exact version.)
-- Never signal right or wrong by color alone. The components add a ✓ or ✗ and screen-reader text; custom widgets must do the same.
+- Nothing may require a server, a build tool, or a third-party script.
 
-### Server-side examples
+## Web Development II notes
 
-- Node and Express code cannot run in the page. Present it as a code sample plus an output block, and be honest about provenance: caption a block "Real output — captured by running this exact program" only when it truly was captured from the code as printed. If you edit a sample, run it again and paste the new output. Otherwise label the block "Expected output".
-- Write for the versions the course names (Node 26, Express 5). Two Express 5 facts that are easy to get wrong from older tutorials: without a body parser `req.body` is `undefined` (not `{}`), and an error thrown in a route handler becomes a 500 response rather than crashing the process.
-- Pure-JavaScript teaching examples (parsing, validation, decoding) belong in playgrounds with `data-preview="false"` and checks, so students can run and break them in the browser.
-- Each module page opens with an audio-companion block linking `../audio/wkN.mp3` and its transcript. If you change what a page teaches, read the transcript: the recording may now disagree with the page.
-
----
-
-## 7. Tests
-
-```
-npm test
-```
-
-runs everything in `tests/` with Node's built-in test runner — no packages to install. It needs Node 22 or newer and, for the browser tests, Chrome or Chromium (set `CHROME_BIN` if it is somewhere unusual). The same command runs on every push (`.github/workflows/test.yml`).
-
-| File | What it guards |
-|------|----------------|
-| `tests/unit/course.test.mjs` | The engine's pure parts: mini-markdown, highlighter, loop guard, preview document, progress store |
-| `tests/unit/content.test.mjs` | Every JSON block parses; quiz keys are in range; answer lengths are balanced; pages match the manifest; links and anchors resolve; nothing loads from a third party; this guide still describes the code |
-| `tests/e2e/site.test.mjs` | In a real browser: pages load cleanly; every quiz can be passed with its own key; every challenge starts unsolved; previews are sandboxed; runaway loops are stopped; pages fit a phone; keyboard and screen-reader behavior |
-
-When a test fails, it names the page and line. Fix the page, not the test — the rules it enforces are the ones in this guide.
-
-Two switches for the browser tests: `WD2_BASE_URL=https://example.com/site/ npm run test:e2e` runs them against a deployed copy instead of your working folder, and `WD2_COVERAGE=1 npm run test:e2e` also prints how much of `course.js` they exercise.
+- The manifest in `course.js` uses module ids `wk1`–`wk4` (labels "Week 1"–"Week 4") and section ids
+  `s1-1`…`s4-review`. The internal engine namespace is still `window.WD1` and progress events are
+  `wd2:progress` / `wd2:refresh`; storage keys are namespaced `wd2:v1`.
+- Server-side examples (Node/Express) cannot run in the page. Present them as code samples plus an
+  output block, and be honest about provenance: "Real output — captured by running this exact
+  program" only when it truly was captured; otherwise label it "Expected output".
+- Pure-JavaScript teaching examples (parsing, validation, decoding) belong in playgrounds with
+  `data-preview="false"` and machine checks, so students can run and break them in the browser.
+- Each module page opens with an audio-companion block linking `../audio/wkN.mp3`.
