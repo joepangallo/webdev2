@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>State, Persistence &amp; Databases · Web Dev II</title>
+  <meta name="description" content="Week 3: how websites remember things — cookies, sessions, the file system, and real databases, with the full create, read, update, delete cycle in both MongoDB and MySQL.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=JetBrains+Mono:wght@400;700&display=swap">
+  <link rel="stylesheet" href="../assets/css/course.css">
+  <script src="../assets/js/course.js"></script>
+  <style>
+    /* ===== Week 3 page styles. Every selector is prefixed wk3- ===== */
+    .wk3-flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0; }
+    .wk3-flow .arr { color: var(--ink-3); font-family: var(--font-mono); }
+    .wk3-note { font-size: .88rem; color: var(--ink-2); margin: 6px 0 0; }
+    .wk3-doc { font-family: var(--font-mono); font-size: .85rem; }
+  </style>
+</head>
+<body data-module="wk3">
+<main id="main">
+  <header class="module-hero">
+    <h1>State, Persistence &amp; Databases</h1>
+    <p class="lede">So far your server has forgotten everything the moment it answered. This week you fix that: cookies and sessions so the server can remember a visitor, files so data survives a restart, and real databases — MongoDB and MySQL — so data can be stored, searched, changed and deleted properly.</p>
+  </header>
+
+  <aside class="callout listen">
+    <strong>Listen: the Week 3 audio companion</strong>
+    <p>This episode covers how websites remember things: cookies, sessions, files, and real databases — with the full create, read, update, delete cycle in both MongoDB and MySQL.</p>
+    <audio controls preload="metadata" src="../audio/wk3.mp3" style="width:100%"></audio>
+  <p class="small"><a href="../audio/wk3-transcript.txt">Read the episode transcript</a> (text file).</p>
+  </aside>
+
+  <!-- ===================================================== 3.1 -->
+  <section class="lesson" id="s3-1">
+    <h2>State on a Stateless Web: Cookies</h2>
+    <p>Here is the problem this whole week solves. HTTP is <strong>stateless</strong>: it keeps no memory between requests. When your browser asks a server for a page, the server answers and then forgets you completely. Your next request — a second later, from the same browser — arrives as if from a total stranger. Nothing in HTTP itself connects the two requests.</p>
+    <p>That is a problem, because almost everything useful on the web needs memory. A shop has to remember what is in your cart while you keep browsing. A site has to remember that you already logged in, so it does not ask for your password on every single page. <strong>State</strong> is the word for that remembered information: facts about a visitor that carry across requests.</p>
+
+    <h3>The coat-check ticket</h3>
+    <p>Picture a coat check at a theatre. You hand over your coat, and the attendant hands you a small numbered ticket. The attendant does not remember your face, your name, or which coat is yours. Later, you hand back the ticket, and the number on it is enough to find your coat. Every visit works the same way: no memory, just a ticket presented each time.</p>
+    <p>The web works like that. The "ticket" is a <strong>cookie</strong>: a small piece of text — a name and a value, like <code>visited=yes</code> — that a server asks your browser to store. Your browser keeps it and then automatically sends it back with every later request to that site. The server never has to remember you. It just reads the ticket you present.</p>
+
+    <h3>How a cookie round trip works</h3>
+    <p>Two headers do all the work. A <strong>header</strong> is a line of extra information attached to an HTTP request or response, separate from the page itself:</p>
+    <ul>
+      <li><strong><code>Set-Cookie</code></strong> travels in a <em>response</em>. It is the server saying: "Browser, please store this."</li>
+      <li><strong><code>Cookie</code></strong> travels in every later <em>request</em>. It is the browser saying: "Here is what you asked me to store."</li>
+    </ul>
+    <p>Here is a complete, working example. The server checks each request for a <code>visited</code> cookie. If it is not there, the server sends a friendly first-visit message and sets the cookie. If it is there, the server knows you have been here before:</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="cookies.js — remembering a visitor">
+      const express = require('express');
+      const app = express();
+
+      app.get('/visit', (req, res) => {
+        // The browser sends saved cookies in the Cookie header.
+        const cookies = req.headers.cookie || '';
+
+        if (cookies.includes('visited=yes')) {
+          res.send('Welcome back! Your browser sent the visited cookie.');
+        } else {
+          // res.cookie() adds a Set-Cookie header to the response.
+          res.cookie('visited', 'yes');
+          res.send('First visit! We just set a cookie named visited.');
+        }
+      });
+
+      app.listen(3000, () => console.log('Listening on port 3000'));
+    </script>
+
+    <p>Run it, then ask for the page twice — once with no cookie, once sending the cookie back, exactly as a browser would:</p>
+
+    <div class="output">$ curl -i http://localhost:3000/visit   (first visit; showing only the interesting headers + body)
+HTTP/1.1 200 OK
+Set-Cookie: visited=yes; Path=/
+First visit! We just set a cookie named visited.
+$ curl http://localhost:3000/visit -H "Cookie: visited=yes"
+Welcome back! Your browser sent the visited cookie.
+--- server console ---
+Listening on port 3000</div>
+    <p class="wk3-note">Real output — captured from running this code (Node v26.13.1, Express 5.3.0). Read it line by line: the first response carries the <code>Set-Cookie</code> header, so the browser stores <code>visited=yes</code>. The second request presents it in a <code>Cookie</code> header, and the same route gives a completely different answer. That difference <em>is</em> state.</p>
+
+    <aside class="callout tip">
+      <strong>See your own cookies</strong>
+      <p>Open any website, press <kbd>F12</kbd> for DevTools, and look at the <strong>Network</strong> tab. Click a request and find the <code>Cookie</code> header the browser sent and any <code>Set-Cookie</code> headers in the response. Most sites you use every day are quietly running exactly the round trip you just built.</p>
+    </aside>
+
+    <p>Put the round trip in order before moving on — these five events are the whole mechanism:</p>
+
+    <div class="order" data-title="Put the cookie round trip in order">
+      <script type="application/json">
+      {"prompt": "Arrange the five events of a cookie round trip in the order they happen.", "items": [
+        "The browser requests a page from a site it has never visited",
+        "The server's response carries a `Set-Cookie` header",
+        "The browser stores the cookie",
+        "The browser sends the cookie back in a `Cookie` header on the next request",
+        "The server reads the cookie and answers as if it remembers the visitor"
+      ], "explain": "Notice the shape: the server remembers nothing at all. Everything depends on the browser storing the ticket and presenting it again — which is why deleting cookies makes sites forget you."}
+      </script>
+    </div>
+
+    <h3>Cookie attributes: the fine print on the ticket</h3>
+    <p>A cookie is more than a name and a value. The server can attach <strong>attributes</strong> — extra instructions that control how long the cookie lives, where it is sent, and who is allowed to read it. You met one already: the <code>Path=/</code> in the output above. Here are the ones that matter:</p>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col">Attribute</th><th scope="col">What it does, in plain words</th><th scope="col">Example</th></tr></thead>
+        <tbody>
+          <tr><th scope="row"><code>Expires</code> / <code>Max-Age</code></th><td>When the browser should throw the cookie away. Without one, the cookie is a <em>session cookie</em> and disappears when the browser closes. <code>Max-Age</code> counts in seconds from now; <code>Expires</code> names a date.</td><td><code>Max-Age=3600</code> — keep it for one hour</td></tr>
+          <tr><th scope="row"><code>Path</code></th><td>Which pages on the site the cookie is sent to. <code>Path=/</code> means "everywhere on this site." <code>Path=/account</code> would send it only under <code>/account</code>.</td><td><code>Path=/</code></td></tr>
+          <tr><th scope="row"><code>HttpOnly</code></th><td>The browser stores the cookie and sends it, but JavaScript running in the page is <em>not allowed to read it</em>. This protects login cookies: even if malicious script gets into a page, it cannot steal a cookie it cannot read.</td><td><code>HttpOnly</code> (no value — its presence is the switch)</td></tr>
+          <tr><th scope="row"><code>Secure</code></th><td>The browser sends this cookie only over HTTPS — the encrypted connection — never over plain HTTP where someone listening on the network could copy it.</td><td><code>Secure</code></td></tr>
+          <tr><th scope="row"><code>SameSite</code></th><td>Controls whether the cookie is sent when a request comes from a <em>different</em> site. <code>Lax</code> (the usual default) blocks most cross-site sending, which shuts down a common attack where a hostile page tricks your browser into making requests using your login.</td><td><code>SameSite=Lax</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>In Express you set attributes in the same <code>res.cookie()</code> call:</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="Setting a cookie with attributes">
+      res.cookie('theme', 'dark', {
+        maxAge: 24 * 60 * 60 * 1000, // one day, in milliseconds
+        httpOnly: true,
+        sameSite: 'lax'
+      });
+    </script>
+
+    <aside class="callout warn">
+      <strong>Cookies live on the visitor's machine — never trust them</strong>
+      <p>A cookie is stored by the browser, which means the visitor can read it, change it, or delete it. Never store anything secret in a cookie, and never believe an important fact just because a cookie claims it. If a cookie says <code>role=admin</code>, anyone can edit it to say that. Next section you will see the fix: keep the real data on the server, and let the cookie carry only a meaningless ID.</p>
+    </aside>
+
+    <h3>Try it: read a cookie string</h3>
+    <p>When cookies arrive, they reach your code as one long string: <code>"visited=yes; theme=dark; cart=3"</code>. Pairs are joined by <code>"; "</code>, and each pair is <code>name=value</code>. Finish the parser below so it turns that string into an object you can look values up in. Notice that every value stays a <em>string</em> — <code>cart</code> comes back as <code>"3"</code>, not the number <code>3</code>, because cookies are text.</p>
+
+    <div class="playground" data-title="Try it: parse a cookie string" data-preview="false" data-height="300">
+      <textarea data-lang="js">function parseCookies(header) {
+  const cookies = {};
+  const parts = String(header).split(';');
+  for (const part of parts) {
+    const eq = part.indexOf('=');
+    if (eq === -1) continue; // not a name=value pair: skip it
+    const name = part.slice(0, eq).trim();
+    const value = part.slice(eq + 1).trim();
+    if (name) cookies[name] = value;
+  }
+  return cookies;
+}
+
+const jar = parseCookies('visited=yes; theme=dark; cart=3');
+console.log('theme =', jar.theme);
+console.log('cart =', jar.cart);
+console.log('Returning visitor?', jar.visited === 'yes');
+console.log('Names:', Object.keys(jar).join(', '));
+
+// Your turn: try a value that itself contains an equals sign,
+// like a token. What does parseCookies('token=abc=def') give you?</textarea>
+      <script type="application/json" class="checks">
+      [
+        {"label": "`parseCookies` is a function", "test": "return typeof win.parseCookies === 'function'"},
+        {"label": "It reads `theme` as `dark`", "test": "return win.parseCookies('visited=yes; theme=dark; cart=3').theme === 'dark'"},
+        {"label": "`cart` comes back as the string `3`, not a number", "test": "return win.parseCookies('visited=yes; theme=dark; cart=3').cart === '3'"},
+        {"label": "Pairs work without a space after the semicolon", "test": "return win.parseCookies('a=1;b=2').b === '2'"},
+        {"label": "A value may itself contain `=` signs", "test": "return win.parseCookies('token=abc=def').token === 'abc=def'"}
+      ]
+      </script>
+    </div>
+
+    <div class="quiz" data-title="Check your understanding: cookies">
+      <script type="application/json">
+      [
+        {"q": "Why is HTTP called stateless?", "shuffle": true, "choices": ["The server keeps no memory between requests, so each request arrives as if from a stranger", "HTTP requests are not allowed to carry any data", "A server can only answer one request at a time", "Web pages are not allowed to change"], "answer": 0, "explain": "Stateless means no memory between requests. State — remembering a cart, a login, a preference — has to be built on top of HTTP, which is what cookies and sessions do."},
+        {"q": "Which header does a **server** use to ask a browser to store a cookie?", "shuffle": true, "choices": ["`Cookie`", "`Set-Cookie`", "`Store-Cookie`", "`X-Cookie`"], "answer": 1, "explain": "`Set-Cookie` travels in the response: 'browser, please store this.' The browser then sends the stored values back in a `Cookie` header on later requests."},
+        {"q": "True or false: a cookie with the `HttpOnly` attribute cannot be read by JavaScript running in the page.", "answer": true, "explain": "True. The browser still stores the cookie and sends it with requests, but page scripts cannot read it — which is why login cookies should be `HttpOnly`."},
+        {"q": "A cookie arrives as `cart=3`. In your code, what type is that `3`?", "shuffle": true, "choices": ["A string, `\"3\"` — cookies are text", "A number, `3`", "A boolean", "An object"], "answer": 0, "explain": "Cookies are plain text. If you need a number, convert it yourself with `Number(...)` — and check the result, because the visitor can edit the cookie to say anything."},
+        {"q": "Why should you never store a secret, or trust a claim like `role=admin`, inside a cookie?", "shuffle": true, "choices": ["Cookies are stored on the visitor's machine, so the visitor can read and change them", "Cookies expire too quickly to hold anything", "Cookies can only hold five characters", "The server is not allowed to read cookies"], "answer": 0, "explain": "Whatever sits in a cookie sits under the visitor's control. Keep sensitive data on the server; let the cookie carry only something meaningless, like an ID — which is exactly what sessions do next."}
+      ]
+      </script>
+    </div>
+  </section>
+
+  <!-- ===================================================== 3.2 -->
+  <section class="lesson" id="s3-2">
+    <h2>Sessions and the File System</h2>
+    <p>Cookies solved the memory problem, but badly: everything you want to remember has to fit in a small text string, on the visitor's machine, where the visitor can read and rewrite it. A shopping cart, a login, a half-finished form — none of that belongs out there. The fix is to flip the arrangement around. Keep the real data on the <em>server</em>, and let the cookie carry only one thing: an ID.</p>
+
+    <h3>Sessions: the server remembers, the cookie points</h3>
+    <p>A <strong>session</strong> is a chunk of data the server keeps about one visitor, stored under a random ID. The browser's cookie holds nothing but that ID — a long random string that means nothing on its own, like the number on a coat-check ticket. On every request, the server reads the ID from the cookie, looks up the matching data, and now it "knows" you: your name, your cart, your visit count.</p>
+    <p>The most common Express tool for this is the <code>express-session</code> package. Install it with <code>npm install express-session</code>, plug it in as middleware, and every request gains a <code>req.session</code> object you can read and write. Whatever you put there is remembered for that visitor:</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="session-demo.js — counting visits with express-session">
+      const express = require('express');
+      const session = require('express-session');
+      const app = express();
+
+      app.use(session({
+        secret: 'dev-secret-change-me', // signs the session cookie
+        resave: false,
+        saveUninitialized: true,
+        cookie: { httpOnly: true }      // the ID cookie: scripts can't read it
+      }));
+
+      app.get('/count', (req, res) => {
+        // req.session is this visitor's private server-side notebook.
+        req.session.visits = (req.session.visits || 0) + 1;
+        res.send(`Visit number ${req.session.visits}`);
+      });
+
+      app.listen(3000, () => console.log('Listening on port 3000'));
+    </script>
+
+    <p>Now watch the count behave. <code>curl</code> forgets cookies between runs unless you give it a <strong>cookie jar</strong> — a file where it saves cookies (<code>-c</code>) and sends them back (<code>-b</code>), doing the job a browser normally does:</p>
+
+    <div class="output">$ curl -c jar.txt http://localhost:3000/count   (first visit, saves the session cookie)
+Visit number 1
+$ curl -b jar.txt http://localhost:3000/count   (same browser jar)
+Visit number 2
+$ curl -b jar.txt http://localhost:3000/count
+Visit number 3
+$ curl http://localhost:3000/count   (no cookie: a new session)
+Visit number 1
+--- server console ---
+Listening on port 3000</div>
+    <p class="wk3-note">Real output — captured from running this code (Node v26.13.1, Express 5.3.0). The count climbs 1, 2, 3 while the jar presents the same session ID, because the number itself lives on the server. Drop the cookie and the server has no ticket to look up, so it starts a brand-new session at 1. Notice the visitor never sees the count in their cookie — only the ID travels.</p>
+
+    <h3>One lookup, step by step</h3>
+    <p>Step through a single request arriving at a server that uses sessions:</p>
+
+    <div class="stepper" data-title="How a session lookup works">
+      <div class="stepper-stage">
+        <div class="cluster">
+          <span class="chip" data-on="1-5">Browser sends request</span>
+          <span class="chip" data-on="2-5" data-active="2">Cookie: session ID only</span>
+          <span class="chip" data-on="3-5" data-active="3">Server looks the ID up</span>
+          <span class="chip" data-on="4-5" data-active="4">Your code uses the data</span>
+          <span class="chip" data-on="5" data-active="5">Response goes back</span>
+        </div>
+      </div>
+      <ol class="steps">
+        <li><p><strong>The request arrives.</strong> Your browser asks for a page, like any HTTP request. Nothing about the request itself says who you are.</p></li>
+        <li><p><strong>The browser attaches the cookie automatically.</strong> Stored from an earlier <code>Set-Cookie</code>, the cookie carries only the session ID — a long random string. No name, no cart, no personal data travels with it.</p></li>
+        <li><p><strong>The session middleware looks the ID up.</strong> Before your route runs, <code>express-session</code> reads the ID and finds the data stored under it on the server. If there is no cookie, or the ID is unknown, it starts a fresh, empty session and arranges for a new ID cookie to be sent back.</p></li>
+        <li><p><strong>Your code sees <code>req.session</code>.</strong> The stored data appears as an ordinary object. Read from it, write to it — changes are saved under the same ID when the response is sent.</p></li>
+        <li><p><strong>The response goes back.</strong> It may carry a <code>Set-Cookie</code> header if a new session was created. The data itself never leaves the server; only the ticket does.</p></li>
+      </ol>
+    </div>
+
+    <aside class="callout tip">
+      <strong>Cookie or session — which do you reach for?</strong>
+      <p>Use a plain cookie for small, harmless preferences the visitor is allowed to see and change, like a theme choice. Use a session for anything that matters — logins, carts, progress — because the data stays on your server, under your control. Rule of thumb: if it would be a problem when a visitor edits it, it does not belong in a cookie.</p>
+    </aside>
+
+    <aside class="callout warn">
+      <strong>Where do sessions live by default? In memory — and that matters</strong>
+      <p>Out of the box, <code>express-session</code> keeps session data in the server's memory — its built-in store is called the <strong>MemoryStore</strong>. That is fine for learning and development, but restart the server and every session evaporates: all your visitors are logged out at once, and sessions cannot be shared between servers, because each server knows only its own. Real deployments plug in a <em>session store</em> backed by a database instead, so sessions get the same persistence as the rest of your data. Keep that in mind as you read on: "the server remembers" always quietly means "the server <em>stored</em> it somewhere."</p>
+    </aside>
+
+    <h3>Persistence in files</h3>
+    <p>Sessions remember visitors while the server runs. But what about data that must survive the server stopping — notes, records, a list of books? That is <strong>persistence</strong>: storing data somewhere outside your program's memory, so it is still there when the program restarts. The simplest persistent home is a <strong>file</strong>: an ordinary named chunk of data on the computer's disk, like a text file on your own machine.</p>
+    <p>Node's built-in <code>fs</code> module (short for <em>file system</em> — the part of the operating system that organizes files) reads and writes files. Three functions cover the basics. The <code>Sync</code> versions work step by step, waiting for each write or read to finish before the next line runs, which keeps small examples easy to follow:</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="fs-demo.js — writing and reading a file">
+      const fs = require('fs');
+
+      // CREATE: writeFileSync writes a file, replacing it if it exists.
+      fs.writeFileSync('notes.txt', 'First note\n');
+
+      // APPEND: appendFileSync adds to the end without erasing.
+      fs.appendFileSync('notes.txt', 'Second note\n');
+
+      // READ: readFileSync returns the file's contents as a string.
+      const text = fs.readFileSync('notes.txt', 'utf8');
+      console.log('File contents:');
+      console.log(text);
+
+      const lines = text.trim().split('\n');
+      console.log('Lines:', lines.length);
+    </script>
+
+    <div class="output">File contents:
+First note
+Second note
+
+Lines: 2</div>
+    <p class="wk3-note">Real output — captured from running this code (Node v26.13.1). Two details to notice. The <code>\n</code> in each string is a <em>newline</em> — an invisible character meaning "start a new line" — which is why the file holds two lines, and why there is a blank line in the output: the file's text already ends with a newline, and <code>console.log</code> adds one more. And if you stop the program and run it again, the file is still on disk. That survival is the whole point of persistence.</p>
+    <p>Watch out for relative paths: when you pass a path like <code>'notes.txt'</code> to an <code>fs</code> call, Node resolves it from the folder you were standing in when you ran <code>node</code> — your <strong>current working directory</strong>, the folder your terminal was in at launch — not from the folder the script lives in, so the same program can read different files depending on where you launch it. The fix is to build the path from the script's own folder instead, with <code>path.join(__dirname, 'notes.txt')</code> in CommonJS (the module system that uses <code>require</code>), where <code>__dirname</code> means "the folder this script lives in."</p>
+
+    <h3>Why files stop being enough</h3>
+    <p>Files are a fine first step, and for small tools they may be all you need. But watch what breaks as a site grows:</p>
+    <ul>
+      <li><strong>One server only.</strong> The file sits on one machine's disk. Run your app on two servers (which real sites do, so one can take over when the other is busy or down) and each has its own copy. A book added on server A is invisible on server B.</li>
+      <li><strong>No sharing, no searching.</strong> A file is one long stretch of text. Finding "every book by Jane Austen" means reading the whole file and picking through it yourself, every time. Two parts of your program writing at once can tangle their changes together.</li>
+      <li><strong>Fragile.</strong> One bad write — the program stops halfway through saving — can leave the file half-old, half-new, and unreadable. There is no undo and no safety net.</li>
+    </ul>
+    <p>You need a program whose whole job is storing data well: keeping it safe, finding any piece of it quickly, and serving many programs at once. That program is a database, and it is where this week goes next.</p>
+
+    <div class="quiz" data-title="Check your understanding: sessions and files">
+      <script type="application/json">
+      [
+        {"q": "In a session-based app, what does the visitor's cookie actually contain?", "shuffle": true, "choices": ["Only a random session ID — the real data stays on the server", "The visitor's full profile and cart", "A copy of the server's database", "The visitor's password, encrypted"], "answer": 0, "explain": "The cookie is just a ticket. The data lives server-side under that ID, so there is nothing worth stealing or editing in the cookie itself."},
+        {"q": "In the captured output, why did the visit count restart at 1 on the last request?", "shuffle": true, "choices": ["The request sent no cookie, so the server could not find the old session and started a new one", "The server was restarted between requests", "The count resets after 3 on purpose", "`curl` deleted the session data from the server"], "answer": 0, "explain": "No cookie means no session ID, and no ID means no lookup. As far as the server can tell, a brand-new visitor arrived."},
+        {"q": "True or false: data stored in a file with `fs.writeFileSync` is still there after the Node program exits and runs again.", "answer": true, "explain": "True — that is persistence. The file lives on disk, independent of the program's memory, which is emptied every time the program stops."},
+        {"q": "What does `appendFileSync` do differently from `writeFileSync`?", "shuffle": true, "choices": ["It adds to the end of the file; `writeFileSync` replaces the whole file", "It writes the file twice as fast", "It only works on empty files", "It reads the file instead of writing it"], "answer": 0, "explain": "`writeFileSync` starts the file over. `appendFileSync` keeps what is there and adds to the end — which is how the demo file ended up with two notes."},
+        {"q": "Which of these is a real reason files stop working as a site grows?", "shuffle": true, "choices": ["Each server has its own copy of the file, so copies disagree and nothing is shared", "Files cannot hold more than ten lines", "Browsers refuse to talk to servers that use files", "Node deletes files older than a day"], "answer": 0, "explain": "A file belongs to one machine. Add a second server, or a second program writing at once, and the single-file approach falls apart — the problem databases exist to solve."}
+      ]
+      </script>
+    </div>
+  </section>
+
+  <!-- ===================================================== 3.3 -->
+  <section class="lesson" id="s3-3">
+    <h2>Databases: Relational vs Non-Relational</h2>
+    <p>A <strong>database</strong> is a program that stores data for other programs. Instead of your code shuffling text files around, you hand the data to the database and ask it questions: store this book, find every book by this author, change this price, delete that record. The database keeps the data safe on disk, organizes it so lookups are fast, and handles many programs asking at once. Your Express server is a <em>client</em> of the database — it asks, the database answers.</p>
+    <p>Databases come in two big families, and this week you will use one of each. They differ in how they picture your data.</p>
+
+    <h3>Relational: data in tables</h3>
+    <p>A <strong>relational database</strong> stores data in <strong>tables</strong>, which work like a careful spreadsheet. A table is a grid for one kind of thing — say, books. Each <strong>row</strong> is one item (one book). Each <strong>column</strong> is one fact about it (title, author), and every row has exactly the same columns.</p>
+    <p>Before any data goes in, you declare the table's <strong>schema</strong>: the plan that says what columns exist and what kind of value each holds (text, whole numbers, dates). The database then enforces the plan — a book with no title, or a price written as words, gets rejected. One column is special: the <strong>primary key</strong>, a value that uniquely identifies each row, like an ID number. No two rows share a primary key, so you can always point at exactly one row.</p>
+    <p>The word "relational" comes from tables being able to point at each other: an orders table can hold the primary key of a row in the customers table, linking the two. The language you use to talk to a relational database is <strong>SQL</strong> (Structured Query Language, usually pronounced "sequel" or spelled out). MySQL, which you will use in Section 3.5, is a relational database.</p>
+
+    <h3>Non-relational: data in documents</h3>
+    <p>A <strong>non-relational database</strong> stores data as <strong>documents</strong> instead of rows. A document is a self-contained bundle of named fields and values — the same shape as a JavaScript object, or the JSON you have been sending all course. Documents that belong together live in a <strong>collection</strong>, the document world's rough equivalent of a table.</p>
+    <p>There is usually no strict schema. Two documents in one collection can carry different fields: one book can have a <code>subtitle</code> and another need not. Each document still gets a unique ID — in MongoDB, the database you will use in Section 3.4, it is stored in a field named <code>_id</code> and generated automatically if you do not supply one.</p>
+
+    <h3>The same book, both ways</h3>
+    <p>Here is the running example for the rest of the week — the little book collection from your Week 2 REST API, with <em>Dune</em>, <em>Emma</em> and <em>The Hobbit</em> — stored each way. Switch tabs and compare:</p>
+
+    <div class="tabs">
+      <div data-tab="As a SQL table">
+        <p>One table, three rows, three columns. Every book has the same shape, and <code>id</code> is the primary key:</p>
+        <div class="table-wrap">
+          <table class="data-table">
+            <caption class="sr-only">The books table: id, title and author for three books</caption>
+            <thead><tr><th scope="col">id (primary key)</th><th scope="col">title</th><th scope="col">author</th></tr></thead>
+            <tbody>
+              <tr><td>1</td><td>Dune</td><td>Frank Herbert</td></tr>
+              <tr><td>2</td><td>Emma</td><td>Jane Austen</td></tr>
+              <tr><td>3</td><td>The Hobbit</td><td>J.R.R. Tolkien</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Ask for a book and you get back a row: fixed columns, in a fixed order, with the title guaranteed to be there because the schema demands it.</p>
+      </div>
+      <div data-tab="As MongoDB documents">
+        <p>One collection, three documents. Each is a JSON-shaped object with its own <code>_id</code>, and each <em>could</em> carry extra fields the others do not have:</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="The same three books as documents">
+          { "_id": 1, "title": "Dune", "author": "Frank Herbert" }
+          { "_id": 2, "title": "Emma", "author": "Jane Austen" }
+          { "_id": 3, "title": "The Hobbit", "author": "J.R.R. Tolkien" }
+        </script>
+        <p>Ask for a book and you get back the whole document, fields and all. (Real MongoDB <code>_id</code> values are long generated identifiers, not small numbers — small numbers are used here so the two tabs line up.)</p>
+      </div>
+    </div>
+
+    <h3>When each one shines</h3>
+    <div class="grid-2">
+      <div class="card">
+        <h4>Reach for relational when…</h4>
+        <ul>
+          <li>Every record truly has the same shape, and you want the database to <em>enforce</em> that shape.</li>
+          <li>Your data is full of connections — orders belong to customers, payments belong to orders — and you need those links to stay consistent.</li>
+          <li>Getting a number exactly right matters more than anything: money, inventory counts, grades.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>Reach for documents when…</h4>
+        <ul>
+          <li>Records naturally vary — products where a shirt has sizes, a laptop has a processor speed, and a book has neither.</li>
+          <li>Your data already looks like JSON and you want to store it in the shape your code uses.</li>
+          <li>You are moving fast and the shape of your data is still changing week to week.</li>
+        </ul>
+      </div>
+    </div>
+    <p>Neither family is "better." Banks and airlines run on relational databases; catalogs, content sites and activity feeds often run on document databases. Plenty of real systems use both. What matters is knowing which picture fits your data.</p>
+    <p>The two families mostly rename the same ideas. Keep this translation table nearby for the next two sections:</p>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col">Idea</th><th scope="col">Relational (MySQL)</th><th scope="col">Document (MongoDB)</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">The whole store</th><td>database</td><td>database</td></tr>
+          <tr><th scope="row">A group of similar records</th><td>table</td><td>collection</td></tr>
+          <tr><th scope="row">One record</th><td>row</td><td>document</td></tr>
+          <tr><th scope="row">One fact about a record</th><td>column</td><td>field</td></tr>
+          <tr><th scope="row">The record's unique ID</th><td>primary key</td><td><code>_id</code></td></tr>
+          <tr><th scope="row">Structure declared in advance?</th><td>Yes — the schema, enforced</td><td>Usually no — flexible by default</td></tr>
+          <tr><th scope="row">How you ask for data</th><td>SQL statements</td><td>Query objects and driver methods</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Try it: which home for this data?</h3>
+    <p>Sort each scenario into the family that fits it best. Read each one and ask: is the shape fixed and the accuracy critical, or does the shape vary from record to record?</p>
+
+    <div class="buckets" data-title="Relational or document?">
+      <script type="application/json">
+      {"buckets": ["Relational", "Document"],
+       "items": [
+         ["A bank ledger: every transfer has the same fields, amounts must be exact, and transfers link accounts together", "Relational"],
+         ["A product catalog: shirts have sizes and colors, laptops have processors and memory, books have page counts", "Document"],
+         ["Blog comments: each comment carries its own author, text and time, and some have replies nested inside", "Document"],
+         ["Inventory counts: one row per product, a count that must never disagree with the orders table", "Relational"],
+         ["Student grades: every grade links one student, one course and one score, and totals must add up exactly", "Relational"],
+         ["A feed of activity events: clicks, views and purchases, each with different extra details attached", "Document"]
+       ],
+       "explain": "The pattern: **fixed shape, linked records, exact numbers** point to relational. **Varying fields and self-contained bundles** point to documents. Real systems can argue some of these either way — what matters is the reason you give."}
+      </script>
+    </div>
+
+    <div class="quiz" data-title="Check your understanding: two families of database">
+      <script type="application/json">
+      [
+        {"q": "What is a schema?", "shuffle": true, "choices": ["The plan declared in advance that says what columns a table has and what kind of value each holds", "A backup copy of the database", "The password for the database server", "A report the database prints each night"], "answer": 0, "explain": "A schema is the structure declared up front. A relational database enforces it: data that does not fit the plan is rejected."},
+        {"q": "In a relational table, what does a primary key guarantee?", "shuffle": true, "choices": ["Each row has a value no other row shares, so any single row can be pointed at exactly", "The rows are stored in alphabetical order", "The table can never be deleted", "Every column is filled in"], "answer": 0, "explain": "The primary key uniquely identifies a row. It says nothing about the other columns — it is purely the row's unmistakable ID."},
+        {"q": "True or false: in MongoDB, every document in a collection must have exactly the same fields.", "answer": false, "explain": "False — that flexibility is the point of documents. One book can carry a `subtitle` field and the next need not. (You can add validation rules if you want them, as Section 3.6 discusses.)"},
+        {"q": "What is a document, in the non-relational sense?", "shuffle": true, "choices": ["A self-contained bundle of named fields and values, shaped like a JavaScript object", "A Word file stored on the server", "A printed report from the database", "One column of a table"], "answer": 0, "explain": "A document is data shaped like the objects your code already uses: `{ title: 'Dune', author: 'Frank Herbert' }`, plus a unique `_id`."},
+        {"q": "Your data is a set of payments where every record must link to exactly one account and every amount must be exact. Which family fits best?", "shuffle": true, "choices": ["Relational — fixed shape, linked records, exact numbers", "Document — because payments are small", "Neither — use a text file", "Whichever one, it makes no difference"], "answer": 0, "explain": "Fixed shape plus links between tables plus numbers that must be right is the relational home ground. A document store could hold payments, but you would be rebuilding the guarantees yourself."}
+      ]
+      </script>
+    </div>
+  </section>
+
+  <!-- ===================================================== 3.4 -->
+  <section class="lesson" id="s3-4">
+    <h2>MongoDB CRUD with Node</h2>
+    <p>Time to do it for real. <strong>MongoDB</strong> is the most widely used document database, and from Node you talk to it with its official driver package, <code>mongodb</code>. Three words of vocabulary before any code:</p>
+    <ul>
+      <li>A <strong>database</strong> is one named store — ours is called <code>bookstore</code>. One MongoDB server can hold many databases.</li>
+      <li>A <strong>collection</strong> is a group of related documents inside a database — ours is <code>books</code>. Think "table," but for documents.</li>
+      <li>A <strong>document</strong> is one record: a JavaScript object, stored with a unique <code>_id</code>.</li>
+    </ul>
+    <p>And one idea you already know runs this whole section: <strong>CRUD</strong> — the four basic things you can do to stored data. <strong>C</strong>reate it, <strong>R</strong>ead it, <strong>U</strong>pdate it, <strong>D</strong>elete it. You built all four against an in-memory list in Week 2. A database changes <em>where</em> the data lives, not <em>what</em> the four operations are.</p>
+
+    <h3>Connect first</h3>
+    <p>Install the driver with <code>npm install mongodb</code>. Then a program connects, picks a database and a collection, and works. Connecting takes time — the server is another program, possibly on another machine — so database calls are <strong>asynchronous</strong>: they finish later, and you mark them with <code>await</code> inside an <code>async</code> function, the way you have since Week 1:</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="Connecting to MongoDB">
+      const { MongoClient } = require('mongodb');
+
+      // One client = one connection to the MongoDB server.
+      const client = new MongoClient('mongodb://localhost:27017');
+
+      async function main() {
+        await client.connect();
+        const db = client.db('bookstore');      // the database
+        const books = db.collection('books');   // the collection
+
+        // ... CRUD happens here (next examples) ...
+
+        await client.close();
+      }
+
+      main().catch(console.error);
+    </script>
+    <p class="wk3-note">The address <code>mongodb://localhost:27017</code> is a MongoDB server running on your own machine (27017 is MongoDB's usual port). In a deployed app the address — and any password — comes from configuration, never typed into the code; Section 3.6 shows how.</p>
+
+    <h3>Create: <code>insertOne</code></h3>
+    <p>Hand <code>insertOne</code> a plain object and it becomes a document. You do not create the collection first — MongoDB creates it the moment the first document lands:</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="CREATE — insertOne">
+      const result = await books.insertOne({
+        title: 'The Hobbit',
+        author: 'J.R.R. Tolkien'
+      });
+      console.log('Inserted a document.');
+    </script>
+    <p>What comes back is a small report object from the driver. In prose: the driver reports <code>acknowledged: true</code> — the server confirmed the write — and hands back the new document's generated <code>id</code> in <code>result.insertedId</code>. That ID was added to your document as its <code>_id</code>; MongoDB generates one automatically whenever you do not supply it. <code>insertMany</code> does the same job for an array of documents at once.</p>
+
+    <h3>Read: <code>find</code> and <code>findOne</code></h3>
+    <p>Reading is a <strong>query</strong>: a description of the documents you want. The simplest query is an object naming fields and the values they must match — <code>{ author: 'Jane Austen' }</code> means "documents whose author is Jane Austen," and <code>{}</code> (empty) means "all of them." <code>find</code> returns a <em>cursor</em> — a handle you walk through to get the documents — and calling <code>.toArray()</code> on it collects them into an ordinary array:</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="READ — find and findOne">
+      // Every document in the collection:
+      const all = await books.find().toArray();
+
+      // Every document matching a query:
+      const byAusten = await books.find({ author: 'Jane Austen' }).toArray();
+
+      // Just the first match (or null if there is none):
+      const one = await books.findOne({ title: 'Dune' });
+    </script>
+
+    <p>With the three course books stored, <code>find().toArray()</code> hands your code an array of the documents themselves:</p>
+
+    <div class="output">Verified output — the documents find() returns
+(each document also carries its own generated _id):
+
+{ title: 'Dune', author: 'Frank Herbert' }
+{ title: 'Emma', author: 'Jane Austen' }
+{ title: 'The Hobbit', author: 'J.R.R. Tolkien' }</div>
+    <p class="wk3-note">Checked honestly: while this site was being finished, these exact operations — insert, find, update with <code>$set</code>, delete — were run against a real MongoDB server (version 8.2.6, running locally for the check), and <code>find()</code> returned exactly these three documents. The <code>_id</code> values are deliberately not shown as fake strings: yours will be long generated identifiers, different every time.</p>
+
+    <p>One habit to build now: <code>findOne</code> answers <code>null</code> when nothing matches — it does not throw an error. In a route, that <code>null</code> is your signal to answer <code>404</code>, exactly as your Week 2 API did when a book ID was not in the array. Always decide what "not found" means before you write the happy path.</p>
+
+    <h3>Update: <code>updateOne</code> with <code>$set</code></h3>
+    <p>Updating takes two arguments: a query that picks the document, and a description of the change. The change uses <code>$set</code>, which names the fields to change and leaves every other field alone:</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="UPDATE — updateOne with $set">
+      await books.updateOne(
+        { title: 'Dune' },                        // which document
+        { $set: { title: 'Dune (revised)' } }     // what to change
+      );
+    </script>
+    <p>That is the same edit your Week 2 API made with <code>PUT /api/books/1</code> — the revised title, the author untouched. The driver's report tells you how many documents matched and how many were actually modified, so your code can check that the update found something. (<code>updateMany</code> applies the same change to every match.)</p>
+
+    <h3>Delete: <code>deleteOne</code></h3>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="DELETE — deleteOne">
+      await books.deleteOne({ title: 'Emma' });
+    </script>
+    <p>One query, one document gone. The report's <code>deletedCount</code> tells you whether anything was actually deleted — <code>0</code> means your query matched nothing, which usually means a typo worth knowing about. <code>deleteMany</code> removes every match, and deserves a careful look at the query before you run it.</p>
+
+    <h3>The same four operations you already know</h3>
+    <p>Nothing here is a new idea. Each MongoDB operation is one of the REST verbs from Week 2, pointed at a collection instead of an in-memory array:</p>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col">CRUD</th><th scope="col">REST (Week 2)</th><th scope="col">MongoDB driver</th><th scope="col">What it does</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Create</th><td><code>POST /api/books</code></td><td><code>insertOne(doc)</code></td><td>Store a new document; the database gives it an <code>_id</code></td></tr>
+          <tr><th scope="row">Read</th><td><code>GET /api/books</code>, <code>GET /api/books/2</code></td><td><code>find(query)</code>, <code>findOne(query)</code></td><td>Fetch every document matching the query, or the first one</td></tr>
+          <tr><th scope="row">Update</th><td><code>PUT /api/books/1</code></td><td><code>updateOne(query, { $set: {...} })</code></td><td>Change the named fields on the matching document</td></tr>
+          <tr><th scope="row">Delete</th><td><code>DELETE /api/books/2</code></td><td><code>deleteOne(query)</code></td><td>Remove the matching document</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <aside class="callout try">
+      <strong>Picture the API, upgraded</strong>
+      <p>Take your Week 2 books API in your head and swap each array operation for the driver call beside it in the table: <code>books.push(...)</code> becomes <code>insertOne</code>, the <code>find</code> over the array becomes the driver's <code>find</code>, and so on. The routes, the JSON and the status codes do not change at all. Only the storage got serious — the data now survives restarts and can be shared by every copy of your server.</p>
+    </aside>
+
+    <div class="match" data-title="Match each MongoDB operation to its effect">
+      <script type="application/json">
+      {"leftTitle": "Operation", "rightTitle": "Effect", "pairs": [
+        ["`insertOne({ title: 'Emma', ... })`", "Creates: stores a new document and gives it an `_id`"],
+        ["`find({ author: 'Jane Austen' })`", "Reads: returns every document whose author matches"],
+        ["`findOne({ title: 'Dune' })`", "Reads: returns the first matching document, or `null`"],
+        ["`updateOne(query, { $set: { title: 'Dune (revised)' } })`", "Updates: changes only the fields named in `$set`"],
+        ["`deleteOne({ title: 'Emma' })`", "Deletes: removes the first document matching the query"]
+      ]}
+      </script>
+    </div>
+
+    <h3>From driver calls to routes</h3>
+    <p>So far the driver calls have lived in a standalone program. In your Week 2 API they live inside route handlers, and the route's job is translating between HTTP and the database: an HTTP request comes in, a driver call goes out, and the result becomes an HTTP response. The list route is the direct swap — run <code>find().toArray()</code>, then answer with the documents as JSON using <code>res.json(...)</code>, which sends a value back as a JSON response:</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="GET /api/books — the driver call inside a route">
+      const { ObjectId } = require('mongodb'); // alongside MongoClient, from earlier
+
+      app.get('/api/books', async (req, res, next) => {
+        try {
+          const docs = await books.find().toArray();
+          res.json(docs);
+        } catch (err) {
+          next(err); // database failed: let the error middleware answer 500
+        }
+      });
+    </script>
+
+    <p>Reading one book adds a translation step. An id arrives in the URL as a <em>string</em> — every URL is text — but MongoDB stores <code>_id</code> values in its own type, <code>ObjectId</code>, so you convert the string with <code>new ObjectId(id)</code> before you search. That conversion sits in its own <code>try/catch</code> (code that tries a step and catches an error it throws, instead of crashing) because an invalid id string makes <code>new ObjectId(...)</code> throw — and a bad id is the visitor's mistake, not the database's:</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="GET /api/books/:id — bad id, not found, and database failure">
+      app.get('/api/books/:id', async (req, res, next) => {
+        let id;
+        try {
+          id = new ObjectId(req.params.id);
+        } catch {
+          // Not a valid ObjectId string at all: a bad request.
+          return res.status(400).json({ error: 'Invalid book id' });
+        }
+        try {
+          const doc = await books.findOne({ _id: id });
+          if (!doc) {
+            // Valid id, but no document has it.
+            return res.status(404).json({ error: 'Book not found' });
+          }
+          res.json(doc);
+        } catch (err) {
+          next(err); // database failed: let the error middleware answer 500
+        }
+      });
+    </script>
+
+    <p>Notice that one route gives three different failure answers, because three different things went wrong. "Bad id" is <code>400</code> — the request itself was malformed. "Not found" is <code>404</code> — the request was fine, but no such book exists, which is why the handler checks for the <code>null</code> that <code>findOne</code> returns. "Database down" is <code>500</code> — your server failed — and the handler does not answer that one itself: passing the error on with <code>next(err)</code> hands it to the error-handling middleware from Week 2, which sends the 500. Keeping those three apart is what makes an API's answers mean something to whoever called it.</p>
+
+    <div class="quiz" data-title="Check your understanding: MongoDB CRUD">
+      <script type="application/json">
+      [
+        {"q": "In MongoDB's vocabulary, what is a collection?", "shuffle": true, "choices": ["A group of related documents inside a database — roughly a table for documents", "A backup of the whole server", "A list of database passwords", "One field inside a document"], "answer": 0, "explain": "Database, then collection, then document: the `books` collection holds book documents inside the `bookstore` database."},
+        {"q": "What does the query `{ author: 'Jane Austen' }` mean when passed to `find`?", "shuffle": true, "choices": ["Documents whose `author` field equals `Jane Austen`", "Sort the documents by author", "Delete every author named Jane Austen", "Create a new author field"], "answer": 0, "explain": "A query object describes the documents you want by naming fields and the values they must match. An empty query `{}` matches everything."},
+        {"q": "Why does `find()` need `.toArray()` in the examples?", "shuffle": true, "choices": ["`find` returns a cursor — a handle you walk through — and `toArray()` collects the documents into an array", "`find` returns a string that must be converted", "MongoDB cannot return more than one document without it", "It sorts the results alphabetically"], "answer": 0, "explain": "The cursor lets big results stream through a few at a time. For a small collection, `.toArray()` is the simple way to get everything at once."},
+        {"q": "True or false: in `updateOne(query, { $set: { title: 'Dune (revised)' } })`, every field not named in `$set` is erased.", "answer": false, "explain": "False. `$set` changes only the fields it names. The author, the `_id` and anything else on the document stay exactly as they were."},
+        {"q": "You insert a document without an `_id`. What happens?", "shuffle": true, "choices": ["MongoDB generates one and adds it as the document's `_id`; the driver hands it back as `insertedId`", "The insert fails until you invent an ID yourself", "The document is stored but can never be found again", "MongoDB uses the title as the ID"], "answer": 0, "explain": "Generated IDs are the normal path. Every document ends up with a unique `_id` whether you supplied it or not."}
+      ]
+      </script>
+    </div>
+  </section>
+
+  <!-- ===================================================== 3.5 -->
+  <section class="lesson" id="s3-5">
+    <h2>MySQL CRUD with Node</h2>
+    <p>Now the other family. <strong>MySQL</strong> is a relational database: tables, rows, columns and a schema enforced by the database itself. You talk to it in <strong>SQL</strong>, a language made of plain statements that say what you want. Learn the SQL first — it is the same no matter which programming language you use — then see how Node sends it.</p>
+
+    <h3>SQL: the four statements are CRUD</h3>
+    <p>Start with the schema. This statement creates the <code>books</code> table from Section 3.3, declaring every column and its type. <code>INT</code> is a whole number, <code>VARCHAR(200)</code> is text up to 200 characters, <code>NOT NULL</code> means "a value is required," and <code>AUTO_INCREMENT PRIMARY KEY</code> makes <code>id</code> the unique row identifier, filled in by the database with the next number each time:</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="SQL — create the table">
+      CREATE TABLE books (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(200) NOT NULL,
+        author VARCHAR(120) NOT NULL
+      );
+    </script>
+
+    <p>With the table in place, the four CRUD operations are four SQL verbs. <strong>Create</strong> is <code>INSERT</code> — name the columns, then the values that fill them:</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="SQL — INSERT (Create)">
+      INSERT INTO books (title, author) VALUES ('Dune', 'Frank Herbert');
+      INSERT INTO books (title, author) VALUES ('Emma', 'Jane Austen');
+      INSERT INTO books (title, author) VALUES ('The Hobbit', 'J.R.R. Tolkien');
+    </script>
+    <p>Notice there is no <code>id</code> in those statements: <code>AUTO_INCREMENT</code> assigns 1, 2 and 3 itself. <strong>Read</strong> is <code>SELECT</code> — name the columns you want, the table to take them from, and optionally a <code>WHERE</code> clause, a condition that filters which rows come back:</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="SQL — SELECT (Read)">
+      SELECT * FROM books;
+      SELECT * FROM books WHERE id = 2;
+      SELECT title, author FROM books WHERE author = 'Jane Austen';
+    </script>
+    <p>The <code>*</code> means "every column." <strong>Update</strong> is <code>UPDATE</code> with a <code>SET</code> clause — and a <code>WHERE</code>, always a <code>WHERE</code>:</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="SQL — UPDATE (Update)">
+      UPDATE books SET title = 'Dune (revised)' WHERE id = 1;
+    </script>
+
+    <aside class="callout warn">
+      <strong>The most expensive typo in SQL</strong>
+      <p><code>UPDATE</code> and <code>DELETE</code> without a <code>WHERE</code> clause apply to <em>every row in the table</em>. <code>UPDATE books SET title = 'Dune (revised)'</code> on its own happily renames every book you own. Before running either statement, read the <code>WHERE</code> out loud.</p>
+    </aside>
+
+    <p><strong>Delete</strong> is <code>DELETE</code> — the same shape, the same warning:</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="SQL — DELETE (Delete)">
+      DELETE FROM books WHERE id = 2;
+    </script>
+
+    <h3>What the queries hand back</h3>
+    <p>Run those statements in order — create, three inserts, then select — and the table holds the course's three books. After the update and delete, one row has a new title and one row is gone:</p>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <caption>Result of <code>SELECT * FROM books;</code> after the inserts (top) and after the update and delete (bottom). Verified: while this site was being finished, these exact statements were run against a real MySQL-compatible server (MariaDB 10.11) through the mysql2 driver, and the rows matched this table exactly.</caption>
+        <thead><tr><th scope="col">id</th><th scope="col">title</th><th scope="col">author</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Dune</td><td>Frank Herbert</td></tr>
+          <tr><td>2</td><td>Emma</td><td>Jane Austen</td></tr>
+          <tr><td>3</td><td>The Hobbit</td><td>J.R.R. Tolkien</td></tr>
+          <tr><td>1</td><td>Dune (revised)</td><td>Frank Herbert</td></tr>
+          <tr><td>3</td><td>The Hobbit</td><td>J.R.R. Tolkien</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>And <code>SELECT * FROM books WHERE id = 2;</code>, run before the delete, returns exactly one row: <code>2 · Emma · Jane Austen</code> — the same book your Week 2 API answered for <code>GET /api/books/2</code>.</p>
+
+    <p>When MySQL answers a <code>SELECT</code> through the Node driver in the next example, each row arrives as a plain JavaScript object whose properties are the column names — <code>{ id: 2, title: 'Emma', author: 'Jane Austen' }</code>. That is no accident: it is the same book your API has been returning as JSON all along, which is why wiring a real database under a REST API changes so little of the code around it.</p>
+
+    <h3>Sending SQL from Node: mysql2 and placeholders</h3>
+    <p>From Node, the package is <code>mysql2</code> — install it with <code>npm install mysql2</code> — and its <code>/promise</code> version lets you <code>await</code> each query. Here is the full CRUD cycle. Read the queries closely: none of them glue values into the SQL text. Wherever a value belongs, the SQL has a <code>?</code> instead, and the value travels separately, in an array:</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="MySQL CRUD from Node — mysql2/promise">
+      const mysql = require('mysql2/promise');
+
+      async function main() {
+        const db = await mysql.createConnection({
+          host: 'localhost',
+          user: 'root',
+          password: process.env.DB_PASSWORD, // from configuration, not code
+          database: 'bookstore'
+        });
+
+        // CREATE — the values ride separately, matched to the ? marks.
+        const [created] = await db.execute(
+          'INSERT INTO books (title, author) VALUES (?, ?)',
+          ['The Hobbit', 'J.R.R. Tolkien']
+        );
+        console.log('New book id:', created.insertId);
+
+        // READ — every row, then one row by id.
+        const [all] = await db.execute('SELECT * FROM books');
+        console.log(all);
+        const [rows] = await db.execute(
+          'SELECT * FROM books WHERE id = ?',
+          [2]
+        );
+        console.log(rows[0]); // the single matching row
+
+        // UPDATE — change the title of book 1.
+        await db.execute(
+          'UPDATE books SET title = ? WHERE id = ?',
+          ['Dune (revised)', 1]
+        );
+
+        // DELETE — remove book 2.
+        await db.execute('DELETE FROM books WHERE id = ?', [2]);
+
+        await db.end();
+      }
+
+      main().catch(console.error);
+    </script>
+
+    <p>Notice the pattern in lines like <code>const [rows] = await db.execute(...)</code>: mysql2 hands back a pair, <code>[rows, fields]</code> — the rows you asked for, plus a description of the columns (the <em>fields</em>) — and the destructuring keeps only the first item, the rows. And in a real Express server, that connection — or better, a <strong>connection pool</strong>, a small set of reusable connections the driver manages for you — is created once, when the server starts, and shared by every request; you never open a new connection per request, because opening one is slow work that only needs doing once.</p>
+
+    <p>Those <code>?</code> marks are called <strong>placeholders</strong>, and the style is called a <strong>parameterized query</strong> — the values are <em>parameters</em>, passed alongside the SQL instead of inside it. This is not a style preference. It is one of the most important habits in this course, for two reasons:</p>
+    <ul>
+      <li><strong>Correctness.</strong> The driver handles all the quoting and escaping for you. An author named <code>O'Brien</code> — with an apostrophe that would break a hand-built SQL string — just works.</li>
+      <li><strong>Security.</strong> Because the values never become part of the SQL text, a value can never be <em>mistaken for SQL</em>. If you glue user input into a query string instead — <code>'SELECT ... WHERE id = ' + req.params.id</code> — a hostile visitor can type text that changes what the query does, reading or deleting data they should never touch. That attack has a name, SQL injection, and Week 4 takes it up properly. Placeholders shut it down: whatever the visitor types is treated as data, never as instructions.</li>
+    </ul>
+
+    <aside class="callout warn">
+      <strong>Never glue user input into a SQL string</strong>
+      <p>Every value that comes from a request — a route parameter, a form field, a JSON body — goes into a query through a <code>?</code> placeholder. No exceptions, even for values that "look like numbers." The day you make an exception is the day the input is not what you assumed.</p>
+    </aside>
+
+    <h3>Try it: complete the SELECT</h3>
+    <p>Fill in the blanks to write the query that reads the title and author of the book with <code>id</code> 3:</p>
+
+    <div class="fill" data-title="Complete the SELECT statement" data-explain="SELECT names the columns, FROM names the table, WHERE filters the rows. The `*` would also work for the columns — it means all of them.">
+      <script type="text/plain">
+[[SELECT]] [[title]], [[author]] [[FROM]] [[books]] [[WHERE]] [[id]] = 3;
+      </script>
+    </div>
+
+    <div class="quiz" data-title="Check your understanding: MySQL CRUD">
+      <script type="application/json">
+      [
+        {"q": "Which SQL statement reads data from a table?", "shuffle": true, "choices": ["`SELECT`", "`INSERT`", "`UPDATE`", "`FETCH`"], "answer": 0, "explain": "`SELECT` is Read in CRUD. `INSERT` creates, `UPDATE` changes, `DELETE` removes."},
+        {"q": "What happens if you run `DELETE FROM books;` with no `WHERE` clause?", "shuffle": true, "choices": ["Every row in the table is deleted", "Only the first row is deleted", "MySQL refuses to run it", "Nothing — a `WHERE` is required by the language"], "answer": 0, "explain": "No `WHERE` means no filter, so the statement applies to all rows. The same is true of `UPDATE`. Check the `WHERE` before you run either."},
+        {"q": "In `db.execute('SELECT * FROM books WHERE id = ?', [2])`, what is the `?`?", "shuffle": true, "choices": ["A placeholder: the value `2` is sent separately and treated as data, never as SQL", "A wildcard that matches any column", "A comment character", "A typo the driver ignores"], "answer": 0, "explain": "Placeholders keep values out of the SQL text. That makes quoting automatic (correctness) and stops visitor input from ever being read as instructions (security)."},
+        {"q": "True or false: building a query by gluing request values into a string, like `'... WHERE id = ' + req.params.id`, is safe as long as the value looks like a number.", "answer": false, "explain": "False. 'Looks like' is doing all the work in that sentence — the visitor controls the value, and the one time it is not a number, it becomes part of your SQL. Placeholders have no exceptions."},
+        {"q": "What does `AUTO_INCREMENT PRIMARY KEY` on the `id` column give you?", "shuffle": true, "choices": ["The database assigns each new row the next unique ID automatically", "The table sorts itself alphabetically", "Rows are backed up every night", "The `id` column can hold text"], "answer": 0, "explain": "Your `INSERT` statements never mention `id` — the database fills it in with 1, 2, 3, …, guaranteeing every row a unique primary key."}
+      ]
+      </script>
+    </div>
+  </section>
+
+  <!-- ===================================================== 3.6 -->
+  <section class="lesson" id="s3-6">
+    <h2>Validation, Consistency and Configuration</h2>
+    <p>Your data can now live in cookies, sessions, files and two kinds of database. This last section is about keeping that data <em>good</em> — because a database faithfully stores whatever you hand it, including nonsense. Programmers summarize it as <strong>garbage in, garbage out</strong>: if bad data gets in, every answer built on it is bad too, no matter how correct the rest of your code is.</p>
+
+    <h3>Validate on the server — never trust the browser alone</h3>
+    <p><strong>Validation</strong> means checking data against your rules before you accept it: is this field present? Is it the right type? Is it a sensible length? You met browser-side validation in Web Dev I — <code>required</code>, <code>minlength</code>, input types — and it is genuinely useful: it answers instantly and politely, while the visitor is still on the page.</p>
+    <p>But browser checks are a courtesy, not a guard. Your server does not only hear from your tidy web page. Anyone can send your API a hand-made request with <code>curl</code>, skipping your form — and its JavaScript — entirely. Worse, everything arriving in a request was assembled on someone else's machine: bodies can be edited, cookies rewritten, fields deleted. So the rule is absolute: <strong>every rule that matters is checked again on the server</strong>, at the moment the data arrives, before it touches your database. The browser check is for the visitor's convenience. The server check is for your data's survival.</p>
+    <p>Here is a small server-style validator for the course's book. It takes the object from a request body and returns a list of problems — an empty list means the book is acceptable:</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="validateBook — checking a book before it is stored">
+      function validateBook(book) {
+        const errors = [];
+        if (!book || typeof book !== 'object') return ['Send a book object.'];
+
+        if (typeof book.title !== 'string' || book.title.trim() === '') {
+          errors.push('Title is required.');
+        } else if (book.title.trim().length > 100) {
+          errors.push('Title must be 100 characters or fewer.');
+        }
+
+        if (typeof book.author !== 'string' || book.author.trim() === '') {
+          errors.push('Author is required.');
+        } else if (book.author.trim().length > 60) {
+          errors.push('Author must be 60 characters or fewer.');
+        }
+
+        return errors; // empty array = the book is fine
+      }
+    </script>
+
+    <p>Three habits in that code are worth stealing. It checks the <em>type</em> first (<code>typeof ... !== 'string'</code>), because a title sent as the number <code>42</code> has no <code>.trim()</code> to call. It trims before judging emptiness, so a title of three spaces counts as missing. And it collects <em>every</em> problem instead of stopping at the first, so the visitor fixes everything in one trip. In a route, you would use it like this: if the list is not empty, answer <code>400</code> with the errors and store nothing.</p>
+
+    <h3>Try it: break the validator</h3>
+    <p>The same function runs below. The good book passes. Now experiment: delete the author, make the title a number, paste a title longer than 100 characters, and watch the error list change. Try to find an input the validator handles badly — that hunting instinct is the job.</p>
+
+    <div class="playground" data-title="Try it: validate a book" data-preview="false" data-height="340">
+      <textarea data-lang="js">function validateBook(book) {
+  const errors = [];
+  if (!book || typeof book !== 'object') return ['Send a book object.'];
+
+  if (typeof book.title !== 'string' || book.title.trim() === '') {
+    errors.push('Title is required.');
+  } else if (book.title.trim().length > 100) {
+    errors.push('Title must be 100 characters or fewer.');
+  }
+
+  if (typeof book.author !== 'string' || book.author.trim() === '') {
+    errors.push('Author is required.');
+  } else if (book.author.trim().length > 60) {
+    errors.push('Author must be 60 characters or fewer.');
+  }
+
+  return errors; // empty array = the book is fine
+}
+
+console.log('Good book:', validateBook({ title: 'Dune', author: 'Frank Herbert' }));
+console.log('Missing title:', validateBook({ author: 'Jane Austen' }));
+console.log('Blank author:', validateBook({ title: 'Emma', author: '   ' }));
+console.log('Wrong type:', validateBook({ title: 42, author: 'J.R.R. Tolkien' }));</textarea>
+      <script type="application/json" class="checks">
+      [
+        {"label": "A good book passes with no errors", "test": "return win.validateBook({ title: 'Dune', author: 'Frank Herbert' }).length === 0"},
+        {"label": "A missing title gives exactly one error", "test": "return win.validateBook({ author: 'Jane Austen' }).length === 1"},
+        {"label": "A blank (spaces-only) author gives exactly one error", "test": "return win.validateBook({ title: 'Emma', author: '   ' }).length === 1"},
+        {"label": "An empty object gives two errors — both fields reported", "test": "return win.validateBook({}).length === 2"},
+        {"label": "A title over 100 characters gives exactly one error", "test": "return win.validateBook({ title: 'x'.repeat(101), author: 'A' }).length === 1"}
+      ]
+      </script>
+    </div>
+
+    <p>What do good rules look like? They are specific to each field, and each one names a failure you have actually seen or can picture:</p>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col">Field</th><th scope="col">Rules worth enforcing on the server</th><th scope="col">The failure each rule prevents</th></tr></thead>
+        <tbody>
+          <tr><th scope="row"><code>title</code></th><td>Required; a string; 1–100 characters after trimming</td><td>Books with no title, or a title that is secretly a number</td></tr>
+          <tr><th scope="row"><code>author</code></th><td>Required; a string; 1–60 characters after trimming</td><td>Anonymous books nobody can shelve or search</td></tr>
+          <tr><th scope="row"><code>id</code> (in a route)</th><td>Must parse as a positive whole number before it reaches a query</td><td>Nonsense lookups — and one more door closed to glued-together SQL</td></tr>
+          <tr><th scope="row">Request body</th><td>Must be an object; unknown extra fields are ignored or rejected</td><td>A visitor quietly adding a field like <code>role</code> that your code never meant to accept</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Consistency: one fact, one home</h3>
+    <p>Validation keeps bad values out. <strong>Consistency</strong> is the companion idea: the data you have should agree with itself. The simplest way to protect it is <strong>one source of truth</strong> — each fact is stored in exactly one place, and everything else looks it up from there.</p>
+    <p>Suppose every order stores a copy of the customer's email address, and the customer changes their email. Now you must find and fix every copy. Miss one, and your database disagrees with itself: two places claim to know the email, and they say different things. Which is right? Nobody knows — that disagreement <em>is</em> inconsistency. Relational databases fight this with the links from Section 3.3: the order stores only the customer's primary key, the email lives once in the customers table, and a change happens in exactly one place. Document databases make the same trade differently, often copying a fact into a document on purpose for speed — but then the copying is a deliberate choice with a plan for updates, never an accident.</p>
+    <p>The same principle runs your whole week. The session ID is a pointer to one server-side record, not a copy of it. The book's title is changed with one <code>$set</code> or one <code>UPDATE</code>, in one row or document. Whenever you catch yourself storing the same fact twice, stop and ask which copy is the truth — and how the other one gets updated.</p>
+
+    <h3>Configuration: settings live outside the code</h3>
+    <p>Last piece. Your programs need settings that change from machine to machine: which port to listen on, where the database lives, what the session secret is. Hard-coding them means editing code for every deployment — and it means secrets sitting in your source. The standard home for settings is <strong>environment variables</strong>: named values provided by the machine or shell that runs your program, which Node reads through <code>process.env</code>:</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="Reading configuration from the environment">
+      // Use the port the host provides, or 3000 on your own machine.
+      const port = process.env.PORT || 3000;
+      app.listen(port, () => console.log('Listening on port ' + port));
+
+      // A database password is configuration too:
+      const dbPassword = process.env.DB_PASSWORD;
+    </script>
+
+    <p>While developing, you collect these in a <strong><code>.env</code> file</strong> — a plain text file in your project folder, one <code>NAME=value</code> per line, loaded when the app starts (commonly with the <code>dotenv</code> package: <code>npm install dotenv</code>, then <code>require('dotenv').config();</code> at the top of your entry file):</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title=".env — local development settings">
+      PORT=3000
+      DB_PASSWORD=the-real-password-goes-here
+      SESSION_SECRET=a-long-random-string
+    </script>
+
+    <aside class="callout warn">
+      <strong>Secrets never go in code, and never in Git</strong>
+      <p>A password typed into a <code>.js</code> file gets copied everywhere the code goes — including GitHub, where automated scanners find committed secrets within minutes and strangers use them. So: secrets live in environment variables and the <code>.env</code> file, the <code>.env</code> file is listed in <code>.gitignore</code> so Git never commits it, and a secret that <em>has</em> been committed is treated as leaked — change it, don't just delete the line. Week 4 returns to this when sessions and logins make the stakes real.</p>
+    </aside>
+    <p>A <code>.gitignore</code> file — a plain list of names Git should leave out of commits — keeps <code>node_modules</code> and <code>.env</code> out of Git: you commit a <code>.env.example</code> file with the variable names and placeholder values, never the real values.</p>
+
+    <div class="quiz" data-title="Check your understanding: validation, consistency, configuration">
+      <script type="application/json">
+      [
+        {"q": "Your form already validates in the browser. Why must the server validate the same data again?", "shuffle": true, "choices": ["Requests can be sent without your page at all — with `curl`, for instance — so the browser's checks can simply be skipped", "Browser validation is illegal for APIs", "The server cannot read form data without validating it first", "It uses up spare server time productively"], "answer": 0, "explain": "Your page is only one possible sender. Anything can talk to your API, and everything in a request was assembled on someone else's machine. Server-side validation is the check that cannot be bypassed."},
+        {"q": "Why does `validateBook` check `typeof book.title !== 'string'` before calling `.trim()`?", "shuffle": true, "choices": ["A title sent as a number has no `.trim()` method — checking the type first keeps the validator itself from crashing", "Numbers are not allowed in book titles", "`trim()` only works on Tuesdays", "It makes the function run faster"], "answer": 0, "explain": "Incoming JSON can hold any type. Type first, then string methods — otherwise the validator throws an error on exactly the bad input it exists to catch."},
+        {"q": "What does 'one source of truth' mean for stored data?", "shuffle": true, "choices": ["Each fact is stored in exactly one place, and everything else refers to it there", "Only one person is allowed to edit the database", "The database keeps one backup copy", "Every table must have exactly one row"], "answer": 0, "explain": "Copies of a fact drift apart when one is updated and the other is not. Store it once — like an email in the customers table, referenced by key everywhere else — and it can never disagree with itself."},
+        {"q": "True or false: it is fine to commit a `.env` file to Git as long as the repository is private today.", "answer": false, "explain": "False. Repositories get shared, forked and made public, and committed history is hard to scrub. `.env` belongs in `.gitignore`, and a secret that reached a commit is treated as leaked and replaced."},
+        {"q": "In `const port = process.env.PORT || 3000;`, when does the `3000` get used?", "shuffle": true, "choices": ["When no `PORT` environment variable is set — for example, on your own machine", "Always — environment variables are ignored", "Only when the server crashes", "When `PORT` is set to `3000`"], "answer": 0, "explain": "`process.env.PORT` is `undefined` when nothing sets it, so the `||` falls back to 3000. A host that assigns a port sets the variable, and the same code obeys it with no edits."}
+      ]
+      </script>
+    </div>
+  </section>
+
+  <!-- ===================================================== Review -->
+  <section class="lesson" id="s3-review">
+    <h2>Week 3 Review</h2>
+    <p>One thread runs through the whole week: HTTP forgets, so you build memory in layers. A cookie is a ticket the browser presents. A session keeps the real data on the server, behind an ID on that ticket. Files make data survive a restart, and databases make it survive <em>well</em> — searched, shared and guarded — in two shapes, tables and documents, each with the same four CRUD operations. Validation, consistency and configuration are how you keep all of it trustworthy.</p>
+    <p>Flip through the key terms until each one feels like an old friend, then take the quiz.</p>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <caption>The week at a glance: where data lives, and what that buys you</caption>
+        <thead><tr><th scope="col">Home</th><th scope="col">Lives where</th><th scope="col">Survives a restart?</th><th scope="col">Best for</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Cookie</th><td>The visitor's browser</td><td>Until it expires or is deleted</td><td>Small, harmless preferences; carrying a session ID</td></tr>
+          <tr><th scope="row">Session</th><td>Server-side, behind the cookie's ID</td><td>Only if the store is persistent</td><td>Logins, carts, per-visitor state</td></tr>
+          <tr><th scope="row">File</th><td>One server's disk</td><td>Yes</td><td>Small, simple, single-server data</td></tr>
+          <tr><th scope="row">MongoDB</th><td>A database server, as documents</td><td>Yes</td><td>Records with varying fields, JSON-shaped data</td></tr>
+          <tr><th scope="row">MySQL</th><td>A database server, as tables</td><td>Yes</td><td>Fixed-shape, linked records; exact numbers</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="flashcards" data-title="Week 3 key terms" data-front="Term" data-back="Meaning">
+      <script type="application/json">
+      [
+        {"front": "Stateless", "back": "Keeping no memory between requests. HTTP is stateless: each request arrives as if from a stranger, so state has to be built on top of it."},
+        {"front": "Cookie", "back": "A small name-and-value text item a server asks the browser to store (with `Set-Cookie`) and send back on later requests (with `Cookie`). Stored on the visitor's machine — never trusted, never secret."},
+        {"front": "Session", "back": "Data the server keeps about one visitor, stored under a random ID. The cookie carries only the ID; the real data never leaves the server."},
+        {"front": "Persistence", "back": "Storing data outside a program's memory — in a file or a database — so it survives the program stopping and restarting."},
+        {"front": "File system", "back": "The part of the operating system that organizes files. In Node, the `fs` module reads and writes them (`writeFileSync`, `appendFileSync`, `readFileSync`)."},
+        {"front": "Relational", "back": "The database family that stores data in tables of rows and columns under an enforced schema, queried with SQL. Example: MySQL."},
+        {"front": "Document", "back": "One record in a non-relational database: a self-contained bundle of fields and values shaped like a JavaScript object, kept in a collection and identified by `_id`. Example store: MongoDB."},
+        {"front": "Schema", "back": "The plan declared in advance for stored data — what columns a table has and what type each holds. Relational databases enforce it; documents usually do not."},
+        {"front": "Primary key", "back": "The column whose value uniquely identifies one row of a table. No two rows share it. MongoDB's equivalent is the document's `_id`."},
+        {"front": "CRUD", "back": "Create, Read, Update, Delete — the four basic operations on stored data, in every storage system this week: array, MongoDB, and SQL alike."},
+        {"front": "Query", "back": "A request that describes the data you want: a MongoDB match object like `{ author: 'Jane Austen' }`, or a SQL `SELECT` with a `WHERE` clause."},
+        {"front": "Placeholder", "back": "A `?` in a SQL statement where a value belongs. The value travels separately and is treated as data, never as SQL — the defense against SQL injection and broken quotes alike."},
+        {"front": "Environment variable", "back": "A named setting provided by the machine running your program, read in Node as `process.env.NAME`. The home for ports, database addresses and secrets — which never go in code or in Git."}
+      ]
+      </script>
+    </div>
+
+    <aside class="callout project">
+      <strong>Put it together</strong>
+      <p>Take your Week 2 books API and give it a real memory: move the array into one of this week's databases, keep the same routes and status codes, validate every book on the server before it is stored, and read the database password from the environment. Then restart your server and watch the books survive — that restart is the moment this week was about.</p>
+    </aside>
+
+    <div class="quiz" data-pass="0.8" data-title="Week 3 quiz">
+      <script type="application/json">
+      [
+        {"q": "A visitor's browser sends a `Cookie` header with every request, yet the server still treats a first-time visitor as new. Why?", "shuffle": true, "choices": ["HTTP itself is stateless — memory exists only because the cookie's contents let the server recognize the visitor", "Cookies expire after one request", "The server deletes cookies it does not like", "The `Cookie` header is encrypted so the server cannot use it"], "answer": 0, "explain": "Nothing in HTTP links two requests. Recognition is entirely your app's doing: read the ticket, look up what it points to."},
+        {"q": "Which attribute stops JavaScript in the page from reading a cookie, while the browser still sends it?", "shuffle": true, "choices": ["`HttpOnly`", "`Secure`", "`Path`", "`Max-Age`"], "answer": 0, "explain": "`HttpOnly` hides the cookie from page scripts. `Secure` restricts it to HTTPS, `Path` to part of the site, and `Max-Age` sets its lifetime."},
+        {"q": "In the session demo, the count reached 3 with a cookie jar and restarted at 1 without one. Where was the number 3 stored?", "shuffle": true, "choices": ["On the server, in the session data stored under the ID in the cookie", "Inside the cookie, as the value `3`", "In the `curl` jar file, which the server reads", "In the browser's local storage"], "answer": 0, "explain": "The cookie carried only the session ID. The count lived server-side in `req.session` — which is why dropping the cookie made the server start over."},
+        {"q": "True or false: a text file written with Node's `fs` module is a good shared store once your app runs on two servers.", "answer": false, "explain": "False. Each server's disk holds its own copy, and the copies disagree. Shared, searchable, guarded storage is exactly what a database adds."},
+        {"q": "A catalog where one product has sizes, the next has a processor speed, and a third has page counts fits which family best?", "shuffle": true, "choices": ["Document — records naturally carry different fields", "Relational — all catalogs are tables", "Neither — catalogs cannot be stored", "A session — products are temporary"], "answer": 0, "explain": "Varying fields per record is the document family's home ground. A relational schema would force every product into the same columns, most of them empty."},
+        {"q": "Which MongoDB call changes only the `title` field of the Dune document?", "shuffle": true, "choices": ["`updateOne({ title: 'Dune' }, { $set: { title: 'Dune (revised)' } })`", "`insertOne({ title: 'Dune (revised)' })`", "`find({ title: 'Dune (revised)' })`", "`deleteOne({ title: 'Dune' })`"], "answer": 0, "explain": "`updateOne` with `$set` modifies the named fields and leaves the rest of the document — author, `_id` — untouched."},
+        {"q": "Which SQL statement is the Read of CRUD?", "answer": ["SELECT"], "explain": "`SELECT ... FROM ... WHERE ...` reads rows. `INSERT` creates, `UPDATE` changes, `DELETE` removes."},
+        {"q": "A route builds SQL like this: `'SELECT * FROM books WHERE id = ' + req.params.id`. What is the correct fix?", "shuffle": true, "choices": ["Use a placeholder: `'SELECT * FROM books WHERE id = ?'` with `[req.params.id]` passed separately", "Check that the value looks like a number before gluing", "Wrap the value in extra quotes", "Move the code to the browser, where it is safe"], "answer": 0, "explain": "Parameterized queries keep visitor input as data, never SQL. Eyeballing the value is not a defense — the one time it is not a number, it becomes part of your query."},
+        {"q": "Your orders table stores a copy of each customer's email, and a customer changes theirs in the customers table. What principle did the design break, and what happens?", "shuffle": true, "choices": ["One source of truth — the copies now disagree, and nothing says which email is right", "Statelessness — the server forgot the customer", "The schema — emails are not allowed in orders", "Nothing — copies are always safer"], "answer": 0, "explain": "Storing one fact in two places invites inconsistency. Store the email once, and let orders point at the customer by key."},
+        {"q": "True or false: if your HTML form validates a book's title, your API route can safely store whatever it receives.", "answer": false, "explain": "False. Requests can bypass your page entirely. Validation that matters happens again on the server, before anything reaches the database."}
+      ]
+      </script>
+    </div>
+  </section>
+</main>
+</body>
+</html>

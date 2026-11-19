@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Routing, Middleware &amp; REST APIs · Web Dev II</title>
+  <meta name="description" content="Week 2: route parameters and query strings, the middleware assembly line, built-in and third-party middleware, RESTful API design, and a single-page front end that consumes your own API.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=JetBrains+Mono:wght@400;700&display=swap">
+  <link rel="stylesheet" href="../assets/css/course.css">
+  <script src="../assets/js/course.js"></script>
+  <style>
+    /* ===== Week 2 page styles. Every selector is prefixed wk2- ===== */
+    .wk2-cap { font-size: .85rem; color: var(--ink-3); margin: 14px 0 6px; }
+    .wk2-cap strong { color: var(--ink-2); }
+    .wk2-output { white-space: pre-wrap; overflow-wrap: anywhere; }
+    .wk2-flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0; }
+    .wk2-flow .wk2-node { border: 1.5px solid var(--line-2); border-radius: 9px; padding: 7px 12px; background: var(--surface-2); font-size: .9rem; }
+    .wk2-flow .wk2-node b { display: block; font-size: .95rem; }
+    .wk2-flow .wk2-node span { font-size: .78rem; color: var(--ink-3); }
+    .wk2-flow .wk2-arrow { color: var(--mod); font-weight: 700; font-size: 1.1rem; }
+    .wk2-mini { font-family: var(--font-mono); font-size: .82rem; }
+    .wk2-booklist { list-style: none; padding: 0; margin: 0 0 1em; display: grid; gap: 6px; }
+    .wk2-booklist li { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; background: var(--surface-2); }
+  </style>
+</head>
+<body data-module="wk2">
+<main id="main">
+  <header class="module-hero">
+    <h1>Routing, Middleware &amp; REST APIs</h1>
+    <p class="lede">Last week your server answered a couple of fixed addresses. This week it grows up: routes that capture values from the URL, a chain of middleware that every request travels through, a properly designed REST API, and a front end that lives on data from that API.</p>
+  </header>
+
+  <aside class="callout listen">
+    <strong>Listen: the Week 2 audio companion</strong>
+    <p>This episode explains the middleware assembly line, how REST APIs are designed, and how a single-page front end talks to your own server.</p>
+    <audio controls preload="metadata" src="../audio/wk2.mp3" style="width:100%"></audio>
+  <p class="small"><a href="../audio/wk2-transcript.txt">Read the episode transcript</a> (text file).</p>
+  </aside>
+
+  <!-- ===================================================== 2.1 -->
+  <section class="lesson" id="s2-1">
+    <h2>Routing in Depth: Parameters and Query Strings</h2>
+    <p>A <strong>route</strong> is a rule that says: when a request with this method arrives at this path, run this function. In Week 1 your routes were fixed addresses like <code>/about</code>. Real sites cannot work that way. A shop with 10,000 products cannot have 10,000 route functions, one per product. It needs one route that captures <em>which</em> product the URL names.</p>
+    <p>Express gives you two different places to pull values out of a URL, and choosing the right one is a design decision you will make constantly:</p>
+    <ul>
+      <li>A <strong>route parameter</strong> is a named placeholder inside the path itself, written with a colon, like <code>/users/:id</code>. It identifies <em>which thing</em> the request is about. The value is part of the address: remove it and the address points somewhere else, or nowhere.</li>
+      <li>A <strong>query string</strong> is the part of the URL after a <code>?</code>: a list of <code>key=value</code> pairs joined by <code>&amp;</code>, like <code>?name=Ada&amp;plan=pro</code>. It carries <em>options</em> for the request: a search term, a page number, a sort order. Remove it and the address still names the same page, just with default options.</li>
+    </ul>
+    <p>Here is the rule of thumb: <strong>if the value says which resource it is, make it a parameter. If the value tunes how the resource is delivered, make it a query string.</strong> <code>/users/42</code> names user 42. <code>/users?sort=name</code> names the user list, sorted one particular way.</p>
+
+    <h3>One program, both mechanisms</h3>
+    <p>This short program uses both. Read it before you look at the output, and predict what each request will return:</p>
+    <script type="text/plain" class="code" data-lang="js" data-title="express-query.js">
+      const express = require('express');
+      const app = express();
+
+      app.get('/greet', (req, res) => {
+        const name = req.query.name || 'stranger';
+        res.json({ message: `Hello, ${name}!` });
+      });
+
+      app.get('/users/:id', (req, res) => {
+        res.json({ userId: req.params.id });
+      });
+
+      app.listen(3000, () => console.log('Listening on port 3000'));
+    </script>
+    <p>Two objects do all the work. <code>req.query</code> is an object Express builds from the query string: for <code>?name=Ada</code> it is <code>{ name: 'Ada' }</code>, and when there is no query string it is an empty object, which is why the code falls back to <code>'stranger'</code>. <code>req.params</code> holds the route parameters: for the path <code>/users/42</code> matched against <code>/users/:id</code>, it is <code>{ id: '42' }</code>. Notice the value is the <em>string</em> <code>'42'</code>, not the number 42 — everything that arrives in a URL is text, and converting it is your job when it matters.</p>
+    <p class="wk2-cap"><strong>Real output</strong> — captured by running this exact program (Node 26, Express 5):</p>
+    <div class="output wk2-output">$ curl "http://localhost:3000/greet?name=Ada"
+{"message":"Hello, Ada!"}
+$ curl http://localhost:3000/greet
+{"message":"Hello, stranger!"}
+$ curl http://localhost:3000/users/42
+{"userId":"42"}
+--- server console ---
+Listening on port 3000</div>
+    <p>The first two requests hit the <em>same</em> route. The query string never changes which route matches; it only changes what the handler finds in <code>req.query</code>. The third request shows a parameter doing the opposite job: <code>/users/42</code>, <code>/users/7</code> and <code>/users/ada</code> all match the one route <code>/users/:id</code>, and the handler learns which user from <code>req.params.id</code>.</p>
+
+    <h3>Three places values hide: a map</h3>
+    <p>By the end of this week, a handler can receive values from three different places, and beginners constantly mix them up. Keep this map next to you:</p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col">Source</th><th scope="col">Where it lives in the request</th><th scope="col">How the handler reads it</th><th scope="col">Example</th></tr></thead>
+        <tbody>
+          <tr><td>Route parameter</td><td>Inside the path, filling a <code>:placeholder</code></td><td><code>req.params.id</code></td><td><code>/users/42</code> → <code>'42'</code></td></tr>
+          <tr><td>Query string</td><td>After the <code>?</code>, as <code>key=value</code> pairs</td><td><code>req.query.name</code></td><td><code>/greet?name=Ada</code> → <code>'Ada'</code></td></tr>
+          <tr><td>Request body</td><td>Sent with <code>POST</code>/<code>PUT</code>, translated by body middleware</td><td><code>req.body.title</code></td><td>JSON <code>{"title":"Dune"}</code> → <code>'Dune'</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Two habits follow from the map. First, a query string can carry several pairs at once — <code>?sort=name&amp;page=3</code> fills both <code>req.query.sort</code> and <code>req.query.page</code> — and any pair may be absent, so handlers that depend on one should supply a default, exactly as <code>express-query.js</code> falls back to <code>'stranger'</code>. Second, all three sources deliver <strong>strings</strong> (the body is the exception: JSON can carry real numbers and booleans). Whenever a value must be a number — an id, a page, a count — converting it is your job.</p>
+
+    <aside class="callout tip">
+      <strong>Route patterns can do more</strong>
+      <p>A route path is a pattern, not just a fixed string. You can use several parameters in one path (<code>/users/:userId/books/:bookId</code>), and a parameter matches exactly one path segment — <code>/users/:id</code> matches <code>/users/42</code> but not <code>/users/42/books</code>. Express tries routes in the order you define them and uses the first match, so define specific routes before catch-all patterns.</p>
+    </aside>
+    <p>One more routing fact worth knowing now: a route can have <strong>more than one handler</strong>. You can pass several functions to <code>app.get()</code> and they run in order, each handing off to the next — which is exactly the mechanism the next section is about.</p>
+
+    <h3>See the split for yourself</h3>
+    <p>Express does this parsing for you on every request, but it helps to watch it happen once. This playground runs entirely in your browser: the function below takes a URL apart the same way Express does — the path on one side, the query pairs on the other. Change the URL on the first line and run it again. Try <code>/users/42</code>, then <code>/users?sort=name&amp;page=3</code>, and notice which values land in <code>segments</code> (where parameters come from) and which land in <code>query</code>.</p>
+    <div class="playground" data-title="Try it: take a URL apart" data-preview="false" data-height="260">
+      <textarea data-lang="js">function parseUrl(url) {
+  const qIndex = url.indexOf('?');
+  const path = qIndex === -1 ? url : url.slice(0, qIndex);
+  const query = {};
+  if (qIndex !== -1) {
+    url.slice(qIndex + 1).split('&amp;').forEach((pair) => {
+      const eq = pair.indexOf('=');
+      if (eq !== -1) query[pair.slice(0, eq)] = pair.slice(eq + 1);
+    });
+  }
+  const segments = path.split('/').filter(Boolean);
+  return { path: path, segments: segments, query: query };
+}
+
+console.log(parseUrl('/users/42'));
+console.log(parseUrl('/greet?name=Ada'));
+console.log(parseUrl('/users?sort=name&amp;page=3'));</textarea>
+      <script type="application/json" class="checks">
+      [
+        {"label": "`parseUrl` is defined", "test": "return typeof win.parseUrl === 'function'"},
+        {"label": "A parameter segment stays in the path: `/users/42` has no query", "test": "return Object.keys(win.parseUrl('/users/42').query).length === 0 && win.parseUrl('/users/42').segments[1] === '42'"},
+        {"label": "Query pairs are parsed: `name=Ada` lands in `query`", "test": "return win.parseUrl('/greet?name=Ada').query.name === 'Ada'"}
+      ]
+      </script>
+    </div>
+    <p>That split is the whole section in one function. The last path segment is where a route like <code>/users/:id</code> finds its value, and the <code>query</code> object is exactly what Express hands you as <code>req.query</code> — keys and values, all strings.</p>
+
+    <div class="buckets" data-title="Parameter or query string?">
+      <script type="application/json">
+      {"buckets": ["Route parameter", "Query string"],
+       "items": [
+         ["The `42` in `/users/42` — it says which user", "Route parameter"],
+         ["The `sort=name` in `/users?sort=name` — it tunes the list", "Query string"],
+         ["The `9780132350884` in `/books/9780132350884` — it says which book", "Route parameter"],
+         ["The `page=3` in `/articles?page=3` — it picks one slice of the list", "Query string"],
+         ["The `ada` in `/profiles/ada` — it says whose profile", "Route parameter"],
+         ["The `q=express` in `/search?q=express` — it carries the search term", "Query string"],
+         ["The `2` in `/api/books/2` — it says which book to return", "Route parameter"],
+         ["The `lang=fr` in `/docs?lang=fr` — it picks a language option", "Query string"]
+       ],
+       "explain": "Ask one question: **does the value say which thing this is, or how to deliver it?** Which-thing values belong in the path as parameters; how-to-deliver values belong in the query string."}
+      </script>
+    </div>
+
+    <div class="quiz" data-title="Check your understanding: parameters and query strings">
+      <script type="application/json">
+      [
+        {"q": "In the route `/users/:id`, what is `:id`?", "shuffle": true, "choices": ["A query string key", "A route parameter: a placeholder that captures one path segment", "A comment Express ignores", "The name of a database table"], "answer": 1, "explain": "A colon in a route path declares a parameter. A request to `/users/42` matches, and the handler reads the captured text as `req.params.id`."},
+        {"q": "A request arrives at `/greet?name=Ada`. Where does the handler find `Ada`?", "shuffle": true, "choices": ["`req.params.name`", "`req.body.name`", "`req.query.name`", "`res.query.name`"], "answer": 2, "explain": "Values after the `?` are parsed into `req.query`. `req.params` is only for colon placeholders in the path itself."},
+        {"q": "True or false: changing the query string can make a request match a different route.", "answer": false, "explain": "Route matching uses the method and the path only. `/greet?name=Ada` and `/greet` hit the same route; the handler just sees a different `req.query`."},
+        {"q": "You are building `/products` for a store. The URL must identify one specific product. Which form is right?", "shuffle": true, "choices": ["`/products?id=17`", "`/products/17`", "`/products#17`", "`/17/products`"], "answer": 1, "explain": "Identifying which resource it is is the parameter's job: `/products/17`. A query string would be right for options like `?sort=price` on the list."},
+        {"q": "In `express-query.js`, a request to `/users/42` returns `{\"userId\":\"42\"}`. Why is `42` in quotes?", "shuffle": true, "choices": ["Because JSON requires quotes on numbers", "Because URL values always arrive as strings, and the code returns the string unchanged", "Because Express converts every parameter to a string only on Tuesdays", "Because `res.json` adds quotes by mistake"], "answer": 1, "explain": "Everything in a URL is text. `req.params.id` is the string `'42'`; if you need the number, convert it yourself with `Number(req.params.id)` — the REST API in Section 2.4 does exactly that."}
+      ]
+      </script>
+    </div>
+  </section>
+
+  <!-- ===================================================== 2.2 -->
+  <section class="lesson" id="s2-2">
+    <h2>Middleware: The Express Assembly Line</h2>
+    <p><strong>Middleware</strong> is a function that sits between the incoming request and the route handler that finally answers it. Every middleware function receives three arguments:</p>
+    <ul>
+      <li><code>req</code> — the request object: the URL, the method, the headers, and anything earlier middleware attached to it.</li>
+      <li><code>res</code> — the response object: your way of sending the answer back.</li>
+      <li><code>next</code> — a function you call to hand the request to the <em>next</em> function in line.</li>
+    </ul>
+    <p>Picture an assembly line in a factory. The request is a product moving down the line on a conveyor belt. Each workstation does one small job — inspects the product, stamps it, wraps it — and then the belt carries it to the next station. The last station is your route handler, which finishes the product and ships it: it sends the response. Middleware is how Express apps are really built: instead of one giant handler doing everything, you line up small, single-job functions and the request flows through them in the order you registered them.</p>
+    <p>You register middleware with <code>app.use()</code>. A function passed to <code>app.use()</code> with no path runs for <em>every</em> request, whatever the URL. Order is everything: Express runs the line top to bottom, in the exact order your code calls <code>app.use()</code> and defines routes.</p>
+
+    <h3>Watch the order happen</h3>
+    <p>This program is deliberately tiny so the order is the whole lesson. Two middleware functions log a line and call <code>next()</code>; then the route handler logs its line and sends the response:</p>
+    <script type="text/plain" class="code" data-lang="js" data-title="middleware-order.js">
+      const express = require('express');
+      const app = express();
+
+      app.use((req, res, next) => {
+        console.log('Middleware 1: request received');
+        next();
+      });
+
+      app.use((req, res, next) => {
+        console.log('Middleware 2: checking the request');
+        next();
+      });
+
+      app.get('/', (req, res) => {
+        console.log('Route handler: sending the response');
+        res.send('Done');
+      });
+
+      app.listen(3000, () => console.log('Listening on port 3000'));
+    </script>
+    <p class="wk2-cap"><strong>Real output</strong> — captured by running this exact program (Node 26, Express 5). The browser receives one word; the server console tells the real story:</p>
+    <div class="output wk2-output">$ curl http://localhost:3000/
+Done
+--- server console ---
+Listening on port 3000
+Middleware 1: request received
+Middleware 2: checking the request
+Route handler: sending the response</div>
+    <p>Read the console top to bottom and you are reading the conveyor belt: Middleware 1 runs first because it was registered first, its <code>next()</code> call starts Middleware 2, whose <code>next()</code> starts the route handler, which sends <code>Done</code> and ends the journey. One request, three functions, strict order.</p>
+
+    <div class="stepper" data-title="One request travels the line">
+      <div class="stepper-stage">
+        <div class="wk2-flow">
+          <div class="wk2-node" data-on="1-4" data-active="1"><b>Request arrives</b><span>GET /</span></div>
+          <div class="wk2-arrow" data-on="1-4">→</div>
+          <div class="wk2-node" data-on="2-4" data-active="2"><b>Logger</b><span>middleware: notes the visit</span></div>
+          <div class="wk2-arrow" data-on="2-4">→</div>
+          <div class="wk2-node" data-on="3-4" data-active="3"><b>Checker</b><span>middleware: inspects the request</span></div>
+          <div class="wk2-arrow" data-on="3-4">→</div>
+          <div class="wk2-node" data-on="4" data-active="4"><b>Route handler</b><span>sends the response</span></div>
+        </div>
+      </div>
+      <ol class="steps">
+        <li><p><strong>The request arrives.</strong> A browser asks for <code>GET /</code>. Express starts at the top of your file and looks for the first function registered for this request. Nothing has run yet — no logging, no checking, no response.</p></li>
+        <li><p><strong>The logger runs.</strong> The first middleware writes a line to the console (in <code>middleware-order.js</code> that is “Middleware 1: request received”). Its job is done, but the request is not answered. Calling <code>next()</code> moves the request one station down the line.</p></li>
+        <li><p><strong>The checker runs.</strong> The second middleware inspects the request (“Middleware 2: checking the request”). A real checker might reject a request that lacks a required header — by sending an error response itself and <em>not</em> calling <code>next()</code>, which stops the line on purpose. This one is satisfied, so it calls <code>next()</code>.</p></li>
+        <li><p><strong>The route handler answers.</strong> The last station matches <code>GET /</code>, logs its line, and calls <code>res.send('Done')</code>. Sending the response is what ends the request's journey — there is no <code>next()</code> after this because there is nothing left to hand off to.</p></li>
+      </ol>
+    </div>
+
+    <h3>A gatekeeper: middleware that says no</h3>
+    <p>Most middleware passes requests along, but the pattern matters most when one refuses. Here is the checker from the stepper grown into a real gatekeeper: it looks for a header and turns the request away if the header is missing. This is a pattern sample — the shape to copy — not a captured run:</p>
+    <script type="text/plain" class="code" data-lang="js" data-title="A gatekeeper middleware (pattern)">
+      function requireToken(req, res, next) {
+        if (req.headers['x-token'] === 'let-me-in') {
+          next(); // token is good: move down the line
+        } else {
+          res.status(403).json({ error: 'Forbidden' }); // no next(): the line stops here
+        }
+      }
+
+      app.use('/api', requireToken);
+    </script>
+    <p>Read the two exits carefully, because every middleware you ever write has exactly these two: <strong>call <code>next()</code></strong> (the request continues) or <strong>send a response</strong> (the request ends here). The bug in the callout below is simply a middleware that takes neither exit. In Week 4 this exact shape — mounted on <code>/api</code>, checking a credential, answering or passing — becomes real login protection.</p>
+
+    <aside class="callout warn">
+      <strong>The classic beginner bug: forgetting <code>next()</code></strong>
+      <p>If a middleware function neither sends a response nor calls <code>next()</code>, the request simply <strong>hangs</strong>. The browser spins, no error appears anywhere, and eventually the browser gives up. The server is not crashed — it is waiting forever at a station where nobody moved the belt. When a request hangs with no error message, check your middleware for a missing <code>next()</code> first.</p>
+    </aside>
+    <p>The flip side is just as useful: a middleware that <em>does</em> send a response should not call <code>next()</code>. That is how gatekeeping works — a checker that finds a problem answers the request itself (often with an error status) and the route handler never runs at all. Section 2.6 and Week 4 both build on that idea. To be precise, the hang happens only when a middleware neither sends a response nor calls <code>next()</code>; a middleware that answers the request itself ends the line on purpose — Week 4's login guard does exactly that, replying 401 and never calling <code>next()</code>.</p>
+    <p>You can also mount middleware on one branch of the line instead of the whole line. Give <code>app.use()</code> a path as its first argument — <code>app.use('/api', fn)</code> — and that station only sees requests whose path starts with <code>/api</code>. Everything else walks straight past it. That is how you will later protect just the API, or log just the admin area, without touching the rest of the app.</p>
+    <p>One more thing middleware can do: <strong>carry data down the line</strong>. Because every station receives the same <code>req</code> object, an early middleware can attach something to it — <code>req.visitTime = Date.now()</code>, say — and every later station and the route handler can read it. Middleware is not only a filter; it is also how a request accumulates context as it travels.</p>
+
+    <div class="fill" data-title="Complete the middleware" data-explain="A middleware function takes `req`, `res` and `next`. Logging is its job here; `next()` is what keeps the belt moving.">
+      <script type="text/plain">
+app.use((req, res, [[next]]) => {
+  console.log(req.method + ' ' + req.url);
+  [[next()]];
+});
+      </script>
+    </div>
+
+    <div class="quiz" data-title="Check your understanding: middleware">
+      <script type="application/json">
+      [
+        {"q": "What are the three arguments every middleware function receives, in order?", "shuffle": true, "choices": ["`req`, `res`, `next`", "`app`, `req`, `res`", "`request`, `response`, `route`", "`err`, `req`, `done`"], "answer": 0, "explain": "Middleware is a function `(req, res, next)`. You read from `req`, answer with `res`, and call `next()` to hand the request on."},
+        {"q": "In `middleware-order.js`, why does “Middleware 1” log before “Middleware 2”?", "shuffle": true, "choices": ["Alphabetical order", "Express runs middleware in the order it was registered with `app.use()`", "Middleware 1 is faster", "Because the route handler calls them in that order"], "answer": 1, "explain": "Registration order is execution order. Swap the two `app.use()` blocks and the console lines swap too."},
+        {"q": "A request to your server hangs forever: no response, no error. What is the most likely cause?", "shuffle": true, "choices": ["The port is wrong", "A middleware function neither sent a response nor called `next()`", "The browser is caching the page", "Express needs to be restarted every hour"], "answer": 1, "explain": "A middleware that does neither stalls the line silently. The request waits at that station forever."},
+        {"q": "True or false: a middleware function that sends an error response should still call `next()` afterwards.", "answer": false, "explain": "Sending the response ends the request. Calling `next()` after answering would run later handlers on an already-answered request — gatekeepers deliberately stop the line."},
+        {"q": "Where does middleware registered with `app.use()` and no path run?", "shuffle": true, "choices": ["Only for the home page", "Only for POST requests", "For every request, in registration order, before later handlers", "Only when an error occurs"], "answer": 2, "explain": "Path-less `app.use()` middleware is global: it is a station every request passes through, which is why loggers and body parsers are registered that way."}
+      ]
+      </script>
+    </div>
+  </section>
+
+  <!-- ===================================================== 2.3 -->
+  <section class="lesson" id="s2-3">
+    <h2>Built-In and Third-Party Middleware</h2>
+    <p>You rarely write every station on the line yourself. Express ships with some middleware built in, and the npm registry offers third-party middleware — packages other developers wrote that you install and plug into your line with the same <code>app.use()</code> call. This section covers the three you will use constantly: one that serves files, two that translate request bodies, and one famous logger.</p>
+
+    <h3><code>express.static</code>: let Express serve your files</h3>
+    <p>Most apps have files that never change per request: images, CSS, client-side JavaScript, plain text files. Writing a route for each one would be silly. <strong><code>express.static</code></strong> is built-in middleware that maps a folder on disk to the web: a request for <code>/hello.txt</code> returns the file <code>public/hello.txt</code>, and a request for <code>/</code> returns <code>public/index.html</code> if it exists. If no file matches, static politely calls <code>next()</code> and the request continues down your line.</p>
+    <script type="text/plain" class="code" data-lang="js" data-title="static-server.js">
+      const express = require('express');
+      const app = express();
+
+      app.use(express.static('public'));
+
+      app.listen(3000, () => console.log('Listening on port 3000'));
+    </script>
+    <p>The whole server is five lines because the middleware does the work. It serves these two files from the <code>public</code> folder:</p>
+    <div class="grid-2">
+      <script type="text/plain" class="code" data-lang="html" data-title="public/hello.txt">
+        Hello from the public folder!
+      </script>
+      <script type="text/plain" class="code" data-lang="html" data-title="public/index.html">
+        <h1>Static home page</h1>
+      </script>
+    </div>
+    <p class="wk2-cap"><strong>Real output</strong> — captured by running this exact program (Node 26, Express 5):</p>
+    <div class="output wk2-output">$ curl http://localhost:3000/hello.txt
+Hello from the public folder!
+$ curl http://localhost:3000/
+&lt;h1&gt;Static home page&lt;/h1&gt;
+--- server console ---
+Listening on port 3000</div>
+    <p>Notice what is <em>not</em> in the console: no route handler ran. The static middleware answered both requests itself. That is the assembly line working as designed — a station that can finish the job does, and the request never travels further.</p>
+
+    <aside class="callout warn">
+      <strong>Order pitfall: static can shadow a route</strong>
+      <p>Because the line runs in registration order, a static file wins over a later route with the same URL. If <code>public/index.html</code> exists, a request for <code>/</code> is answered by static middleware and your <code>app.get('/', ...)</code> handler below it never runs — no error, no warning, just the file. When a route mysteriously "does nothing," check whether an earlier station is answering its requests first.</p>
+    </aside>
+
+    <h3>Body translators: <code>express.json()</code> and <code>express.urlencoded()</code></h3>
+    <p>You met these in Week 1; here is their place on the line. A request body arrives as raw text. Two built-in middleware functions translate it into a JavaScript object on <code>req.body</code>:</p>
+    <ul>
+      <li><code>express.json()</code> translates bodies sent as <strong>JSON</strong> (JavaScript Object Notation — the text format for data you will meet properly in Section 2.4), which is how APIs receive data.</li>
+      <li><code>express.urlencoded()</code> translates bodies sent by ordinary <strong>HTML forms</strong>, which encode fields as <code>name=Ada&amp;plan=free</code>.</li>
+    </ul>
+    <p>Both are ordinary middleware: they run early in the line, fill in <code>req.body</code>, and call <code>next()</code>, so by the time your route handler runs, the body is already a usable object. Forget to register the right one and <code>req.body</code> is empty — another silent, confusing failure with the same root cause as a missing <code>next()</code>: a station on the line was never installed.</p>
+
+    <h3><code>morgan</code>: a logger that writes your server's diary</h3>
+    <p><strong>morgan</strong> is a third-party middleware package (<code>npm install morgan</code>) that logs one line per request: the method, the path, the status code your server answered with, how long it took, and the size of the response. During development it is the fastest way to see what your server is actually being asked for. Its <code>'dev'</code> format is the one used in most tutorials:</p>
+    <script type="text/plain" class="code" data-lang="js" data-title="morgan-demo.js">
+      const express = require('express');
+      const morgan = require('morgan');
+      const app = express();
+      app.use(morgan('dev'));
+      app.get('/', (req, res) => res.send('Home'));
+      app.get('/missing-test', (req, res) => res.status(404).json({ error: 'Book not found' }));
+      app.listen(3000, () => console.log('Listening on port 3000'));
+    </script>
+    <p class="wk2-cap"><strong>Real output</strong> — captured by running this exact program (Node 26, Express 5, morgan 'dev'). One request was made to <code>/</code> and one to <code>/missing-test</code>. Response times differ on every run — the format is the lesson:</p>
+    <div class="output wk2-output">Listening on port 3000
+GET / 200 2.047 ms - 4
+GET /missing-test 404 1.073 ms - 26</div>
+    <p>Read the second line left to right: a <code>GET</code> request, for <code>/</code>, answered <code>200</code> (success), in <code>2.047 ms</code> (milliseconds — thousandths of a second), with a body of <code>4</code> bytes (<code>Home</code>). The third line is the interesting one: somebody asked for <code>/missing-test</code> and got a <code>404</code>. In a real app, a diary line like that is often how you discover a broken link or a mistyped fetch URL in your front end — the request reached the server fine; the server simply had nothing at that address.</p>
+
+    <h3>Where middleware comes from</h3>
+    <p>The stations in this section come from three places, and it is worth keeping them straight:</p>
+    <div class="tabs">
+      <div data-tab="Built in">
+        <p>These ship inside Express itself — no install step, just <code>app.use()</code>. This week you used three: <code>express.static</code> (serve files), <code>express.json</code> (read JSON bodies) and <code>express.urlencoded</code> (read form bodies). If a capability is built in, prefer it: it is maintained with Express and every Express developer recognizes it on sight.</p>
+      </div>
+      <div data-tab="Third-party">
+        <p>These are npm packages written by other developers: <code>npm install morgan</code>, then <code>require</code> it and plug it into the line like any other middleware. The ecosystem is huge — logging, cookies, sessions, security headers, file uploads. Installing one is a real decision, though: you are trusting its maintainers with code that runs on every request, so pick packages that are widely used and actively maintained.</p>
+      </div>
+      <div data-tab="Your own">
+        <p>Any function with the <code>(req, res, next)</code> shape is middleware, including the ones you write. Yours are for jobs specific to your app: stamping a request with a time, checking a header, attaching data the handlers will need. Section 2.2's logger and checker were both hand-written middleware.</p>
+      </div>
+    </div>
+    <p>Whichever shelf a station came from, the rules from Section 2.2 apply unchanged: it runs in registration order, it sees the requests that reach it, and it must answer or call <code>next()</code>.</p>
+
+    <h3>All three shelves in one file</h3>
+    <p>A realistic Week 2 server start combines all of it. Notice the order — logger first so nothing escapes the diary, translators next so bodies are ready, static files, and only then the routes and APIs from the rest of the week:</p>
+    <script type="text/plain" class="code" data-lang="js" data-title="A typical Week 2 app skeleton">
+      const express = require('express');
+      const morgan = require('morgan');
+      const app = express();
+
+      app.use(morgan('dev'));              // third-party: the diary
+      app.use(express.json());             // built-in: JSON bodies -> req.body
+      app.use(express.urlencoded({ extended: true })); // built-in: form bodies -> req.body
+      app.use(express.static('public'));   // built-in: the front end and its files
+
+      // ...your routes and routers go here (Sections 2.4 and 2.6)...
+
+      app.listen(3000, () => console.log('Listening on port 3000'));
+    </script>
+    <p>Four lines of setup, and every request that ever arrives is logged, translated and offered the static files before your own handlers see it. Most Express apps you will ever read start with some version of this block — recognizing it is like recognizing the first chord of a song.</p>
+
+    <div class="match" data-title="Match each middleware to its job">
+      <script type="application/json">
+      {"leftTitle": "Middleware", "rightTitle": "Its job", "pairs": [
+        ["`express.static('public')`", "Serves files from the `public` folder at matching URLs"],
+        ["`express.json()`", "Translates a JSON request body into `req.body`"],
+        ["`express.urlencoded()`", "Translates an HTML form body into `req.body`"],
+        ["`morgan('dev')`", "Logs one line per request: method, path, status, time, size"],
+        ["Your own `(req, res, next)` function", "Any custom station: logging, checking, gatekeeping"]
+      ]}
+      </script>
+    </div>
+
+    <div class="quiz" data-title="Check your understanding: built-in and third-party middleware">
+      <script type="application/json">
+      [
+        {"q": "A request for `/hello.txt` is answered even though your app defines no route for it. What answered it?", "shuffle": true, "choices": ["The browser's cache", "`express.static` middleware serving `public/hello.txt`", "The route handler for `/`", "Node's http module"], "answer": 1, "explain": "`express.static('public')` maps URLs to files in the folder. It answers file requests itself and passes everything else on with `next()`."},
+        {"q": "Your POST handler runs but `req.body` is empty, even though the client sent JSON. What is missing from the line?", "shuffle": true, "choices": ["`morgan('dev')`", "`express.static`", "`app.use(express.json())` registered before the route", "`next()` in the route handler"], "answer": 2, "explain": "Nobody translated the body. `express.json()` must run before the handler that reads `req.body` — order on the line matters."},
+        {"q": "In the morgan line `GET /missing-test 404 1.073 ms - 26`, what does `26` mean?", "shuffle": true, "choices": ["The port number", "The response body size: 26 bytes", "The number of requests so far", "An error code"], "answer": 1, "explain": "The fields are method, path, status, response time, and response size in bytes. The JSON error body `{ \"error\": \"Book not found\" }` is 26 bytes long."},
+        {"q": "True or false: morgan is built into Express and needs no installation.", "answer": false, "explain": "morgan is third-party middleware: `npm install morgan`, then `require` it and plug it in with `app.use()`. `express.static`, `express.json` and `express.urlencoded` are the built-in ones here."},
+        {"q": "Why is morgan normally registered near the very top of the file?", "shuffle": true, "choices": ["So it can log every request, including ones later stations answer or reject", "Because Express requires it", "So it runs after all routes finish", "To make the server start faster"], "answer": 0, "explain": "A logger only sees requests that reach its station. At the top of the line, every request passes it — including 404s and requests a gatekeeper turns away."}
+      ]
+      </script>
+    </div>
+  </section>
+
+  <!-- ===================================================== 2.4 -->
+  <section class="lesson" id="s2-4">
+    <h2>RESTful APIs: Design, JSON and Status Codes</h2>
+    <p>An <strong>API</strong> (application programming interface) is a way for one program to ask another program for data or actions, using agreed rules instead of a human clicking a page. A <strong>RESTful API</strong> is an API designed in the REST style, and REST itself rests on a few plain ideas you can hold in your head:</p>
+    <ul>
+      <li><strong>Everything is a resource</strong> — a thing your app keeps: a book, a user, an order. Each resource gets its own URL.</li>
+      <li><strong>URLs are nouns, not verbs.</strong> The address names the thing (<code>/api/books</code>, <code>/api/books/2</code>), never the action. You will not see <code>/getBook</code> or <code>/deleteBook</code> in a REST API.</li>
+      <li><strong>The HTTP method carries the verb.</strong> <code>GET</code> reads, <code>POST</code> creates, <code>PUT</code> replaces, <code>DELETE</code> removes. The method plus the noun says everything.</li>
+      <li><strong>Data travels as JSON</strong>, and the <strong>status code</strong> says how it went — for successes and failures alike.</li>
+    </ul>
+    <p>Why be this strict? Because a client programmer who has never seen your code can guess your API. If <code>/api/books</code> lists books, then <code>/api/books/2</code> is book 2, <code>POST /api/books</code> creates one, and <code>/api/users</code> almost certainly lists users. That predictability is the whole point of the standard.</p>
+
+    <h3>Methods are CRUD verbs</h3>
+    <p>Most data work is four operations, nicknamed <strong>CRUD</strong>: Create, Read, Update, Delete. REST maps them onto HTTP methods like this:</p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col">HTTP method</th><th scope="col">CRUD</th><th scope="col">Route in this API</th><th scope="col">What it does</th><th scope="col">Success status</th></tr></thead>
+        <tbody>
+          <tr><td><code>GET</code></td><td>Read (all)</td><td><code>GET /api/books</code></td><td>List every book</td><td>200</td></tr>
+          <tr><td><code>GET</code></td><td>Read (one)</td><td><code>GET /api/books/2</code></td><td>Return book 2</td><td>200</td></tr>
+          <tr><td><code>POST</code></td><td>Create</td><td><code>POST /api/books</code></td><td>Add a new book from the JSON body</td><td>201</td></tr>
+          <tr><td><code>PUT</code></td><td>Update</td><td><code>PUT /api/books/1</code></td><td>Replace book 1 with the JSON body</td><td>200</td></tr>
+          <tr><td><code>DELETE</code></td><td>Delete</td><td><code>DELETE /api/books/2</code></td><td>Remove book 2</td><td>204</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Look at the route column: only two URL shapes, <code>/api/books</code> and <code>/api/books/:id</code>, cover all five operations. The method — not the URL — says which operation. And notice how Week 2 comes together in that second shape: the <code>:id</code> route parameter from Section 2.1 is how the API knows which book you mean.</p>
+    <p>One close relative deserves a sentence: <code>PATCH</code> also updates, but where <code>PUT</code> replaces the whole record with what you send, <code>PATCH</code> changes only the fields you send and leaves the rest alone. This course uses <code>PUT</code>.</p>
+
+    <h3>Status codes that matter</h3>
+    <p>Every response carries a three-digit <strong>status code</strong>. The first digit is the family: 2xx means success, 4xx means the <em>client</em> asked for something wrong, 5xx means the <em>server</em> failed. Six codes cover nearly everything you will send this week:</p>
+    <div class="match" data-title="Match each status code to when you send it">
+      <script type="application/json">
+      {"leftTitle": "Code", "rightTitle": "Send it when…", "pairs": [
+        ["200 OK", "The request worked and the body carries the answer (a list, one book, an updated book)"],
+        ["201 Created", "A `POST` successfully created a new resource"],
+        ["204 No Content", "The request worked and there is nothing to send back — the classic `DELETE` answer"],
+        ["400 Bad Request", "The client's request itself is broken, e.g. data that fails validation"],
+        ["404 Not Found", "No resource exists at that address, e.g. book 99 in a two-book collection"],
+        ["500 Internal Server Error", "Your server's code failed — the bug is on your side, not the client's"]
+      ]}
+      </script>
+    </div>
+
+    <p>Two more codes belong to this story — 401 (the request has no valid login) and 403 (the login is valid, but not allowed here) — and you have already met 403 in Section 2.2's gatekeeper; both get their full treatment in Week 4, where login protection makes them matter.</p>
+
+    <h3>Design drill: a second resource, guessed cold</h3>
+    <p>Test the standard on yourself. Suppose the same app grows a <code>users</code> resource — you have never seen its code. REST lets you predict its whole surface before you look:</p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col">You want to…</th><th scope="col">You send</th><th scope="col">Success answer</th></tr></thead>
+        <tbody>
+          <tr><td>List all users</td><td><code>GET /api/users</code></td><td>200, a JSON array</td></tr>
+          <tr><td>Read user 7</td><td><code>GET /api/users/7</code></td><td>200, one user as JSON</td></tr>
+          <tr><td>Create a user</td><td><code>POST /api/users</code> with a JSON body</td><td>201, the created user</td></tr>
+          <tr><td>Replace user 7</td><td><code>PUT /api/users/7</code> with a JSON body</td><td>200, the updated user</td></tr>
+          <tr><td>Delete user 7</td><td><code>DELETE /api/users/7</code></td><td>204, no body</td></tr>
+          <tr><td>Read a user that does not exist</td><td><code>GET /api/users/999</code></td><td>404, a JSON error</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>If you guessed all six, you have understood REST better than any definition could teach it: the design is a <em>convention</em>, and conventions pay off precisely when strangers — teammates, future you, a front end written by someone else — can rely on them without asking.</p>
+
+    <h3>JSON: the language of APIs</h3>
+    <p><strong>JSON</strong> (JavaScript Object Notation) is a text format for structured data: objects with <code>"key": value</code> pairs, arrays in square brackets, strings in double quotes, numbers and <code>true</code>/<code>false</code> bare. It looks like a JavaScript object because it grew out of one, but it is plain text, so every language can read and write it. When your handler calls <code>res.json(books)</code>, Express converts the JavaScript value to JSON text and labels it with the <code>application/json</code> content type. When a client sends JSON to you, <code>express.json()</code> — the translator from Section 2.3 — converts it back. JSON out, JSON in: that round trip is the heartbeat of every API you will build or consume.</p>
+
+    <h3>The complete API</h3>
+    <p>Here is the whole thing: a book collection API with all five operations. The data lives in an ordinary array in memory — no database yet (that is Week 3), so restarting the server resets the collection to the two starter books.</p>
+    <script type="text/plain" class="code" data-lang="js" data-title="rest-api.js">
+      const express = require('express');
+      const app = express();
+      app.use(express.json());
+
+      let books = [
+        { id: 1, title: 'Dune', author: 'Frank Herbert' },
+        { id: 2, title: 'Emma', author: 'Jane Austen' }
+      ];
+      let nextId = 3;
+
+      app.get('/api/books', (req, res) => {
+        res.json(books);
+      });
+
+      app.get('/api/books/:id', (req, res) => {
+        const book = books.find((b) => b.id === Number(req.params.id));
+        if (!book) return res.status(404).json({ error: 'Book not found' });
+        res.json(book);
+      });
+
+      app.post('/api/books', (req, res) => {
+        const book = { id: nextId++, title: req.body.title, author: req.body.author };
+        books.push(book);
+        res.status(201).json(book);
+      });
+
+      app.put('/api/books/:id', (req, res) => {
+        const book = books.find((b) => b.id === Number(req.params.id));
+        if (!book) return res.status(404).json({ error: 'Book not found' });
+        book.title = req.body.title;
+        book.author = req.body.author;
+        res.json(book);
+      });
+
+      app.delete('/api/books/:id', (req, res) => {
+        const i = books.findIndex((b) => b.id === Number(req.params.id));
+        if (i === -1) return res.status(404).json({ error: 'Book not found' });
+        books.splice(i, 1);
+        res.status(204).send();
+      });
+
+      app.listen(3000, () => console.log('Listening on port 3000'));
+    </script>
+    <p>Three details to carry away. First, <code>Number(req.params.id)</code>: parameters arrive as strings (Section 2.1), and the stored <code>id</code> is a number, so the comparison converts first — skip that and no book would ever be found. Second, the <code>404</code> answers are JSON too: <code>{"error":"Book not found"}</code>. An API client is a program, not a person, so even errors arrive in the format it can parse. Third, the <code>DELETE</code> handler answers <code>204</code> with no body at all — success, nothing to say.</p>
+    <p class="wk2-cap"><strong>Real output</strong> — the full captured session, running this exact program (Node 26, Express 5) and driving it with <code>curl</code>, a command-line tool for making HTTP requests. The requests run in order against one running server, so you can watch the collection change:</p>
+    <div class="output wk2-output">$ curl http://localhost:3000/api/books
+[{"id":1,"title":"Dune","author":"Frank Herbert"},{"id":2,"title":"Emma","author":"Jane Austen"}]
+$ curl http://localhost:3000/api/books/2
+{"id":2,"title":"Emma","author":"Jane Austen"}
+$ curl -X POST http://localhost:3000/api/books -H "Content-Type: application/json" -d '{"title":"The Hobbit","author":"J.R.R. Tolkien"}' -w " [status %{http_code}]"
+{"id":3,"title":"The Hobbit","author":"J.R.R. Tolkien"} [status 201]
+$ curl -X PUT http://localhost:3000/api/books/1 -H "Content-Type: application/json" -d '{"title":"Dune (revised)","author":"Frank Herbert"}'
+{"id":1,"title":"Dune (revised)","author":"Frank Herbert"}
+$ curl -X DELETE http://localhost:3000/api/books/2 -w "[status %{http_code}]"
+[status 204]
+$ curl http://localhost:3000/api/books/99 -w " [status %{http_code}]"
+{"error":"Book not found"} [status 404]
+$ curl http://localhost:3000/api/books
+[{"id":1,"title":"Dune (revised)","author":"Frank Herbert"},{"id":3,"title":"The Hobbit","author":"J.R.R. Tolkien"}]
+--- server console ---
+Listening on port 3000</div>
+    <p>Trace the final list and check it against the session: book 1 was renamed by the <code>PUT</code>, book 2 (<em>Emma</em>) was deleted, book 3 (<em>The Hobbit</em>) was created by the <code>POST</code> — and the request for book 99 in between changed nothing, it just reported <code>404</code> in JSON. That is a complete CRUD story told in seven requests.</p>
+
+    <div class="fill" data-title="Complete the create handler" data-explain="A successful creation answers 201 and returns the new resource — including the id the server assigned, which the client could not have known beforehand.">
+      <script type="text/plain">
+app.post('/api/books', (req, res) => {
+  const book = { id: nextId++, title: req.body.[[title]], author: req.body.[[author]] };
+  books.push(book);
+  res.status([[201]]).json(book);
+});
+      </script>
+    </div>
+    <p>Notice the design symmetry you can now read at a glance: the collection URL (<code>/api/books</code>) supports <code>GET</code> (list) and <code>POST</code> (create); the item URL (<code>/api/books/:id</code>) supports <code>GET</code>, <code>PUT</code> and <code>DELETE</code>. Two shapes, five operations, zero verbs in any address. When you design the API for your final project, start from exactly this table and only add what your resources genuinely need.</p>
+
+    <div class="quiz" data-title="Check your understanding: REST APIs">
+      <script type="application/json">
+      [
+        {"q": "Which URL follows REST design for the book with id 7?", "shuffle": true, "choices": ["`/getBook?id=7`", "`/api/books/7`", "`/api/books/get/7`", "`/book/7/delete`"], "answer": 1, "explain": "Nouns in the URL, verbs in the method. `/api/books/7` with `GET`, `PUT` or `DELETE` covers read, replace and remove for that one resource."},
+        {"q": "A `POST /api/books` succeeds and creates a book. Which status should the API return?", "shuffle": true, "choices": ["200", "201", "204", "302"], "answer": 1, "explain": "201 Created is the success code for a creation. The verified session shows exactly this: the new book's JSON came back with `[status 201]`."},
+        {"q": "Why does the `DELETE` handler answer 204 with an empty body?", "shuffle": true, "choices": ["Because the book was not found", "204 means success with no content to return — the thing is gone, there is nothing to show", "Because DELETE responses are not allowed a status", "It is a bug in the program"], "answer": 1, "explain": "204 No Content: the request worked and there is deliberately nothing to send back. A missing book would be a different answer: 404."},
+        {"q": "A client asks for `/api/books/99` and there is no book 99. What does this API send?", "shuffle": true, "choices": ["An HTML error page", "Status 500 with a stack trace", "Status 404 with the JSON body `{\"error\":\"Book not found\"}`", "An empty array with status 200"], "answer": 2, "explain": "Verified in the session above: `{\"error\":\"Book not found\"} [status 404]`. API errors are JSON, because the client reading them is a program."},
+        {"q": "In `rest-api.js`, why is the lookup written `b.id === Number(req.params.id)` instead of `b.id === req.params.id`?", "shuffle": true, "choices": ["`Number()` makes the search faster", "Route parameters are strings and the stored ids are numbers; without conversion the comparison never matches", "Express requires `Number()` in every handler", "To round the id to a whole number"], "answer": 1, "explain": "`req.params.id` is the string `'2'`; the stored id is the number `2`. Strict equality between different types is false, so the conversion is what makes lookups work."}
+      ]
+      </script>
+    </div>
+  </section>
+
+  <!-- ===================================================== 2.5 -->
+  <section class="lesson" id="s2-5">
+    <h2>The Front End: Single-Page Apps That Consume APIs</h2>
+    <p>Everything so far lives on the server. Now cross to the other side: the program running in the visitor's browser. In Week 1 of Web Dev I terms, a traditional site works page by page — click a link, the server builds a whole new HTML page, the browser throws the old one away and paints the new one. A <strong>single-page application</strong> (SPA) works differently:</p>
+    <ul>
+      <li>The browser loads <strong>one</strong> HTML page, once.</li>
+      <li>JavaScript running in that page <strong>re-renders</strong> — redraws — just the parts that change when you click, type or navigate. The page itself never reloads.</li>
+      <li>The data behind those redraws comes from an <strong>API</strong>: the JavaScript asks a server for JSON and renders it, exactly like the book API you built in Section 2.4.</li>
+    </ul>
+    <p>A <strong>front-end framework</strong> is a library that organizes this style of building — React, Vue and Angular are the famous ones. They all share two ideas worth learning in plain words, whatever framework you meet later:</p>
+    <ul>
+      <li>A <strong>component</strong> is a reusable piece of interface bundled with the code that renders it: a book card, a search box, a navigation bar. You build a page by assembling components, the way the server side assembles middleware.</li>
+      <li><strong>State</strong> is the data the interface currently depends on — here, the list of books. The rule that makes SPAs manageable: the screen is a function of the state. Change the state, re-render, and the screen is correct again. You never poke at individual pixels; you update the data and let the rendering follow.</li>
+    </ul>
+
+    <aside class="callout tip">
+      <strong>First, the bridge: promises, <code>async</code> and <code>await</code></strong>
+      <p>A <strong>promise</strong> is a placeholder for a value that arrives later: the operation has started, but the result is not in your hands yet. <code>fetch()</code> returns a promise, because a network request takes time your code cannot predict. Inside an <strong>async function</strong> — a function marked with the <code>async</code> keyword, which lets it pause mid-run — you can <code>await</code> that promise: your code stops at that line until the value lands, and if the request fails, the failure becomes an <strong>exception</strong> (an error thrown as a value your code can catch) that you can handle with <code>try</code>/<code>catch</code>. The <code>.then()</code> chain you are about to see is the same idea written differently: each <code>.then()</code> says “when the value arrives, run this next.”</p>
+    </aside>
+    <script type="text/plain" class="code" data-lang="js" data-title="Two styles, one fetch">
+      // Style 1: the .then() chain
+      fetch('/api/books')
+        .then((res) => res.json())
+        .then((books) => console.log(books));
+
+      // Style 2: async and await, inside an async function
+      async function loadBooks() {
+        const res = await fetch('/api/books');
+        const books = await res.json();
+        console.log(books);
+      }
+    </script>
+
+    <h3>The <code>fetch()</code> pattern</h3>
+    <p>The browser's built-in way to call an API is <code>fetch()</code>: you give it a URL, it asks the server, and it hands you back the response so your code can read the JSON and render it. This is the pattern you will run against your own Week 2 server — the same <code>rest-api.js</code> from Section 2.4, with the front end and the API served from the same origin:</p>
+    <script type="text/plain" class="code" data-lang="js" data-title="app.js (browser) — fetch the list and render it">
+      fetch('/api/books')
+        .then((res) => {
+          if (!res.ok) throw new Error('Request failed: ' + res.status);
+          return res.json();
+        })
+        .then((books) => {
+          const list = document.getElementById('book-list');
+          list.replaceChildren();
+          books.forEach((b) => {
+            const li = document.createElement('li');
+            const strong = document.createElement('strong');
+            strong.textContent = b.title;
+            li.append(strong, ' by ' + b.author);
+            list.append(li);
+          });
+        });
+    </script>
+    <p>Read it as a pipeline. <code>fetch('/api/books')</code> sends <code>GET /api/books</code> to your server. The first <code>.then</code> runs when the response arrives and converts its body from JSON text into a JavaScript array with <code>res.json()</code>. The second <code>.then</code> receives that array — the exact JSON from Section 2.4 — and turns each book into an <code>&lt;li&gt;</code>. Adding a book is the same shape: <code>fetch</code> with <code>method: 'POST'</code> and a JSON body, then re-render from the updated state.</p>
+    <aside class="callout warn">
+      <strong>Two <code>fetch()</code> traps</strong>
+      <p>First: <code>fetch()</code> only <strong>fails</strong> — its promise rejects (ends in failure instead of delivering a value) — on network problems, like no connection or a server that never answers. A 404 or 500 response still “succeeds” as far as <code>fetch()</code> is concerned, so check <code>res.ok</code> (a true/false property that is true exactly when the status is in the 2xx success family) before trusting the data — that is what the guard line in the sample does, turning a bad status into a thrown error. Second: a 204 response has no body at all, so never call <code>.json()</code> on it — there is nothing to parse and it throws. After a <code>DELETE</code>, just update the page from your state.</p>
+    </aside>
+
+    <aside class="callout tip">
+      <strong>When the browser blocks your calls: CORS</strong>
+      <p>If you open your front-end page from a file, or from a different port than your API, the browser will block its <code>fetch()</code> calls. That block is called <strong>CORS</strong> (cross-origin resource sharing): a browser security rule about which origins — an origin is a scheme, host and port together, like <code>http://localhost:3000</code> — a page may read answers from. It is not a bug in your server; your server answered fine, and the browser refused to hand the answer to the page. This course's fix is to serve the page from the same Express app with <code>express.static</code> (Section 2.3), so page and API share one origin and CORS never comes up. The alternative, when the two genuinely live apart, is a <code>cors</code> middleware package on the server that tells browsers which origins are allowed.</p>
+    </aside>
+
+    <h3>Try it: the same rendering, simulated in this page</h3>
+    <p>This page has no server behind it, so the playground below <strong>simulates</strong> the API: the books live in a local array whose items are exactly the verified API JSON from Section 2.4. Everything else is the real thing — the rendering follows the pattern above, and the add-book form updates the state and re-renders, just as it would after a successful <code>POST</code>. Point this same code at <code>fetch()</code> and it works unchanged against your running server.</p>
+    <div class="playground" data-title="Try it: render the book list, then add a book" data-height="300">
+      <textarea data-lang="html">&lt;h1&gt;Book list&lt;/h1&gt;
+&lt;ul id="book-list"&gt;&lt;/ul&gt;
+&lt;div&gt;
+  &lt;label&gt;Title &lt;input id="new-title" type="text" placeholder="The Hobbit"&gt;&lt;/label&gt;
+  &lt;label&gt;Author &lt;input id="new-author" type="text" placeholder="J.R.R. Tolkien"&gt;&lt;/label&gt;
+  &lt;button id="add-btn" type="button"&gt;Add book&lt;/button&gt;
+&lt;/div&gt;</textarea>
+      <textarea data-lang="js">// In the real app this array arrives from fetch('/api/books').
+// Here it is the same JSON, held locally, because this page has no server.
+let books = [
+  { id: 1, title: 'Dune', author: 'Frank Herbert' },
+  { id: 2, title: 'Emma', author: 'Jane Austen' }
+];
+let nextId = 3;
+
+const list = document.getElementById('book-list');
+
+function render() {
+  list.replaceChildren();
+  books.forEach((b) => {
+    const li = document.createElement('li');
+    const strong = document.createElement('strong');
+    strong.textContent = b.title;
+    li.appendChild(strong);
+    li.appendChild(document.createTextNode(' by ' + b.author));
+    list.appendChild(li);
+  });
+}
+
+document.getElementById('add-btn').addEventListener('click', () => {
+  const title = document.getElementById('new-title').value.trim();
+  const author = document.getElementById('new-author').value.trim();
+  if (!title || !author) return;
+  books.push({ id: nextId++, title: title, author: author });
+  render();
+  document.getElementById('new-title').value = '';
+  document.getElementById('new-author').value = '';
+});
+
+render();</textarea>
+      <script type="application/json" class="checks">
+      [
+        {"label": "The list renders 2 books on load", "test": "return $$('#book-list li').length === 2"},
+        {"label": "The first book is Dune by Frank Herbert", "test": "return !!$('#book-list li') && $('#book-list li').textContent.indexOf('Dune') !== -1 && $('#book-list li').textContent.indexOf('Frank Herbert') !== -1"},
+        {"label": "The add-book form has title and author inputs and a button", "test": "return !!$('#new-title') && !!$('#new-author') && !!$('#add-btn')"}
+      ]
+      </script>
+    </div>
+    <p>Use it the way the checks cannot: type a title and an author, click <strong>Add book</strong>, and watch the list grow from 2 books to 3. Nothing reloaded. The state changed, <code>render()</code> ran again, and the screen followed the data — the entire SPA idea in one small page. Notice how <code>render()</code> builds each item: it creates real elements with <code>document.createElement</code> (a browser method that makes an element node) and sets their words with <code>textContent</code> (a property that inserts plain text, never markup), so a book title can never inject markup into the page — Week 4 returns to this attack. (The rendering logic in this playground was verified outside the browser before this page was published: the list renders exactly the two starter books, one add makes three, and blank entries are rejected.)</p>
+
+    <h3>Components and state, in the small</h3>
+    <p>The playground's render code is a component in embryo. Written as a named function that takes data and returns a piece of interface — here, a real element built node by node — it is exactly what a framework component does; the frameworks add tooling around the same idea:</p>
+    <script type="text/plain" class="code" data-lang="js" data-title="A book component (pattern)">
+      function bookItem(book) {
+        const li = document.createElement('li');
+        const strong = document.createElement('strong');
+        strong.textContent = book.title;
+        li.append(strong, ' by ' + book.author);
+        return li;
+      }
+      // Rendering the list = applying the component to every item in the state:
+      // books.forEach((b) => list.appendChild(bookItem(b)));
+    </script>
+    <p>And the add-book click is the full state cycle in four beats: <strong>read</strong> the input, <strong>update</strong> the state (push the new book), <strong>re-render</strong> from the state, and the <strong>screen follows</strong>. In the real app there is one extra beat at the front — <code>POST</code> the new book to the API and let the server assign its id — because the server, not the page, is the permanent home of the data. The page's state is a working copy; the API is the original. Keeping those two straight — who owns the truth, and how the copy refreshes — is most of front-end engineering.</p>
+
+    <div class="match" data-title="Match each front-end term to its meaning">
+      <script type="application/json">
+      {"leftTitle": "Term", "rightTitle": "Meaning", "pairs": [
+        ["SPA", "One page loads once; JavaScript re-renders parts of it instead of reloading"],
+        ["Component", "A reusable piece of interface bundled with the code that renders it"],
+        ["State", "The data the interface depends on; change it and re-render, and the screen follows"],
+        ["`fetch()`", "The browser's built-in way to call an API and receive its response"],
+        ["`res.json()`", "Turns a response's JSON text into a JavaScript value"],
+        ["Render", "Turning data (state) into the HTML the visitor sees"]
+      ]}
+      </script>
+    </div>
+
+    <aside class="callout tip">
+      <strong>Who serves the front end?</strong>
+      <p>Often, your own Express server does — remember <code>express.static</code> from Section 2.3. One server can deliver the SPA's HTML, CSS and JavaScript as static files <em>and</em> answer its <code>/api/...</code> calls. Two jobs, one assembly line: static middleware near the top, API routes below it.</p>
+    </aside>
+
+    <h3>The same page, built with a framework: Vue</h3>
+    <p>Everything above was <strong>vanilla</strong> JavaScript — plain JavaScript with no library, which is the right way to learn what a framework actually does for you. Now meet one: <strong>Vue</strong> is a front-end framework, and below is the playground's book page rebuilt with it. <strong>This code runs in your own project</strong>, saved as the <code>index.html</code> in your Week 2 server's <code>public</code> folder, next to <code>rest-api.js</code> — this course site itself loads no third-party scripts, which is why this is a code sample to copy, not a live playground. It uses Vue 3's <strong>global build</strong>: a single script file, loaded from a CDN (content delivery network — a public server that hosts library files), that gives the page a global <code>Vue</code> object. No build step, no install — one script tag.</p>
+    <script type="text/plain" class="code" data-lang="html" data-title="public/index.html — the book page in Vue (your project)">
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="utf-8">
+        <title>Book list — Vue version</title>
+        <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"><\/script>
+      </head>
+      <body>
+        <div id="app">
+          <h1>Book list</h1>
+          <ul>
+            <li v-for="book in books" :key="book.id">
+              <strong>{{ book.title }}</strong> by {{ book.author }}
+            </li>
+          </ul>
+          <div>
+            <label>Title <input v-model="newTitle" type="text" placeholder="The Hobbit"></label>
+            <label>Author <input v-model="newAuthor" type="text" placeholder="J.R.R. Tolkien"></label>
+            <button type="button" @click="addBook">Add book</button>
+          </div>
+        </div>
+
+        <script>
+          const { createApp } = Vue;
+
+          createApp({
+            data() {
+              return {
+                books: [],
+                newTitle: '',
+                newAuthor: ''
+              };
+            },
+            mounted() {
+              fetch('/api/books')
+                .then((res) => res.json())
+                .then((books) => { this.books = books; });
+            },
+            methods: {
+              addBook() {
+                const title = this.newTitle.trim();
+                const author = this.newAuthor.trim();
+                if (!title || !author) return;
+                fetch('/api/books', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ title: title, author: author })
+                })
+                  .then((res) => res.json())
+                  .then((book) => {
+                    this.books.push(book);
+                    this.newTitle = '';
+                    this.newAuthor = '';
+                  });
+              }
+            }
+          }).mount('#app');
+        <\/script>
+      </body>
+      </html>
+    </script>
+    <p>Read it against the playground. The HTML inside <code>#app</code> is the <strong>template</strong>: the markup that describes the interface, with extra Vue attributes called <strong>directives</strong> (instructions to the framework, written as attributes starting with <code>v-</code>). <code>v-for</code> repeats the <code>&lt;li&gt;</code> once per book; the <code>{{ }}</code> pairs drop values into the page as text; <code>v-model</code> ties each input to a piece of state, two ways — typing updates the state, and clearing the state clears the input. The <code>data()</code> function returns the state, and <code>books</code> there is <strong>reactive</strong> state: data the framework watches, so when it changes, the page re-renders on its own. <code>mounted()</code> is a <strong>lifecycle hook</strong> — a function Vue calls for you at a set moment, here once, right after the app first appears — and it fetches <code>/api/books</code> from the same API as the rest of the week. The <code>addBook</code> method <code>POST</code>s the new book and pushes the book the server returns (with its real, server-assigned id) into <code>books</code>. Notice what is missing: there is no <code>render()</code> call anywhere, because nobody needs to make one.</p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col">Vanilla playground version</th><th scope="col">Framework (Vue) version</th></tr></thead>
+        <tbody>
+          <tr><td>Keeping an array and re-rendering by hand</td><td>Reactive state the framework watches</td></tr>
+          <tr><td>Writing render code that builds the list</td><td>Declaring a template that describes the list</td></tr>
+          <tr><td>Calling <code>render()</code> after every change</td><td>The framework re-renders automatically when state changes</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Same page, same API, same state idea — the framework simply takes over the “keep the screen matched to the data” bookkeeping you did by hand. That trade is why frameworks exist, and why learning the vanilla version first was not wasted time: when a framework page misbehaves, the state underneath is still where you look.</p>
+
+    <div class="quiz" data-title="Check your understanding: single-page apps">
+      <script type="application/json">
+      [
+        {"q": "What makes an app a *single-page* application?", "shuffle": true, "choices": ["It has only one feature", "One HTML page loads once; JavaScript re-renders parts of it and gets data from an API", "It is served by a single server file", "It only works on one browser"], "answer": 1, "explain": "No full-page reloads. Navigation and updates are redraws driven by JavaScript, fed with JSON from API calls."},
+        {"q": "In the `fetch()` pattern, what does `res.json()` do?", "shuffle": true, "choices": ["Sends JSON to the server", "Converts the response body from JSON text into a JavaScript value your code can use", "Checks that the response status is 200", "Renders the data as a list"], "answer": 1, "explain": "The response arrives as text. `res.json()` parses it — for `/api/books`, into the array of book objects your render code maps over."},
+        {"q": "True or false: in the playground, adding a book reloads the page.", "answer": false, "explain": "That is the SPA point: the click updates the state (the `books` array) and calls `render()` again. The page never reloads — only the list is redrawn."},
+        {"q": "What is *state*, in the plain sense used in this section?", "shuffle": true, "choices": ["The US state the server is hosted in", "The data the interface currently depends on; change it and re-render, and the screen follows", "A cookie stored by the browser", "The server's configuration file"], "answer": 1, "explain": "State here is the book list. The screen is a function of the state: update the data, re-render, done — in the playground and in real frameworks alike."},
+        {"q": "Why did the playground hold the books in a local array instead of calling `fetch()`?", "shuffle": true, "choices": ["`fetch()` is deprecated", "This course page has no server behind it, so it simulates the API with the same JSON; the rendering code works unchanged with real `fetch()`", "Local arrays are faster than APIs", "Browsers block `fetch()` on course sites"], "answer": 1, "explain": "The simulation swaps only where the data comes from. Against your own running `rest-api.js`, the identical render code consumes the identical JSON via `fetch('/api/books')`."},
+        {"q": "In the Vue version of the book list, a book is added to the `books` array and no render function is called. Why does the new book appear on the page?", "shuffle": true, "choices": ["The browser refreshes the list every second", "The state is reactive: Vue watches it and re-renders automatically when it changes", "The server pushes new HTML to the page", "`v-model` redraws the whole page"], "answer": 1, "explain": "That automatic re-render is the framework's core bargain: you keep the state correct, and the framework keeps the screen matching it. In the vanilla playground you had to call `render()` yourself after every change."},
+        {"q": "What does the `v-for` directive do in the Vue template?", "shuffle": true, "choices": ["Fetches the list from the API", "Validates the add-book form", "Renders one element per item in the array it is given", "Sorts the books alphabetically"], "answer": 2, "explain": "An element written `<li v-for=\"book in books\">` is repeated once for each book in the reactive `books` array — the template declares the shape once, and the framework repeats it per item."}
+      ]
+      </script>
+    </div>
+  </section>
+
+  <!-- ===================================================== 2.6 -->
+  <section class="lesson" id="s2-6">
+    <h2>Organizing an Express App: Routers and Error Handlers</h2>
+    <p><em>This section is enrichment: it makes everything from this week easier to grow, and Week 3 and Week 4 assume you have seen it.</em></p>
+    <p>Your <code>rest-api.js</code> is one file with five routes, and it is already easy to lose track of. Now imagine the real app: books, users, orders, reviews — forty routes, three kinds of middleware, all in one file thousands of lines long. Nothing about it is <em>wrong</em>; it is simply unfindable. Every change means scrolling past unrelated code, and every teammate's edit collides with yours. The fix is not a new language feature. It is filing: group related routes into their own module, and mount each group at its own address.</p>
+
+    <h3><code>express.Router</code>: a mini-app for one resource</h3>
+    <p>An Express <strong>router</strong> is a small, self-contained bundle of routes and middleware that behaves like a mini application. You build one per resource in its own file, defining paths <em>relative</em> to where it will be mounted — inside <code>routes/books.js</code>, the list route is just <code>'/'</code>, because the <code>/api/books</code> part is supplied when the main app mounts it:</p>
+    <script type="text/plain" class="code" data-lang="js" data-title="routes/books.js (excerpt)">
+      const express = require('express');
+      const router = express.Router();
+
+      let books = [
+        { id: 1, title: 'Dune', author: 'Frank Herbert' },
+        { id: 2, title: 'Emma', author: 'Jane Austen' }
+      ];
+      let nextId = 3;
+
+      // Mounted at /api/books, so '/' here means GET /api/books
+      router.get('/', (req, res) => {
+        res.json(books);
+      });
+
+      // '/:id' here means GET /api/books/:id
+      router.get('/:id', (req, res) => {
+        const book = books.find((b) => b.id === Number(req.params.id));
+        if (!book) return res.status(404).json({ error: 'Book not found' });
+        res.json(book);
+      });
+
+      // POST, PUT and DELETE move here too, unchanged.
+
+      module.exports = router;
+    </script>
+    <p>The main file then shrinks to wiring: build the app, install the global middleware, and mount each router at its prefix with <code>app.use()</code> — the same <code>app.use()</code> from Section 2.2, now carrying a router instead of a single function:</p>
+    <script type="text/plain" class="code" data-lang="js" data-title="app.js (excerpt)">
+      const express = require('express');
+      const booksRouter = require('./routes/books');
+
+      const app = express();
+      app.use(express.json());
+
+      app.use('/api/books', booksRouter);
+
+      app.listen(3000, () => console.log('Listening on port 3000'));
+    </script>
+    <p>Be clear about what changed and what did not: <strong>only the filing changed</strong>. The reorganized API answers identically to Section 2.4 — the same requests return the same verified responses, the same statuses, the same JSON — because the handlers themselves were not rewritten, just moved. A <code>GET /api/books/99</code> still returns <code>{"error":"Book not found"}</code> with status 404. When a refactor changes no behavior, that sameness is the success criterion, and the captured session in Section 2.4 is your checklist.</p>
+
+    <h3>The last two stations: the 404 handler and the error handler</h3>
+    <p>A well-organized app also decides, deliberately, what happens when a request matches <em>nothing</em>, and what happens when a handler <em>fails</em>. Both are middleware — placed at the very end of the line, where only unanswered or failed requests ever reach them.</p>
+    <p>First, the <strong>404 handler</strong>: a plain middleware registered after every route. Any request that reaches it was not answered by anything above, so its address names nothing your app has. For an API, it answers in JSON, like every other API response:</p>
+    <script type="text/plain" class="code" data-lang="js" data-title="The 404 handler (after all routes)">
+      app.use((req, res) => {
+        res.status(404).json({ error: 'Not found' });
+      });
+    </script>
+    <p>Second, the <strong>error-handling middleware</strong>. Ordinary stations have three arguments; an error handler has <strong>four</strong> — <code>(err, req, res, next)</code> — and that extra first argument is how Express recognizes it. It never runs during a normal request. It runs when an earlier handler calls <code>next(err)</code> with an error, or throws one: Express skips every remaining ordinary station and jumps straight here. Its job is to log the real problem on the server (where only you can see it) and send the client a calm, generic 500:</p>
+    <script type="text/plain" class="code" data-lang="js" data-title="The error-handling middleware (registered last)">
+      app.use((err, req, res, next) => {
+        console.error(err);
+        res.status(500).json({ error: 'Internal server error' });
+      });
+    </script>
+    <p class="wk2-cap"><strong>Expected output</strong> — this pattern is shown as the standard shape rather than a fresh capture: with this handler in place, a handler that fails produces one error logged on the server console and a <code>500</code> response whose JSON body is <code>{"error":"Internal server error"}</code>. (The API-level error you have already seen verified is the 404 JSON from Section 2.4: <code>{"error":"Book not found"}</code>.) The client never receives the stack trace — that stays in your server log, where it helps you and leaks nothing.</p>
+    <p>One modern convenience belongs here. In Express 5, if an <strong>async handler</strong> — a handler written as an <code>async</code> function, so it returns a promise (Section 2.5) — has that promise reject (the async version of throwing an error), Express forwards the error to the error-handling middleware automatically. <code>try</code>/<code>catch</code> is still needed for errors thrown later inside plain <strong>callbacks</strong> — functions you hand to other code, to be run whenever some work finishes, like a timer firing or a file read completing — which no framework can catch for you.</p>
+    <aside class="callout tip">
+      <strong>Express 5 details that do real work</strong>
+      <p>This course teaches Express 5, the current version. Three of its details matter in this section:</p>
+      <ul>
+        <li><strong>Async errors are forwarded automatically</strong> (above): when an async handler's promise rejects, Express sends the error to the error-handling middleware on its own — no wrapper code needed.</li>
+        <li><strong>Catch-all routes:</strong> a wildcard is a catch-all path pattern, and Express 5's router rejects a bare <code>'*'</code> path — <code>app.get('*', ...)</code> throws an error at startup. Write a catch-all as middleware with <code>app.use</code>, exactly as this section's 404 handler does, or use a named wildcard such as <code>'/*splat'</code> when you need a real route.</li>
+        <li><strong>The body parsers are built into Express</strong> (<code>express.json()</code>, <code>express.urlencoded()</code>), so there is no separate parser package to install.</li>
+      </ul>
+    </aside>
+    <p>Put the week's architecture together and the line reads: global middleware (logger, body translators, static files) at the top, routers in the middle, then the 404 handler, then the error handler, last of all. Every request has a defined path through the app — including the requests that fail.</p>
+    <p>On disk, the organized app looks like this — small files, each named for the one thing it holds:</p>
+    <script type="text/plain" class="code" data-lang="js" data-title="Project layout">
+      app.js            the wiring: middleware, mounts, listen
+      routes/
+        books.js      the books router (Section 2.4's handlers, moved)
+        users.js      the users router, when you add one
+      public/
+        index.html    the single-page front end (Section 2.5)
+        app.js        its browser JavaScript: fetch + render
+    </script>
+    <p>That layout is the bridge to the rest of the course. Week 3 swaps the array inside <code>routes/books.js</code> for a real database without touching a single URL. Week 4 adds an authentication router and a gatekeeping middleware in front of the others. Because the filing is clean, each of those changes lands in exactly one place.</p>
+
+    <div class="order" data-title="Put the app file in order">
+      <script type="application/json">
+      {"prompt": "You are assembling the organized app from this section. Put the pieces in the order they belong in the file — which is also the order a request meets them.",
+       "items": [
+         "`app.use(morgan('dev'))` and `app.use(express.json())` — global middleware",
+         "`app.use(express.static('public'))` — serve the front end",
+         "`app.use('/api/books', booksRouter)` — the resource routes",
+         "The 404 handler — answers anything unmatched",
+         "The error-handling middleware `(err, req, res, next)` — catches failures"
+       ],
+       "explain": "Global stations first so every request passes them, routers next, and the two safety nets last: the 404 handler only sees requests nothing else answered, and the four-argument error handler only runs when something upstream passes it an error."}
+      </script>
+    </div>
+
+    <div class="quiz" data-title="Check your understanding: routers and error handlers">
+      <script type="application/json">
+      [
+        {"q": "Inside `routes/books.js`, the list route is written as `router.get('/', ...)`. Why does it still answer `GET /api/books`?", "shuffle": true, "choices": ["Express ignores the mount path", "The router is mounted with `app.use('/api/books', booksRouter)`, and routes inside are relative to that prefix", "The file name supplies the path", "`'/'` is a wildcard that matches everything"], "answer": 1, "explain": "Mount prefix plus relative path: `/api/books` + `/` = `/api/books`, and `/api/books` + `/:id` = `/api/books/:id`. That relativity is what makes routers reusable and movable."},
+        {"q": "How does Express recognize an error-handling middleware function?", "shuffle": true, "choices": ["Its name contains `error`", "It is registered with `app.error()`", "It has four arguments: `(err, req, res, next)`", "It is the last function in the file"], "answer": 2, "explain": "The four-argument signature is the marker. Express skips it during normal requests and jumps to it when a handler passes or throws an error."},
+        {"q": "True or false: reorganizing `rest-api.js` into a router changes what `GET /api/books` returns.", "answer": false, "explain": "The move is pure filing: same handlers, same responses, same verified outputs as Section 2.4. If a response changed, the refactor broke something."},
+        {"q": "Why is the 404 handler registered *after* all the routes?", "shuffle": true, "choices": ["Express requires 404 handlers to be last by law", "So it only receives requests that no route answered; registered earlier, it would swallow real requests", "To make it run faster", "Because it needs the error handler's variables"], "answer": 1, "explain": "Middleware runs in registration order and the 404 handler answers everything it receives. Position is its filter: last in line means only unmatched requests arrive."},
+        {"q": "A route handler calls `next(err)` after a database failure. What runs next?", "shuffle": true, "choices": ["The next ordinary route in line", "The error-handling middleware, which logs the error and sends a generic 500 JSON response", "The 404 handler", "The static middleware"], "answer": 1, "explain": "Passing an error to `next()` skips all remaining ordinary stations and lands in the four-argument error handler — which is why it is registered last and why the client gets a calm 500 instead of a stack trace."}
+      ]
+      </script>
+    </div>
+  </section>
+
+  <!-- ===================================================== Review -->
+  <section class="lesson" id="s2-review">
+    <h2>Week 2 Review</h2>
+    <p>This week your server stopped being a handful of fixed pages and became a system: routes that capture values from the URL, a middleware line every request travels, a REST API with predictable URLs, JSON in both directions and honest status codes — and a front end that treats that API as its source of data. Those five ideas (parameters, middleware, REST, JSON, and the SPA pattern) are the working core of the rest of this course: Week 3 gives the API real persistence, and Week 4 locks it down.</p>
+    <aside class="callout warn">
+      <strong>Midterm next</strong>
+      <p>The <strong>midterm exam follows this week</strong>. It covers Weeks 1 and 2: Node and Express foundations, route parameters and query strings, middleware order and <code>next()</code>, built-in and third-party middleware, REST design, status codes, and how a front end consumes an API. Work through the flashcards and the review quiz below; if you can explain <em>why</em> each answer is right — especially anything about middleware order or status codes — you are ready.</p>
+    </aside>
+
+    <h3>The week on one screen</h3>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col">Question you can now answer</th><th scope="col">Where it lives</th></tr></thead>
+        <tbody>
+          <tr><td>Which value identifies the resource, and which values are just options?</td><td>Parameters in the path; options in the query string (2.1)</td></tr>
+          <tr><td>In what order does my server code run for one request — and what makes it stop?</td><td>Registration order down the middleware line; a response, or a missing <code>next()</code> (2.2)</td></tr>
+          <tr><td>Who serves files, who translates bodies, who keeps the diary?</td><td><code>express.static</code>, <code>express.json()</code>/<code>express.urlencoded()</code>, morgan (2.3)</td></tr>
+          <tr><td>How do I design an API a stranger can guess?</td><td>Noun URLs, method verbs, JSON both ways, honest status codes (2.4)</td></tr>
+          <tr><td>How does a page update without reloading?</td><td>State changes, re-render, data from <code>fetch()</code> (2.5)</td></tr>
+          <tr><td>How does the app stay findable as it grows — and what catches failures?</td><td>Routers per resource; the 404 handler and the four-argument error handler last (2.6)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Trace one request end to end</h3>
+    <p>Everything in this course so far happens inside a single button click. Step through it once, slowly — a visitor to your book app clicks <strong>Add book</strong>:</p>
+    <div class="stepper" data-title="One click, whole stack">
+      <div class="stepper-stage">
+        <div class="wk2-flow">
+          <div class="wk2-node" data-on="1-5" data-active="1"><b>Browser</b><span>fetch POST /api/books</span></div>
+          <div class="wk2-arrow" data-on="1-5">→</div>
+          <div class="wk2-node" data-on="2-5" data-active="2"><b>Middleware line</b><span>morgan, express.json()</span></div>
+          <div class="wk2-arrow" data-on="2-5">→</div>
+          <div class="wk2-node" data-on="3-5" data-active="3"><b>Books router</b><span>POST / handler</span></div>
+          <div class="wk2-arrow" data-on="3-5">→</div>
+          <div class="wk2-node" data-on="4-5" data-active="4"><b>Response</b><span>201 + the new book as JSON</span></div>
+          <div class="wk2-arrow" data-on="4-5">→</div>
+          <div class="wk2-node" data-on="5" data-active="5"><b>Re-render</b><span>state updated, list redrawn</span></div>
+        </div>
+      </div>
+      <ol class="steps">
+        <li><p><strong>The front end asks.</strong> The click handler sends <code>fetch('/api/books', { method: 'POST', ... })</code> with the new book as a JSON body. The page does not reload; the request travels in the background (Section 2.5).</p></li>
+        <li><p><strong>The line processes it.</strong> On the server, morgan logs the request, then <code>express.json()</code> translates the JSON body into <code>req.body</code> and calls <code>next()</code>. Static middleware finds no matching file and passes it on (Sections 2.2 and 2.3).</p></li>
+        <li><p><strong>The router handles it.</strong> The request reaches the books router mounted at <code>/api/books</code>; its <code>POST /</code> handler reads <code>req.body.title</code> and <code>req.body.author</code>, assigns the next id, and stores the book (Sections 2.4 and 2.6).</p></li>
+        <li><p><strong>The API answers.</strong> The handler replies <code>201 Created</code> with the new book — including its server-assigned id — as JSON. If the book had not existed or the data were bad, the same machinery would have produced the JSON 404 or a 400 instead.</p></li>
+        <li><p><strong>The screen follows.</strong> Back in the browser, the <code>fetch()</code> promise resolves, the code adds the returned book to its state, and <code>render()</code> redraws the list — now three books, exactly as in the Section 2.5 playground. One click used every idea in the week.</p></li>
+      </ol>
+    </div>
+
+    <h3>Debugging this week: symptom → station</h3>
+    <p>Almost every Week 2 bug is a line problem: a station missing, misplaced, or refusing to move the belt. Diagnose by symptom:</p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col">Symptom</th><th scope="col">Likely station</th><th scope="col">Fix</th></tr></thead>
+        <tbody>
+          <tr><td>Request hangs forever, no error anywhere</td><td>Some middleware</td><td>Find the function that neither responds nor calls <code>next()</code></td></tr>
+          <tr><td><code>req.body</code> is empty on POST/PUT</td><td>Body translators</td><td>Register <code>express.json()</code> (or <code>express.urlencoded()</code>) <em>before</em> the routes</td></tr>
+          <tr><td>A route "does nothing"; a file answers instead</td><td><code>express.static</code></td><td>Static is registered above the route and a file matches the URL — reorder or rename</td></tr>
+          <tr><td>Every id lookup returns 404</td><td>Route handler</td><td><code>req.params.id</code> is a string; compare with <code>Number(req.params.id)</code></td></tr>
+          <tr><td>Nothing is logged, even for 404s</td><td>morgan</td><td>It is registered too late; move it to the top of the line</td></tr>
+          <tr><td>Front end renders nothing, console shows a JSON error</td><td>The fetch/render pair</td><td>Check the URL against the morgan diary: the API path the page asks for is not the path the server serves</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="flashcards" data-title="Week 2 key terms" data-front="Term" data-back="Definition">
+      <script type="application/json">
+      [
+        {"front": "Route parameter", "back": "A named placeholder in a route path, written with a colon (`/users/:id`). It captures one path segment; the handler reads it from `req.params`. It identifies **which** resource a request is about."},
+        {"front": "Query string", "back": "The part of a URL after `?`: `key=value` pairs joined by `&`. Express parses it into `req.query`. It carries **options** for a request — a search term, a page number, a sort order — never the resource's identity."},
+        {"front": "Middleware", "back": "A function `(req, res, next)` that sits between the incoming request and the final handler. Middleware runs in registration order; each station does one job and either answers the request or hands it on."},
+        {"front": "`next`", "back": "The third argument every middleware receives. Calling `next()` hands the request to the next function in line. Calling `next(err)` skips ahead to the error-handling middleware. Forgetting both — no response, no `next()` — makes the request hang."},
+        {"front": "Static files", "back": "Files served exactly as they sit on disk — HTML, CSS, images, text. `express.static('public')` middleware maps a folder to the web: `/hello.txt` returns `public/hello.txt`, and `/` returns `public/index.html`."},
+        {"front": "REST", "back": "A style for designing APIs: everything is a resource with its own URL, URLs are nouns (`/api/books/2`), the HTTP method carries the verb, data travels as JSON, and status codes report the outcome."},
+        {"front": "Resource", "back": "A thing your application keeps and exposes through the API — a book, a user, an order. A collection lives at a plural noun URL (`/api/books`); one item adds its id (`/api/books/2`)."},
+        {"front": "Status code", "back": "The three-digit number on every HTTP response. 2xx success (200 OK, 201 Created, 204 No Content), 4xx the client's mistake (400 Bad Request, 404 Not Found), 5xx the server's failure (500)."},
+        {"front": "JSON", "back": "JavaScript Object Notation: a text format for structured data — objects, arrays, strings, numbers, booleans. APIs send it with `res.json()` and receive it through `express.json()`. It is text, so every language can use it."},
+        {"front": "SPA", "back": "Single-page application. One HTML page loads once; JavaScript re-renders parts of it as the user interacts, and the data behind the redraws comes from API calls instead of full-page reloads."},
+        {"front": "`fetch()`", "back": "The browser's built-in function for calling an API from front-end JavaScript. `fetch('/api/books')` sends the request; `res.json()` on the response turns its JSON body into a JavaScript value you can render."},
+        {"front": "Router", "back": "`express.Router()`: a self-contained bundle of routes for one resource, defined with paths relative to its mount point and attached with `app.use('/api/books', booksRouter)`. It organizes an app without changing any response."}
+      ]
+      </script>
+    </div>
+
+    <div class="quiz" data-title="Week 2 review quiz">
+      <script type="application/json">
+      [
+        {"q": "A request arrives at `/api/books/2?verbose=true`. Which part is the route parameter and which is the query string?", "shuffle": true, "choices": ["Parameter: `verbose=true`; query string: `2`", "Parameter: `2`; query string: `verbose=true`", "Both are parameters", "Both are query string"], "answer": 1, "explain": "`2` fills the `:id` placeholder in the path, so it is `req.params.id`. Everything after `?` is the query string, read from `req.query`."},
+        {"q": "Your middleware logs every request but some requests never reach your route handler and never get a response. The middleware ends with `console.log(...)` and nothing else. What is wrong?", "shuffle": true, "choices": ["The log line is too long", "It never calls `next()` and never sends a response, so requests stall at that station", "Logging middleware must be registered last", "Console output blocks Express"], "answer": 1, "explain": "The classic hang. A station must answer the request itself or call `next()` to move it down the line; doing neither strands it forever."},
+        {"q": "In which order do these run for one request: route handler, first-registered middleware, second-registered middleware?", "shuffle": true, "choices": ["Route handler, middleware 1, middleware 2", "Middleware 1, middleware 2, route handler", "Middleware 2, middleware 1, route handler", "All at once, in parallel"], "answer": 1, "explain": "Registration order is execution order — the verified console output of `middleware-order.js` shows exactly this sequence."},
+        {"q": "Which middleware serves `public/style.css` when a browser asks for `/style.css`?", "shuffle": true, "choices": ["`express.json()`", "`morgan('dev')`", "`express.static('public')`", "`express.urlencoded()`"], "answer": 2, "explain": "Static middleware maps URLs onto files in the folder. The body translators and the logger pass the request along; only static answers it."},
+        {"q": "A client `POST`s a book as JSON, but your handler sees an empty `req.body`. Name the missing piece.", "shuffle": true, "choices": ["`app.use(express.json())` before the routes", "A route parameter", "A 201 status", "`morgan('dev')`"], "answer": 0, "explain": "Raw JSON text becomes `req.body` only if the `express.json()` translator runs earlier in the line. No translator, no body."},
+        {"q": "Design check: which of these is the RESTful way to delete book 5?", "shuffle": true, "choices": ["`GET /deleteBook/5`", "`POST /api/books/5/delete`", "`DELETE /api/books/5`", "`DELETE /api/deleteBook?id=5`"], "answer": 2, "explain": "Noun in the URL, verb in the method: `DELETE` on the resource's own address. URLs never contain action words in REST design."},
+        {"q": "Your API successfully creates a resource, then successfully deletes one. Which pair of status codes did it return?", "shuffle": true, "choices": ["200 and 200", "201 and 204", "201 and 200", "302 and 404"], "answer": 1, "explain": "201 Created for the POST, 204 No Content for the DELETE — both appear in the verified `rest-api.js` session."},
+        {"q": "A request for a book that does not exist returns `{\"error\":\"Book not found\"}`. Why JSON, and which status goes with it?", "shuffle": true, "choices": ["JSON because browsers require it; status 200", "JSON because the client is a program that parses it; status 404", "JSON because HTML is not allowed in APIs; status 500", "JSON by accident; status 201"], "answer": 1, "explain": "API clients are programs, so errors arrive in the same parseable format as successes. 404 says the resource is not there — a client-side addressing mistake, not a server failure."},
+        {"q": "What does the front end's `fetch('/api/books')` receive, and what does it do with it?", "shuffle": true, "choices": ["A finished HTML page, which it displays whole", "A JSON array of books, which its rendering code turns into list items without reloading the page", "A database connection, which it queries directly", "A status code only; the data stays on the server"], "answer": 1, "explain": "That is the SPA loop: request JSON, render it into the existing page. State changes, re-render, screen follows — no reload."},
+        {"q": "An error-handling middleware is defined as `(err, req, res, next)`. When does Express run it?", "shuffle": true, "choices": ["On every request, first", "Only when an earlier handler passes or throws an error; ordinary requests skip it", "Only for 404s", "When the server starts"], "answer": 1, "explain": "The four-argument signature marks it as the error station. It sits last in the line and only receives requests that failed somewhere upstream."}
+      ]
+      </script>
+    </div>
+  </section>
+</main>
+</body>
+</html>

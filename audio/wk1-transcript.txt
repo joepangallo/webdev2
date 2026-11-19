@@ -1,0 +1,68 @@
+Alex: In Web Development One, your JavaScript lived in the browser, decorating pages after they arrived. Today that same language walks out of the browser, sits down on the server, and starts answering requests itself. That one move turns a page builder into a full stack developer.
+Jordan: Full stack is one of those phrases I hear everywhere. What does it actually mean?
+Alex: It means you can work on both ends of a website. The front end is what the visitor sees in the browser. The back end is the program on a distant computer that decides what to send back. In this course you will build both.
+Jordan: So welcome to Web Development Two. Where do we start?
+Alex: With a simple question. Why did JavaScript need to leave the browser at all?
+Jordan: I assumed JavaScript was invented for browsers and just stayed there.
+Alex: For its first fourteen years, it mostly did. JavaScript began in nineteen ninety-five as a small scripting language, a short set of instructions that runs inside another program, meant to make pages react when you clicked or typed.
+Jordan: And browsers were happy to be its only home?
+Alex: They were, but developers kept hitting a wall. A browser page cannot safely do everything. It cannot keep a shared list of all your customers, because every visitor has a different browser. It cannot hide secret keys, because anyone can view its source. And it cannot be trusted to check prices or grades, because a visitor can change what the browser sends.
+Jordan: So some work has to happen on a computer the site owner controls.
+Alex: Exactly. That computer is a server, which in plain English is just an always-on computer whose job is to listen for requests and send back responses. Servers used to mean learning a second language, like Java or Python, even if your pages were all JavaScript.
+Jordan: Two languages for one website sounds like twice the ways to get confused.
+Alex: That was the daily pain. Then, in two thousand and nine, a runtime called Node arrived and changed the bargain. A runtime is the program that actually runs your code and gives it abilities, like reading files or talking to a network. Your browser is one runtime for JavaScript. Node is another runtime, built for ordinary computers instead of browser tabs.
+Jordan: So Node is not a new language at all.
+Alex: That is the trap to avoid. Node does not replace JavaScript. It takes the same language you already know, removes the browser-only parts like clicking on a page, and adds server powers, like opening a network port, which is a numbered doorway where a program listens for visitors.
+Jordan: What does a Node program actually do all day?
+Alex: Mostly it waits, listens, and answers quickly. A request arrives, your code decides what it means, sends a response, and goes back to waiting. Node is good at juggling many visitors at once, because it does not freeze while one slow job finishes. It sets that job aside and helps the next visitor.
+Jordan: Like a good waiter who takes another table's order while the kitchen cooks the first one.
+Jordan: Okay, so I can run JavaScript on a server with Node. How do I actually answer a web request?
+Alex: That brings us to our second big idea. Node ships with a built-in tool called the H T T P module. H T T P, or HyperText Transfer Protocol, is the agreed conversation where a browser asks for something and a server answers. The module is the raw, do-it-yourself way to hold that conversation.
+Jordan: Raw sounds honest but tiring.
+Alex: It is both, and that is why we start there. With the raw module, you write a function that runs for every single request. Your code has to look at the address that was asked for, look at the method, which is the verb of the request, and then decide, by hand, what to send back.
+Jordan: Remind me what those verbs are, in plain words.
+Alex: A get request asks the server to send something back, like showing a page or listing books. A post request sends new data for the server to act on, like submitting a form or creating an account. Same doorway, different intentions, and your code has to tell them apart.
+Jordan: And with the raw module, I am checking every detail myself?
+Alex: Every detail. If a visitor asks for a page you do not have, you must remember to send back a four hundred four response, which is the status code that means not found. A status code is the short number at the start of every response that says how things went. Two hundred means success. Four hundred four means the thing asked for is not here.
+Jordan: I bet beginners forget that last part.
+Alex: They do, and you will feel it yourself this week. A server that stays silent is worse than a server that says no clearly.
+Jordan: So where does Express come in?
+Alex: Express is a framework, which in plain English is a ready-made skeleton of code that handles the repetitive parts so you can focus on what makes your site different. Express sits on top of Node and turns that one giant checking function into tidy, separate routes.
+Jordan: And a route is?
+Alex: A route is a pairing of an address and a verb with the function that should answer it. You can picture a route that listens for a get request to the home page and replies with a welcome message, and a different route that listens for a post request to a signup address and saves the new visitor's details.
+Jordan: That sounds much easier to read than one enormous list of checks.
+Alex: It is easier to read and easier to grow. You declare each answer in its own small block and let Express match the incoming request to the right one.
+Jordan: Is Express doing magic behind the scenes?
+Alex: No magic. Express is still Node, using that same H T T P conversation underneath. It just organizes your work.
+Jordan: What does a beginner trap look like here?
+Alex: Two classics. First, answering a get request when you meant post, so your form seems to vanish. Second, never sending a response at all, so the browser just spins. Express helps, but it cannot read your mind.
+Jordan: So week one is really about thinking in requests and responses.
+Alex: That is the mindset shift. Pages are no longer files you hand over. They are answers you build, fresh, for each request.
+Jordan: That leaves our third idea. Where does Express come from?
+Alex: From other people, generously. Developers publish reusable pieces of code called packages, bundles of code someone else wrote and tested so you do not have to start from zero.
+Jordan: And npm is where those live?
+Alex: N P M, which stands for Node Package Manager, is both the giant public library where packages are stored and the tool on your computer that fetches them for you. When you install Express, npm downloads it, plus the smaller packages Express itself depends on, and places them in a folder in your project.
+Jordan: That sounds like standing on other people's code in the best way.
+Alex: It is, and professionals do it every day. Using a trusted, widely used package lets you spend your learning time on the ideas that matter, like routes and responses.
+Jordan: But there must be a responsible part. You said that word on purpose.
+Alex: I did. Responsible means three habits. First, check what you are installing. Is it widely used, recently maintained, and clearly documented? A package nobody has touched in eight years is a warning sign. Second, install only what you need. Every package is code you are trusting to run on your server.
+Jordan: And third?
+Alex: Third, keep a list. Your project keeps a file that records every package and its version, so a teammate, or future you, can rebuild the exact same setup on another computer. Never rely on remembering what you installed on a tired evening three weeks ago.
+Jordan: Is there a trap with versions?
+Alex: Yes. A newer version can change how something works, so update deliberately, one at a time, and test afterward, instead of updating everything at once and guessing what broke.
+Jordan: So npm gives me power, and the habits keep that power safe.
+Alex: Beautifully put. Borrow widely, borrow wisely, and write down what you borrowed.
+Jordan: All right, I have the ideas. What do I actually do with my hands this week?
+Alex: Head to the course site and open the Week One module page. Your try this activity starts with the form playground. You fill in a small form, press submit, and the playground shows you exactly what a browser sends to a server.
+Jordan: What will I see that I could not see before?
+Alex: You will see the method, the address, and the actual data from each field, laid out plainly. A form does not float magically into a database. It becomes a neat package of names and values riding along with a request, and your server's job is to unpack it.
+Jordan: That already explains a lot of confusing form bugs.
+Alex: Then comes my favorite moment. The module lets you ask the raw H T T P server for a page it does not have, and watch what happens when the four hundred four response is forgotten.
+Jordan: The spinning browser of doom.
+Alex: The very one. Feeling that hang once, in a safe playground, teaches you to always ask, what does my server say when the answer is no?
+Jordan: Let me try to say the whole week back to you.
+Alex: Please do.
+Jordan: JavaScript left the browser because some work must happen on a computer the owner controls. Node is the runtime that runs JavaScript there. The raw H T T P module lets me answer requests by hand, and Express organizes those answers into clear routes for get and post requests. And npm lets me borrow trusted packages, as long as I check them and keep my list.
+Alex: I could not have summarized it better. Carry that picture everywhere this term. Every topic coming up is just a richer version of a visitor asking and your server answering wisely.
+Jordan: What is waiting for us next week?
+Alex: Next week we make those routes smarter, line up middleware like an assembly line, and design a proper R E S T A P I that a front end page can talk to. Bring this week's waiter. He is about to get a much better kitchen.

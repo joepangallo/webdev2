@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Final Project · Web Dev II</title>
+<meta name="description" content="The Web Development II final project: one full-stack web app, built a milestone at a time — Express server, REST API, database persistence, and logins with roles.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/course.css">
+<script src="../assets/js/course.js"></script>
+</head>
+<body data-page="project">
+<main id="main">
+  <header class="module-hero" id="top">
+    <p class="eyebrow"><span class="tag">Final project</span><span>25% of your grade</span><span>One app · one milestone per week</span></p>
+    <h1>The Final Project: Your Full-Stack App</h1>
+    <p class="lede">You design and build one complete web application — server, API, database and logins — and it grows by one milestone after each week of the course. Nothing is thrown away: the small server you write in Week 1 is the same app you finish in Week 4, with accounts and roles switched on.</p>
+  </header>
+
+  <section class="lesson" id="how" aria-labelledby="how-h">
+    <h2 id="how-h">How the project works</h2>
+    <p>Each milestone uses only what the class has covered up to that week, and each one is checked before the next begins. If you keep up weekly, the "final project" is never a last-minute mountain — it is four small climbs.</p>
+    <div class="cards">
+      <div class="card"><h3>One app</h3><p>Pick a theme below. Every milestone adds to the same codebase, so your early decisions — names, folders, data shapes — keep paying off.</p></div>
+      <div class="card"><h3>A milestone per week</h3><p>Server after Week 1, API and front end after Week 2, real persistence after Week 3, accounts and roles after Week 4.</p></div>
+      <div class="card"><h3>It has to run</h3><p>Your app must start with one command and answer requests on your machine. "It worked in a screenshot" is not a deliverable.</p></div>
+      <div class="card"><h3>Show your work</h3><p>A short README explains what your app does and how to run it. Future you — and your instructor — will thank present you.</p></div>
+    </div>
+    <aside class="callout tip">
+      <strong>Start embarrassingly small.</strong>
+      <p>The best Week 1 server stores nothing, styles nothing, and answers two routes. You will grow it every week. A tiny app that runs beats a grand design that does not.</p>
+    </aside>
+  </section>
+
+  <section class="lesson" id="themes" aria-labelledby="themes-h">
+    <h2 id="themes-h">Choose your theme</h2>
+    <p>Your app needs <strong>data worth storing</strong>: a collection of things that can be listed, added, edited and deleted, where some actions are public and some are private. These themes all fit. Pick one, adapt one, or propose your own in the same shape.</p>
+    <div class="tabs">
+      <div data-tab="Collection tracker"><p>Track a personal collection — books, games, vinyl, trading cards. <strong>Data:</strong> items with a title, a category, a year and a note. <strong>Public:</strong> browse the collection. <strong>Private:</strong> only the owner adds or edits items.</p></div>
+      <div data-tab="Club manager"><p>Run a club or team: members, events and sign-ups. <strong>Data:</strong> members, events, attendance. <strong>Public:</strong> see upcoming events. <strong>Private:</strong> members sign up; officers manage the roster.</p></div>
+      <div data-tab="Booking board"><p>Book a shared resource — tutoring slots, lab seats, studio time. <strong>Data:</strong> time slots and who holds them. <strong>Public:</strong> see open slots. <strong>Private:</strong> signed-in users book and cancel their own slots.</p></div>
+      <div data-tab="Recipe box"><p>A shared recipe collection with ingredients and steps. <strong>Data:</strong> recipes with ingredients, time and difficulty. <strong>Public:</strong> search and read recipes. <strong>Private:</strong> cooks contribute and edit their own.</p></div>
+      <div data-tab="Local business API"><p>A small business — a food truck, a repair shop, a salon — with a menu or service list and a request form. <strong>Data:</strong> offerings and customer requests. <strong>Public:</strong> browse offerings, send a request. <strong>Private:</strong> the owner views and answers requests.</p></div>
+    </div>
+    <p>Whichever theme you choose, write down — before any code — the <strong>one main collection</strong> your app stores (books, events, slots, recipes, requests). Every milestone revolves around it.</p>
+  </section>
+
+  <section class="lesson" id="m1" aria-labelledby="m1-h">
+    <p class="section-eyebrow"><span class="s-num">M1</span><span>After Week 1</span><span>20 points</span></p>
+    <h2 id="m1-h">Milestone 1 · A Running Server</h2>
+    <p><strong>Goal:</strong> a Node project with an Express server that starts cleanly and answers real routes. This is the skeleton everything else hangs on.</p>
+    <p><strong>Builds on:</strong> Week 1 — Node, the http module, npm, Express, GET and POST.</p>
+    <div class="table-wrap"><table class="data">
+      <thead><tr><th>Requirement</th><th>What "done" looks like</th></tr></thead>
+      <tbody>
+        <tr><td>Project setup</td><td><code>npm init</code> done; <code>express</code> in <code>dependencies</code>; a <code>start</code> script in package.json</td></tr>
+        <tr><td>Server</td><td><code>node</code> starts it with no errors; it listens on a port taken from <code>process.env.PORT</code> with a sensible default</td></tr>
+        <tr><td>Routes</td><td>At least three GET routes (home plus two about your theme) and one POST route that reads a form or JSON body and answers with what it received</td></tr>
+        <tr><td>Not found</td><td>An unknown address gets a clear "not found" response, not a crash or a hang</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Deliverable:</strong> your project folder (or repo link) plus a one-paragraph note naming your theme and your main collection.</p>
+    <div class="quiz" data-title="Milestone 1 self-check">
+      <script type="application/json">
+[
+  {
+    "q": "Your server answers at `http://localhost:3000` on your machine. A classmate on another computer types the same address and gets nothing. Why?",
+    "shuffle": true,
+    "choices": [
+      "Your code is broken",
+      "`localhost` means *this* computer — theirs points at their own machine",
+      "Express only serves one visitor",
+      "The port is too low"
+    ],
+    "answer": 1,
+    "explain": "`localhost` always means the machine you are sitting at. Sharing your running app with others is a deployment step, not a code fix."
+  },
+  {
+    "q": "Which file records your project's dependencies so a fresh copy can be rebuilt with one install command?",
+    "shuffle": true,
+    "choices": [
+      "`server.js`",
+      "`README.md`",
+      "`package.json`",
+      "`node_modules`"
+    ],
+    "answer": 2,
+    "explain": "`package.json` lists dependencies; `npm install` rebuilds `node_modules` from it. You share the list, never the folder."
+  },
+  {
+    "q": "Your POST route receives a form but `req.body` is empty. The most likely cause is…",
+    "shuffle": true,
+    "choices": [
+      "The form used GET",
+      "The body-parsing middleware (`express.urlencoded`) is missing or runs after the route",
+      "POST routes cannot read forms",
+      "The port is already in use"
+    ],
+    "answer": 1,
+    "explain": "Express does not unpack form bodies until the matching middleware has run — and middleware only applies to routes defined after it."
+  }
+]
+      </script>
+    </div>
+  </section>
+
+  <section class="lesson" id="m2" aria-labelledby="m2-h">
+    <p class="section-eyebrow"><span class="s-num">M2</span><span>After Week 2</span><span>25 points</span></p>
+    <h2 id="m2-h">Milestone 2 · API and Front End</h2>
+    <p><strong>Goal:</strong> your main collection becomes a small REST API, and a web page uses it. For now the data can live in memory — Week 3 makes it permanent.</p>
+    <p><strong>Builds on:</strong> Week 2 — routing in depth, middleware, REST design, single-page front ends.</p>
+    <div class="table-wrap"><table class="data">
+      <thead><tr><th>Requirement</th><th>What "done" looks like</th></tr></thead>
+      <tbody>
+        <tr><td>REST endpoints</td><td>GET all, GET one by id, POST, PUT, DELETE for your main collection, with nouns-not-verbs paths like <code>/api/books</code></td></tr>
+        <tr><td>Status codes</td><td>201 on create, 204 on delete, 404 with a JSON error when an id does not exist</td></tr>
+        <tr><td>Middleware</td><td>JSON body parsing, a request logger, static file serving, and an error-handling middleware — in an order you can explain</td></tr>
+        <tr><td>Front end</td><td>One page built with a front-end framework (for example Vue loaded from a CDN script tag — no build step needed, as in Week 2) that fetches your API, renders the list from the framework's state, and has a form that adds a new item through the API (no page reload)</td></tr>
+        <tr><td>Organization</td><td>Routes for the collection live in their own router file, mounted with <code>app.use</code></td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Deliverable:</strong> the updated project, plus a short list of your endpoints (method + path + what it does).</p>
+    <div class="quiz" data-title="Milestone 2 self-check">
+      <script type="application/json">
+[
+  {
+    "q": "A POST to `/api/books` succeeds and creates a book. Which status code should the response carry?",
+    "shuffle": true,
+    "choices": [
+      "200",
+      "201",
+      "204",
+      "302"
+    ],
+    "answer": 1,
+    "explain": "201 Created is the success code for 'a new resource now exists'. 200 is a plain OK; 204 means success with no response body — right for DELETE."
+  },
+  {
+    "q": "Your front end shows the list but the add-form reloads the whole page. What is missing?",
+    "shuffle": true,
+    "choices": [
+      "A bigger server",
+      "JavaScript that intercepts the submit, sends the data with `fetch`, and updates the page",
+      "A second HTML file",
+      "A database"
+    ],
+    "answer": 1,
+    "explain": "A plain form submit always navigates. Single-page behavior comes from JavaScript handling the event and talking to the API itself."
+  },
+  {
+    "q": "Why move the book routes into a router file instead of leaving everything in the server file?",
+    "shuffle": true,
+    "choices": [
+      "Routers run faster",
+      "Each file stays about one thing, so the app remains readable as it grows",
+      "Express requires exactly two files",
+      "Routers hide the code from users"
+    ],
+    "answer": 1,
+    "explain": "Organization is about the humans. The API answers identically either way — you proved that in Week 2 — but a one-topic file is far easier to change safely."
+  }
+]
+      </script>
+    </div>
+  </section>
+
+  <section class="lesson" id="m3" aria-labelledby="m3-h">
+    <p class="section-eyebrow"><span class="s-num">M3</span><span>After Week 3</span><span>25 points</span></p>
+    <h2 id="m3-h">Milestone 3 · Real Persistence</h2>
+    <p><strong>Goal:</strong> restart your server and your data is still there. Your API now reads and writes a real database — MongoDB or MySQL, your choice — and refuses bad data.</p>
+    <p><strong>Builds on:</strong> Week 3 — cookies and sessions, relational vs non-relational databases, CRUD, validation and configuration.</p>
+    <div class="table-wrap"><table class="data">
+      <thead><tr><th>Requirement</th><th>What "done" looks like</th></tr></thead>
+      <tbody>
+        <tr><td>Database</td><td>Main collection stored in MongoDB or MySQL; all five API operations use the database, not an in-memory array</td></tr>
+        <tr><td>Safe queries</td><td>MySQL: every query uses placeholders — no user input glued into SQL strings. MongoDB: filters built from validated fields only</td></tr>
+        <tr><td>Validation</td><td>The server rejects creates/updates with missing or wrong-typed required fields, answering 400 with a useful JSON error</td></tr>
+        <tr><td>Configuration</td><td>Connection string and port come from environment variables (a <code>.env</code> file locally); no secrets anywhere in the code or the repo</td></tr>
+        <tr><td>Seed data</td><td>A documented way to load a few starter records, so a fresh clone is not an empty app</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Deliverable:</strong> the updated project; your README now includes setup steps that end with a running app and visible seed data.</p>
+    <div class="quiz" data-title="Milestone 3 self-check">
+      <script type="application/json">
+[
+  {
+    "q": "You restart your server and the items your classmate added are gone. What does that tell you?",
+    "shuffle": true,
+    "choices": [
+      "The database is down",
+      "The data was still living in an in-memory array, not the database",
+      "The browser cleared its cookies",
+      "The port changed"
+    ],
+    "answer": 1,
+    "explain": "Memory dies with the process. Surviving a restart is the whole point of persistence — it is also the fastest test that your API really uses the database."
+  },
+  {
+    "q": "Why must the server validate data the browser form already checked?",
+    "shuffle": true,
+    "choices": [
+      "Browsers check badly",
+      "Anyone can send requests without your form — the server is the last line of defense",
+      "Validation is faster on the server",
+      "It is required by HTML"
+    ],
+    "answer": 1,
+    "explain": "Your form is a courtesy, not a guard. Tools like curl can POST anything; server-side validation is what actually protects the data."
+  },
+  {
+    "q": "Your database password is sitting in `server.js`, which you pushed to a public repo. What now?",
+    "shuffle": true,
+    "choices": [
+      "Nothing — passwords in code are normal",
+      "Delete the file from the repo and relax",
+      "Treat the password as leaked: change it, move secrets to environment variables, and keep them out of Git from now on",
+      "Rename the variable so nobody notices"
+    ],
+    "answer": 2,
+    "explain": "Once a secret is pushed, assume it is copied. Changing the password is the fix; removing the file alone does not un-leak it."
+  }
+]
+      </script>
+    </div>
+  </section>
+
+  <section class="lesson" id="m4" aria-labelledby="m4-h">
+    <p class="section-eyebrow"><span class="s-num">M4</span><span>After Week 4</span><span>30 points</span></p>
+    <h2 id="m4-h">Milestone 4 · Accounts and Roles</h2>
+    <p><strong>Goal:</strong> your app knows who is using it and what they may do. This is the finished full-stack application — the course in one project.</p>
+    <p><strong>Builds on:</strong> Week 4 — authentication, sessions, hashing, roles and protected routes, security hygiene.</p>
+    <div class="table-wrap"><table class="data">
+      <thead><tr><th>Requirement</th><th>What "done" looks like</th></tr></thead>
+      <tbody>
+        <tr><td>Accounts</td><td>Register and log in; passwords stored only as salted hashes (never plain text, never reversible)</td></tr>
+        <tr><td>Sessions</td><td>Login creates a session; the browser carries only the session ID cookie; logout truly ends it</td></tr>
+        <tr><td>Authorization</td><td>At least two roles (for example member and admin, or owner and visitor) with different powers, enforced on the server</td></tr>
+        <tr><td>Protected routes</td><td>Creating/editing/deleting through the API requires the right login and role: 401 when signed out, 403 when signed in but not allowed</td></tr>
+        <tr><td>Hygiene pass</td><td>Secrets in environment variables, cookie flags set sensibly, dependencies checked, no passwords or keys in the repo</td></tr>
+      </tbody>
+    </table></div>
+    <p><strong>Deliverable:</strong> the finished project, a README with setup and test accounts (a demo member and a demo admin), and a half-page reflection: what your app does, and which course idea was hardest to make real.</p>
+    <div class="quiz" data-title="Milestone 4 self-check">
+      <script type="application/json">
+[
+  {
+    "q": "Your UI hides the Delete button from members, but a member deletes an item by sending a DELETE request directly. What went wrong?",
+    "shuffle": true,
+    "choices": [
+      "The button was not hidden well enough",
+      "Authorization was only done in the interface — the server must check the role on every protected request",
+      "Members should not know URLs",
+      "The session cookie was too short"
+    ],
+    "answer": 1,
+    "explain": "Hiding a button is presentation. The server is the authority: every protected route verifies who is asking and what they may do."
+  },
+  {
+    "q": "A signed-in member tries to open the admin page. Which response is correct?",
+    "shuffle": true,
+    "choices": [
+      "200 with an apology",
+      "401",
+      "403",
+      "404"
+    ],
+    "answer": 2,
+    "explain": "They are authenticated (we know who they are) but not authorized for this. 401 is for 'not signed in'; 403 is 'signed in, still no'."
+  },
+  {
+    "q": "Why store a salted hash of a password instead of the password itself?",
+    "shuffle": true,
+    "choices": [
+      "Hashes are shorter",
+      "If the database leaks, attackers get fingerprints they cannot log in with — and the salt stops precomputed guessing",
+      "Browsers require it",
+      "It makes login faster"
+    ],
+    "answer": 1,
+    "explain": "The server never needs the password again — only the ability to check a new attempt against the stored fingerprint. Salt makes identical passwords store differently."
+  }
+]
+      </script>
+    </div>
+  </section>
+
+  <section class="lesson" id="rubric" aria-labelledby="rubric-h">
+    <h2 id="rubric-h">How the project is graded</h2>
+    <p>One hundred points across the four milestones (20 + 25 + 25 + 30). Within each milestone, the same four questions are asked:</p>
+    <div class="table-wrap"><table class="data">
+      <thead><tr><th>Criterion</th><th>What earns the points</th></tr></thead>
+      <tbody>
+        <tr><td>It runs (40%)</td><td>Starts cleanly from the README steps and behaves as specified — routes answer, data persists, logins work</td></tr>
+        <tr><td>It is correct (30%)</td><td>The week's concepts are used the way the course teaches them: REST shapes, middleware order, safe queries, hashed passwords, server-side checks</td></tr>
+        <tr><td>It is understandable (20%)</td><td>Files organized by topic, sensible names, a README another student could follow</td></tr>
+        <tr><td>It is yours (10%)</td><td>Your theme, your data, your decisions — and a reflection that sounds like someone who built it</td></tr>
+      </tbody>
+    </table></div>
+    <aside class="callout warn">
+      <strong>Two hard rules.</strong>
+      <p>First: never commit a secret — a password, key or connection string — to your repository; a leaked secret in a milestone is fixed by rotating it, not by deleting the file. Second: code you submit is code you can explain. Walking through your own app, out loud, is part of the final.</p>
+    </aside>
+    <p class="muted">The Week 4 module page ends with a capstone walkthrough that assembles exactly this kind of app, piece by piece, mapped to the week each piece came from — build alongside it if you ever feel lost.</p>
+  </section>
+</main>
+</body>
+</html>

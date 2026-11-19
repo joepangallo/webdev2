@@ -1,0 +1,59 @@
+Alex: Anyone can walk up to your server and claim to be anyone. This week, the final week, you learn to ask two different questions about every visitor. Who are you, really? And even if that is true, what are you allowed to do here?
+Jordan: Quick recap first.
+Alex: Last week we gave the server a memory. Cookies act as cloakroom tickets, sessions keep the real record on the server, and databases in relational and document shapes hold data through the full create, read, update, and delete cycle.
+Jordan: Good. Now, those two questions you opened with. They sound similar, but you said they are different.
+Alex: They are different, and confusing them is the beginner trap of the week. Authentication is proving who you are. Authorization is deciding what someone who is known is allowed to do. One checks identity. The other checks permission.
+Jordan: Give me a picture.
+Alex: Picture a school building. Authentication is the front desk checking your identification and agreeing that you are, in fact, a teacher at this school. Authorization is everything after that. A teacher may enter classrooms and the staff room, but not the payroll office. A student is genuinely a student, that part is authenticated, and still may not enter the staff room at all.
+Jordan: So being known does not mean being allowed everywhere.
+Alex: Never. Every serious security failure in the news seems to involve one of those two checks being skipped, or being quietly assumed instead of actually done. In your code, you will do both, out loud, on every protected route.
+Jordan: Protected route. That phrase again.
+Alex: A protected route is a route that checks before it answers. Is this visitor authenticated, and are they authorized for this thing? If either answer is no, it refuses clearly, often with four hundred one, which means we do not know who you are, or four hundred three, which means we know, and the answer is still no.
+Jordan: Let us start with authentication. That usually means a password.
+Alex: It does, and passwords come with a solemn duty. Never store a password plainly, exactly as the visitor typed it. Not anywhere.
+Jordan: Why is plain storage so dangerous if my database is private?
+Alex: Because databases leak. Backups get copied, laptops get lost, and one small mistake can expose the whole table. If passwords are stored plainly, every account falls at once, and most people reuse passwords, so other sites fall too.
+Jordan: Properly means hashing, I think.
+Alex: Yes. Hashing means running a password through a one-way mathematical scramble. The result, called a hash, always comes out the same for the same input, but you cannot run it backwards to recover the original. When a visitor signs in, you scramble what they typed and compare it with the stored scramble. A match means they knew the password.
+Jordan: Like comparing fingerprints instead of keeping a copy of the person.
+Alex: A fine picture. And then we add one more ingredient, because attackers prepare enormous lists of pre-made scrambles for common passwords. That ingredient is a salt, which in plain English is a random extra string, different for every single account, mixed into the password before hashing.
+Jordan: So two people with the same password end up with different stored hashes.
+Alex: Exactly. The salt is not secret. It can sit right beside the hash. Its job is uniqueness, so no ready-made list works, and every account must be attacked one slow, expensive guess at a time. Good password libraries do the hashing and the salting for you. Use them. Never invent your own scramble.
+Jordan: Okay. A visitor proves who they are. How does my server remember that proof on the next request, since H T T P forgets everything?
+Alex: That is our second big idea, and you already own half of it. The older answer is the session. The server keeps the record, and the browser carries only the ticket, the cookie with the session identifier, exactly as we built it last week.
+Jordan: And the newer answer is tokens.
+Alex: Yes. A token is a signed bundle of claims that the visitor carries with them and presents with each request. The most famous kind is the J W T, which stands for JSON Web Token. JSON, pronounced jay-son by most developers, is simply a common text format for naming values. So a J W T is a token written in that format.
+Jordan: Signed bundle of claims. Unpack that for me.
+Alex: A J W T has three parts, joined together as one long string. The first part names how it was signed. The middle part, called the payload, holds the claims, which are plain statements like who this visitor is and when this token expires. The last part is the signature, a special stamp made with a secret key held only by the server.
+Jordan: And the signature is what makes it trustworthy.
+Alex: Exactly. Anyone can read a token, and we will prove that in a moment. But nobody without the secret key can change it without breaking the signature. When a token arrives, your server checks the stamp. If the stamp is good and the token has not expired, the claims inside can be trusted, because only your server could have stamped them.
+Jordan: Wait. Anyone can read it? That sounds wrong.
+Alex: It surprises everyone, and it is vital. The payload is only encoded, which means written in a transport-friendly alphabet. Encoded is not encrypted. Encrypted means scrambled so only a key holder can read it. Encoded means anyone can decode it in seconds and read every claim, including the visitor's name and identifier.
+Jordan: So never put anything secret in a token.
+Alex: Never. No passwords, no private notes, nothing you would not happily print on a name badge worn in public. Think of a token as a stamped wristband at a concert. Everyone can see its color. What matters is that only the venue could have stamped it, and that it cannot be copied onto a different wrist.
+Jordan: Sessions or tokens, then. Which should I choose?
+Alex: Honest answer. Sessions are simple, and the server can cancel one instantly by deleting the record. Tokens travel well when many servers must all trust the same visitor, and the server stores nothing. Tokens are harder to cancel early, because a stamped token stays valid until it expires, which is why careful teams keep token lifetimes short.
+Jordan: That brings us to the third idea. Roles and hygiene.
+Alex: Yes. Once you know who a visitor is, authorization gets practical through roles. A role is a named bundle of permissions, like student, teacher, or administrator. You do not scatter individual checks for individual people all through your code. You give each account a role, and each protected route declares which roles may pass.
+Jordan: So a teacher role can post grades, a student role can view their own, and that decision lives in one clear place.
+Alex: Exactly, and when a new teacher joins, you change one role on one account, not fifty scattered checks. One more habit, and it is a famous trap. Checking permission only in the page is not enough. A visitor can send requests directly to your server without ever opening your page. The check must live on the server route itself, every time.
+Jordan: The server never trusts the page to have done the checking.
+Alex: Never. Now hygiene, which is the unglamorous set of habits that keeps all of this standing. First, H T T P S everywhere. The S means the conversation travels encrypted, scrambled in transit so listeners on the network cannot read passwords or tokens as they pass. A login over a plain connection is a password spoken loudly in a crowded room.
+Jordan: Second?
+Alex: Secrets stay secret and stay out of your code. Signing keys and database passwords belong in a separate, private place your program reads at startup, never in files you share. A secret pasted into a public project is gone forever, because copies spread fast.
+Jordan: And third brings back an old friend, I suspect.
+Alex: It does. Injection, the attack we met last week, where a visitor's typing is treated as instructions. Placeholders in your database questions, careful checking of everything that arrives, and honest error messages that reveal nothing useful to an attacker. Hygiene is not one clever trick. It is doing the plain things, every time, without exception.
+Jordan: Time for my hands, then. What is on the course site this week?
+Alex: Open the Week Four page. The first try this activity hands you a real token and invites you to decode its payload yourself. You paste it in, the middle section opens up, and there, in plain readable text, are the claims. A name, an identifier, an expiry time.
+Jordan: I think that moment will change how I see every token forever.
+Alex: It should. After that, nobody can tell you a token is a locked box. You have opened one. The second activity is the permission matrix. You get a small school site, a set of roles, and a grid of routes, and you decide, cell by cell, who may pass and who must be refused.
+Jordan: And the disagreements in my own head will be the interesting part.
+Alex: They always are. Should a student see another student's grades if they guess the address? Working the matrix forces authorization out of vague feelings and into clear decisions your protected routes can then enforce.
+Jordan: Let me try the whole course back, not just the week, since this is the end.
+Alex: This is the moment. Go ahead.
+Jordan: In Week One, JavaScript left the browser with Node, and Express turned requests into routes. In Week Two, middleware lined up like an assembly line, and R E S T design let a single page talk to my own A P I. In Week Three, cookies, sessions, and databases gave my server a memory, with the full create, read, update, and delete cycle. And this week, authentication proved who a visitor is, authorization decided what they may do, and hygiene kept the whole thing safe.
+Alex: That is the full arc, and you just described full stack development without flinching. Browser JavaScript grew up, moved to the server, learned to remember, and learned to protect what it remembers. That is the course.
+Jordan: One honest piece of business before we close.
+Alex: Yes. Your final exam and your posttest both follow this week, at the end of Week Four. Prepare the way we have worked all term. Explain each idea in plain words, and trace one request from browser to database and back. If you can do that out loud, you can do it on the exam.
+Jordan: Thank you. I came in making pages, and I am leaving able to build the whole conversation.
+Alex: And thank you for asking the questions every beginner is thinking. Keep building, and carry this course into whatever you make next.

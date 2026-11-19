@@ -1,0 +1,55 @@
+Alex: Your server can answer beautifully, route precisely, and still forget every single visitor the second the conversation ends. Today we fix that. Today your server learns to remember.
+Jordan: Before we start, what did we carry in from last week?
+Alex: Last week we made routes precise with parameters and query strings, lined middleware up like an assembly line, and designed a R E S T A P I that a single page front end could trust.
+Jordan: And my server still has no memory. Why not?
+Alex: Because of how H T T P was designed. H T T P, the conversation between browser and server, is stateless, which in plain English means each request arrives as if it were the very first one. The protocol itself keeps no memory between requests. No memory is a feature for simplicity, and a problem for real life.
+Jordan: Real life being shopping carts and staying signed in.
+Alex: Exactly. Imagine a shop that greets you as a total stranger every time you speak a new sentence. That is a stateless server without help. So the web invented a small, clever workaround, and it is our first big idea. The cookie.
+Jordan: I know cookies from those pop-up banners. What are they, really?
+Alex: A cookie is a tiny piece of text that a server asks your browser to hold on to, and that your browser then shows again with every later request to that same site. Nothing more mysterious than that. A name and a value, stored by the browser, returned faithfully.
+Jordan: Give me the picture that makes it stick.
+Alex: Picture a cloakroom at a theater. You hand over your coat, and the attendant hands you a small numbered ticket. You do not carry the coat around all evening. Later, you show the ticket, and the attendant brings your exact coat back. The ticket itself is not valuable. It only points to the thing being kept for you.
+Jordan: So the cookie is the ticket.
+Alex: The cookie is the ticket. Your browser is you, holding it in a pocket. And the server is the attendant, checking the number each time you come back to the counter.
+Jordan: What numbers are actually on these tickets in real life?
+Alex: Often just an identifier, a long random string that means nothing by itself. Or small preferences, like a language choice or a theme. Good rule of thumb, and a real trap to avoid. Never store anything secret or precious inside a cookie itself, because the visitor can read it and can change it. A cookie is a claim, not a proof.
+Jordan: So a cookie that says, I have paid, could just be edited to say that.
+Alex: Precisely. Which is why serious sites keep the real information somewhere safer, and let the cookie only carry the ticket number. That leads straight into our second big idea.
+Jordan: Sessions and files.
+Alex: Yes. A session is the server's own record of one visitor's visit, kept on the server side, and linked to that visitor by the ticket number in their cookie. The cart, the sign-in state, the half-finished form, all of that can live in the session record, where the visitor cannot tamper with it directly.
+Jordan: Where does the server physically keep that record?
+Alex: At first, often in a file. Node can read and write files, which are named bundles of data stored on the computer's disk. Saving your data to a file is called persistence, which simply means the data survives after the program stops or restarts. Without persistence, everything your visitors made vanishes the moment your server restarts.
+Jordan: Files sound simple and honest. Why do they stop being enough?
+Alex: For a class project with a handful of visitors, files are genuinely fine, and you will use them this week so you can see your data with your own eyes. But picture a busy shop. Thousands of visitors, all changing their carts at the same moment. One shared file becomes a bottleneck. Two changes at once can overwrite each other. Searching one giant file for one visitor gets slower every day. And if your site grows onto two servers, each one has its own files, and they disagree.
+Jordan: So files fail on teamwork, speed, and searching, all at once.
+Alex: Well said. When data matters, and many people use it at the same time, you need a program whose whole job is keeping data safely. That program is a database, and choosing its shape is our third big idea.
+Jordan: I keep hearing two shapes. Relational and document.
+Alex: Start with the relational database, the older and stricter shape. Relational means data is organized into tables, like careful spreadsheets. Each table holds one kind of thing, like books or visitors. Each row is one book or one visitor. Each column is one fact about it, like title or price. Tables connect to each other through shared values, so a sale can point to the exact book and the exact visitor involved.
+Jordan: And a system like MySQL is one of those.
+Alex: Yes. MySQL, pronounced my sequel by many of its users, is a famous relational database. Its strength is order and integrity. It can insist that a price is always a number, and that a sale never points to a book that does not exist. For money, bookings, and grades, that strictness is gold.
+Jordan: And the document shape?
+Alex: A document database stores each item as a document, which is a self-contained bundle of named values, much like a filled-in form or a single record card. One book document can carry its title, its author, and a list of tags, all together in one place, even if the next book has slightly different details.
+Jordan: And MongoDB is the famous one there.
+Alex: It is. MongoDB, often shortened to Mongo, is built for that flexible shape. Its strength is that it bends easily while a project is young and changing, and it feels natural to JavaScript developers because a document looks a lot like the objects you already write in your code.
+Jordan: Is one simply better?
+Alex: That is the trap question of the week. Neither is simply better. Highly connected, strict, must-never-be-wrong data leans relational. Flexible, self-contained, fast-changing data leans document. Real professionals choose by the shape of the data and the promises they must keep, not by fashion. This week you will work with both, on purpose.
+Jordan: Whichever shape I choose, what do I actually do with the data?
+Alex: The same four jobs, everywhere, forever. They are called C R U D, which stands for Create, Read, Update, and Delete. Create adds a new book. Read fetches one book, or lists them all. Update changes the price of a book that exists. Delete removes a book for good.
+Jordan: That sounds a lot like last week's methods.
+Alex: Your ear is getting sharp. It is the same pattern. A post request tends to create, a get request reads, a patch or put request updates, and a delete request deletes. Last week's A P I design and this week's database work are two ends of one road. A request arrives, your route asks the database to do one of the four jobs, and the answer travels back.
+Jordan: Walk me through one full cycle, slowly.
+Alex: A visitor adds a book on your page. Your front end sends a post request. Your route checks the details look sane, then asks the database to create the record, and replies with a status code meaning created. Later, the visitor opens the list, a get request, and your route reads the records back. They spot a wrong price, send an update, and your route changes just that field. At the end of term, an old book is removed with a delete, and a later read honestly answers not found.
+Jordan: And there is a safety habit you wanted me to hear about here.
+Alex: An essential one. When your code sends a question to a database, never glue a visitor's typing directly into that question. Instead, use a placeholder query, which means your question has a blank space marked in it, and the database fills in the visitor's value separately, treating it strictly as data and never as instructions.
+Jordan: Why does that separation matter so much?
+Alex: Because a clever visitor can type text that looks like a command. If your code pastes it straight into the question, the database might obey it, and that is how records get stolen or wiped. Placeholders shut that door completely. It costs you nothing and protects everything. Make it a habit from your very first query.
+Jordan: All right. What do I do with my hands this week?
+Alex: Open the Week Three page on the course site. The first try this activity is the cookie string parser. Browsers send cookies back as one long line of text, with pairs separated in a tidy pattern. The activity hands you real examples of that line and asks you to split it into clean names and values you can actually use.
+Jordan: So I get to see the ticket, up close, instead of imagining it.
+Alex: Exactly, and you will notice how plain it is. Just text. That plainness is why the rule about never trusting a cookie matters so much.
+Jordan: And the second activity?
+Alex: The database scenario sorting activity. You get a stack of short, realistic situations. A library catalog. A bank ledger. A recipe collection that changes every week. For each one, you decide, relational or document, and you say which C R U D jobs it needs most. There is no single trick answer. The learning is in the reasons you give.
+Jordan: Let me say the week back. H T T P forgets, so cookies act as cloakroom tickets. Sessions keep the real record safely on the server. Files persist data at first, but databases take over when data grows, and they come in relational and document shapes. Either way, I create, read, update, and delete, and I always use placeholders for visitor values.
+Alex: That is the whole week, cleanly held. Carry this forward. Memory is what turns a clever demo into a place visitors can actually live in.
+Jordan: And next week we protect all of it, I hope.
+Alex: We do. Next week is about proving who a visitor is, deciding what they are allowed to do, and guarding the data you learned to keep today.

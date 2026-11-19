@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Authentication &amp; Authorization · Web Dev II</title>
+  <meta name="description" content="Week 4: authentication vs authorization, password hashing and salts, sessions and the login flow, JSON Web Tokens, roles and protected routes, security hygiene, and a full-stack capstone walkthrough.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=JetBrains+Mono:wght@400;700&display=swap">
+  <link rel="stylesheet" href="../assets/css/course.css">
+  <script src="../assets/js/course.js"></script>
+  <style>
+    /* ===== Week 4 page styles. Every selector is prefixed c4- ===== */
+    .c4-flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; margin: 14px 0; }
+    .c4-flow .c4-node { flex: 1 1 130px; border: 1.5px solid var(--line-2); border-radius: 10px; padding: 10px 12px; background: var(--surface); font-size: .88rem; }
+    .c4-flow .c4-node b { display: block; font-size: .92rem; margin-bottom: 2px; }
+    .c4-flow .c4-node span { color: var(--ink-3); font-size: .8rem; line-height: 1.35; display: block; }
+    .c4-flow .c4-node.on { border-color: var(--mod); background: color-mix(in srgb, var(--mod) 12%, var(--surface)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--mod) 35%, transparent); }
+    .c4-token { font-family: var(--font-mono); font-size: .86rem; line-height: 1.7; overflow-wrap: anywhere; padding: 12px 14px; background: var(--code-bg); border: 1px solid var(--code-line); border-radius: 8px; color: var(--code-ink); }
+    .c4-token .h { color: var(--bad); font-weight: 700; }
+    .c4-token .p { color: var(--accent); font-weight: 700; }
+    .c4-token .s { color: var(--visited); font-weight: 700; }
+    .c4-tree { min-width: 520px; }
+    .c4-checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    .c4-checklist li { margin: 0; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--surface); font-size: .93rem; }
+    .c4-checklist li b { display: block; margin-bottom: 2px; }
+  </style>
+</head>
+<body data-module="wk4">
+<main id="main">
+  <header class="module-hero">
+    <h1>Authentication &amp; Authorization</h1>
+    <p class="lede">Your app can store data and answer requests. This week it learns to ask two harder questions — who are you, and what are you allowed to do — and to keep asking them on every single request.</p>
+  </header>
+
+<aside class="callout listen">
+  <strong>Listen: the Week 4 audio companion</strong>
+  <p>This episode explains how apps know who you are and what you are allowed to do: hashed passwords, sessions, tokens, and roles — plus the security habits that keep it all safe.</p>
+  <audio controls preload="metadata" src="../audio/wk4.mp3" style="width:100%"></audio>
+  <p class="small"><a href="../audio/wk4-transcript.txt">Read the episode transcript</a> (text file).</p>
+</aside>
+
+  <!-- ===================================================== 4.1 -->
+  <section class="lesson" id="s4-1">
+    <h2>Authentication vs Authorization: Passwords and Hashing</h2>
+    <p>Almost every real app has accounts. The moment you add accounts, you take on two separate jobs, and mixing them up is the source of a lot of real-world security bugs. Keep the two questions apart from the very start:</p>
+    <div class="grid-2">
+      <div class="card">
+        <p><strong>Authentication — “Who are you?”</strong></p>
+        <p>Authentication is proving your identity. You claim to be a user, and the app checks something only that user should have — usually a password. If the proof checks out, the app believes the claim. Logging in is authentication.</p>
+      </div>
+      <div class="card">
+        <p><strong>Authorization — “What may you do?”</strong></p>
+        <p>Authorization is deciding what an already-identified user is allowed to do. You can be fully logged in and still not be allowed to see another student’s grades, edit a course, or open the admin page. Authorization always comes <em>after</em> authentication.</p>
+      </div>
+    </div>
+    <p>Think of a building badge. Showing your badge at the front desk and having the photo match your face is <strong>authentication</strong>: the building now knows who you are. Which doors that badge actually unlocks — the lobby, your floor, the server room — is <strong>authorization</strong>. A valid badge gets you identified everywhere, but it only opens the doors you were given permission for. Your app works the same way: first it identifies the visitor, then it checks each door separately.</p>
+    <p>Try sorting real moments from a course app. Each one is mostly about one question or the other.</p>
+
+    <div class="buckets" data-title="Authentication or authorization?">
+      <script type="application/json">
+      {"buckets": ["Authentication — who are you?", "Authorization — what may you do?"],
+       "items": [
+         ["Typing your password on the login page", "Authentication — who are you?"],
+         ["A fingerprint unlock on your phone", "Authentication — who are you?"],
+         ["The server checking that the password matches the stored hash", "Authentication — who are you?"],
+         ["A student being blocked from the grade-entry page", "Authorization — what may you do?"],
+         ["Only instructors can post final grades", "Authorization — what may you do?"],
+         ["An admin deleting a course", "Authorization — what may you do?"],
+         ["Staying signed in because your session cookie is valid", "Authentication — who are you?"],
+         ["A signed-in user getting a 403 on `/admin`", "Authorization — what may you do?"]
+       ],
+       "explain": "If the moment is about **proving identity**, it is authentication. If the person is already known and the moment is about **permission for one action**, it is authorization."}
+      </script>
+    </div>
+
+    <h3>Why you never store a plain password</h3>
+    <p>A <strong>password</strong> is a secret word or phrase that only the account owner should know. The obvious way to support logins is to store each user’s password in the database and compare what they type against it. Do not do this. Databases leak: a backup file gets shared, a misconfigured server exposes a table, an attacker finds an injection bug (Section 4.5). If your table holds plain-text passwords, one leak hands out every account at once — and because people reuse passwords, it hands out their email and bank accounts too.</p>
+    <p>The fix is to store something you can <em>check</em> a password against without storing the password itself. That something is a hash.</p>
+    <p>A <strong>hash</strong> is a one-way fingerprint of some data. You run the password through a <strong>hash function</strong> — a recipe that scrambles input into a fixed-size string of characters — and you store the result. The important properties are:</p>
+    <ul>
+      <li><strong>One-way.</strong> You can turn a password into its hash, but you cannot turn the hash back into the password. There is no “unhash” button.</li>
+      <li><strong>Deterministic.</strong> The same input always produces the same hash, so checking a login attempt is easy: hash what the user typed and compare it with the stored hash.</li>
+      <li><strong>Completely different for a tiny change.</strong> Change one letter and the hash looks nothing alike, so a hash reveals nothing about how close a guess is.</li>
+    </ul>
+    <p>At login you never recover the real password. You hash the attempt and compare fingerprints. If they match, the attempt almost certainly came from someone who knows the password — and your database never held the password itself.</p>
+
+    <h3>The salt: one random extra ingredient per user</h3>
+    <p>Hashing alone has a weakness. Two users who both chose <code>hunter2</code> would get the <em>same</em> hash, and an attacker who pre-computes hashes for common passwords (a precomputed list is often called a rainbow table) can match them in bulk.</p>
+    <p>A <strong>salt</strong> fixes that. A salt is a random value generated fresh for each user and mixed into the password before hashing. That randomness must come from a cryptographic random source — in the demo below, <code>crypto.randomBytes</code> — never from a counter, a timestamp, or the username, all of which an attacker can predict or guess. You store the salt right next to the hash — the salt is not a secret — and you use it again at login time. Now two users with the same password store completely different values, and precomputed tables are useless because every user’s mixture is unique.</p>
+    <p>The program below is the real demo for this week. It uses Node’s built-in <code>crypto</code> module: <code>scryptSync</code> is a deliberately slow hash function designed for passwords (slowness is a feature — it makes guessing expensive), and <code>randomBytes</code> creates the salt.</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="hash-demo.js">
+      const crypto = require('crypto');
+
+      function hashPassword(password) {
+        const salt = crypto.randomBytes(16).toString('hex');
+        const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+        return salt + ':' + hash;
+      }
+
+      function checkPassword(password, stored) {
+        const [salt, hash] = stored.split(':');
+        const test = crypto.scryptSync(password, salt, 64).toString('hex');
+        return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(test, 'hex'));
+      }
+
+      const stored = hashPassword('correct horse battery staple');
+      console.log('Stored value looks like:', stored.slice(0, 20) + '... (' + stored.length + ' chars total)');
+      console.log('Right password accepted:', checkPassword('correct horse battery staple', stored));
+      console.log('Wrong password accepted:', checkPassword('hunter2', stored));
+    </script>
+    <p>Captured run (Node v26.13.1). The stored value is <code>salt:hash</code> — a 32-character salt, a colon, and a 128-character hash, <strong>161 characters total</strong>. The salt is random on every run, so the first characters of your stored value will differ from this capture; the booleans are the stable lesson.</p>
+    <div class="output">Stored value looks like: 2140a7ec9afe7c7e98e9... (161 chars total)
+Right password accepted: true
+Wrong password accepted: false</div>
+    <p>Read the code once more, slowly. <code>hashPassword</code> returns one string, <code>salt:hash</code>, and that single string is all you save in the database. <code>checkPassword</code> splits it back apart, re-hashes the attempt with the same salt, and compares. One detail worth copying into your own code: never compare the hashes with <code>===</code>. Verification uses <code>crypto.timingSafeEqual</code>, which takes the same amount of time whether the values match early or late, so the comparison does not leak how much of a guess was right through timing — an attacker cannot learn the hash byte by byte by measuring response times.</p>
+    <p>One simplification to notice: the demo uses <code>scryptSync</code>, the synchronous (blocking) form of <code>scrypt</code>, to keep the code short. In a real server you would use the asynchronous form of <code>scrypt</code> (or a library that does the same), because the sync version freezes the event loop — while one password is being checked, every other visitor waits, which is the Week 1 event-loop problem returning in a new place.</p>
+
+    <h3>What the server actually stores</h3>
+    <p>Put the pieces together and a row of your <code>users</code> table (Week 3) looks like this. Notice what is <em>not</em> in it: the password itself appears nowhere, and it never will.</p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col">Column</th><th scope="col">Example value</th><th scope="col">Why it is there</th></tr></thead>
+        <tbody>
+          <tr><td><code>id</code></td><td><code>42</code></td><td>The user’s permanent ID — this is what goes into the session and the JWT <code>sub</code> claim</td></tr>
+          <tr><td><code>username</code></td><td><code>ada</code></td><td>The name the user logs in with; how the server finds the row</td></tr>
+          <tr><td><code>password_hash</code></td><td><code>salt:hash</code> (161 characters)</td><td>The salted hash from <code>hashPassword</code> — everything login needs, nothing an attacker can reuse directly</td></tr>
+          <tr><td><code>role</code></td><td><code>student</code></td><td>The authorization level from Section 4.4, copied into the session or token at login</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Students often ask why the app does not simply <em>encrypt</em> the passwords instead. The tabs below draw the line, because the difference decides whether a leak is embarrassing or catastrophic.</p>
+    <div class="tabs">
+      <div data-tab="Hashing (what you do)">
+        <p><strong>One-way, on purpose.</strong> Hashing turns a password into a fingerprint and throws the password away. There is no key and no reverse operation. At login you do not recover anything: you hash the new attempt and compare fingerprints. If your table leaks, the attacker gets fingerprints — useless for logging in directly, and expensive to guess against because a password hash like <code>scrypt</code> is deliberately slow.</p>
+      </div>
+      <div data-tab="Encryption (what you do not do)">
+        <p><strong>Two-way, by design.</strong> Encryption scrambles data so that whoever holds the key can unscramble it. Your server would need the key at login time, which means the key lives somewhere the server can reach — and an attacker who compromises the server can usually reach it too. One key plus one leaked table equals every password, recovered. Anything that <em>can</em> be reversed eventually will be.</p>
+      </div>
+      <div data-tab="The rule">
+        <p><strong>Passwords are verified, never recovered.</strong> A well-built app genuinely cannot tell a user what their password is — that is why real sites offer “reset your password” and never “email me my password.” If a site can show you your old password, it stored it reversibly, and you have learned something alarming about that site.</p>
+      </div>
+    </div>
+
+    <aside class="callout warn">
+      <strong>Never invent your own password scheme</strong>
+      <p>This demo uses Node’s built-in <code>scrypt</code> so you can see every moving part. <code>bcrypt</code>, <code>scrypt</code> and Argon2id are all legitimate password hashes — none of them is the one “real” choice — and <code>scrypt</code>’s advantage here is simply that it is built into Node, so the demo needs no extra package. In a real project, keep using <code>scrypt</code> in its asynchronous form, or use a well-tested library such as <code>bcrypt</code> or <code>argon2</code> from npm. Never store passwords in plain text, never use a fast general-purpose hash like MD5 or SHA-256 alone for passwords, and never try to “encrypt” passwords — encryption can be reversed by anyone who finds the key, which is exactly the problem hashing avoids.</p>
+    </aside>
+
+    <div class="fill" data-mode="text" data-title="Fill in the vocabulary" data-explain="Authentication proves identity. Authorization decides permission. A hash is the one-way fingerprint. A salt is the random per-user value mixed in before hashing.">
+      <script type="text/plain">Proving who a user is is called [[authentication]]. Deciding what that user may do is called [[authorization]]. You store a one-way fingerprint of the password called a [[hash]], mixed with a random per-user value called a [[salt]].</script>
+    </div>
+
+    <div class="quiz" data-title="Check your understanding: authentication, authorization and hashing">
+      <script type="application/json">
+      [
+        {"q": "A signed-in student opens the grade-entry page and the server replies 403 Forbidden. Which question did the server just answer?", "shuffle": true, "choices": ["Authentication — who are you?", "Authorization — what may you do?"], "answer": 1, "explain": "The student was already identified, so authentication had succeeded. Blocking one action for a known user is authorization."},
+        {"q": "Why is storing plain-text passwords in the database so dangerous?", "shuffle": true, "choices": ["Plain text takes up too much disk space", "One database leak exposes every password at once, including on other sites where users reused them", "Browsers refuse to send plain-text passwords", "Plain text cannot be compared at login time"], "answer": 1, "explain": "The storage format does not stop logins from working — it makes a single leak catastrophic, because the actual secrets are sitting in the table."},
+        {"q": "True or false: at login, the server decrypts the stored hash to recover the password and compares it with what you typed.", "answer": false, "explain": "Hashing is one-way; there is nothing to decrypt. The server hashes what you typed and compares the two fingerprints."},
+        {"q": "Two users both pick the password `hunter2`. With a per-user salt, what do their stored values look like?", "shuffle": true, "choices": ["Identical, because the passwords are identical", "Completely different, because each salt is random", "The same hash with different usernames attached", "Empty, because duplicate passwords are rejected"], "answer": 1, "explain": "The salt is mixed in before hashing, so the same password produces a different stored `salt:hash` value for each user."},
+        {"q": "In `hash-demo.js`, how many characters long is the full stored `salt:hash` value? (Type a number.)", "answer": ["161"], "explain": "32 characters of salt + 1 colon + 128 characters of hash = 161 characters total, as the captured run shows."}
+      ]
+      </script>
+    </div>
+  </section>
+
+  <!-- ===================================================== 4.2 -->
+  <section class="lesson" id="s4-2">
+    <h2>Sessions and the Login Flow</h2>
+    <p>In Week 3 you met the problem underneath everything in this section: HTTP is <strong>stateless</strong>, which means each request arrives with no memory of the requests before it. A <strong>session</strong> is the server’s fix — a small record the server keeps about one visitor, identified by a random <strong>session ID</strong>. Your browser carries that ID in a <strong>cookie</strong> (a small name-and-value pair the browser stores and sends back automatically), and the server uses it to look your record up on every request.</p>
+    <p>You already ran the smallest possible session demo in Week 3. Here it is again, because the login flow is this same machine with one extra job: remembering <em>who</em> the session belongs to.</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="session-demo.js (from Week 3)">
+      const express = require('express');
+      const session = require('express-session');
+      const app = express();
+
+      app.use(session({ secret: 'dev-secret', resave: false, saveUninitialized: true }));
+
+      app.get('/count', (req, res) => {
+        req.session.visits = (req.session.visits || 0) + 1;
+        res.send('Visit number ' + req.session.visits);
+      });
+
+      app.listen(3000, () => console.log('Listening on port 3000'));
+    </script>
+    <p>Captured run (Node v26.13.1, Express 5.3.0). The <code>-c</code> flag saves the session cookie into a jar file and <code>-b</code> sends it back — that is exactly what a browser does for you automatically.</p>
+    <div class="output">$ curl -c jar.txt http://localhost:3000/count   (first visit, saves the session cookie)
+Visit number 1
+$ curl -b jar.txt http://localhost:3000/count   (same browser jar)
+Visit number 2
+$ curl -b jar.txt http://localhost:3000/count
+Visit number 3
+$ curl http://localhost:3000/count   (no cookie: a new session)
+Visit number 1
+--- server console ---
+Listening on port 3000</div>
+    <p>Notice what the cookie holds: only the session ID. The visit count itself never leaves the server. That split — an unguessable ID in the browser, the real data on the server — is what makes sessions safe enough to carry login state.</p>
+
+    <h3>The login flow, step by step</h3>
+    <p>Logging in is just a session that gets a name attached to it. Step through the whole exchange:</p>
+
+    <div class="stepper" data-title="The login flow">
+      <div class="stepper-stage">
+        <div class="c4-flow">
+          <div class="c4-node" data-on="1-6" data-active="1"><b>1 · Form</b><span>You submit a username and password over HTTPS.</span></div>
+          <div class="c4-node" data-on="2-6" data-active="2"><b>2 · Check</b><span>The server hashes the attempt and compares it with the stored hash.</span></div>
+          <div class="c4-node" data-on="3-6" data-active="3"><b>3 · Session</b><span>The server creates a session and stores your user ID in it.</span></div>
+          <div class="c4-node" data-on="4-6" data-active="4"><b>4 · Cookie</b><span>The response sets a cookie holding only the session ID.</span></div>
+          <div class="c4-node" data-on="5-6" data-active="5"><b>5 · Recognized</b><span>Later requests send the cookie, so the server knows it is still you.</span></div>
+          <div class="c4-node" data-on="6" data-active="6"><b>6 · Logout</b><span>Logout destroys the session on the server. The old ID stops working.</span></div>
+        </div>
+      </div>
+      <ol class="steps">
+        <li><p><strong>You submit credentials.</strong> <em>Credentials</em> are the proof you present to log in — here, a username and a password, sent in a <code>POST</code> request. This step is why login pages must use HTTPS (Section 4.5): the password travels in this request.</p></li>
+        <li><p><strong>The server checks the hash.</strong> The server looks up the stored <code>salt:hash</code> value for that username and runs the <code>checkPassword</code> function from Section 4.1. If there is no such user, or the check fails, the answer is a generic “wrong username or password” — never say which half was wrong, because that tells an attacker which usernames exist.</p></li>
+        <li><p><strong>A session is created.</strong> On success the server creates a fresh session and stores the user’s ID (and usually their role, Section 4.4) in it. “Fresh” matters: the server throws away any session ID the browser had before login and issues a new one, so an old ID planted by an attacker cannot be reused. This is called regenerating the session.</p></li>
+        <li><p><strong>The cookie carries the ID.</strong> The server’s response includes a <code>Set-Cookie</code> header with the new session ID. From here on, your browser attaches that cookie to every request to this site without you doing anything.</p></li>
+        <li><p><strong>Later requests are recognized.</strong> The session middleware reads the cookie, loads the session record, and your route handlers can read <code>req.session.userId</code> to know who is asking. No password is sent again — the session ID stands in for it until the session ends.</p></li>
+        <li><p><strong>Logout destroys the session.</strong> Logging out deletes the session record on the server, not just the cookie in the browser. Anyone holding a copy of the old session ID finds it worthless, because there is nothing left for it to unlock.</p></li>
+      </ol>
+    </div>
+
+    <h3>A login route, assembled from the pieces</h3>
+    <p>Here is the flow as real Express code. It combines three things you have already seen: the <code>express-session</code> setup from <code>session-demo.js</code>, the <code>checkPassword</code> function from Section 4.1, and a <code>POST</code> route from Week 1. The two helper lookups stand in for the database queries you wrote in Week 3.</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="login route (assembled from the verified patterns)">
+      const express = require('express');
+      const session = require('express-session');
+
+      const app = express();
+      app.use(express.urlencoded({ extended: false }));
+
+      app.use(session({
+        secret: process.env.SESSION_SECRET,
+        resave: false,
+        saveUninitialized: false
+      }));
+
+      // POST /login — check the password, then start a named session
+      app.post('/login', (req, res) => {
+        const { username, password } = req.body;
+        const user = findUser(username);            // Week 3: look the user up in the database
+        if (!user || !checkPassword(password, user.passwordHash)) {
+          return res.status(401).send('Wrong username or password');
+        }
+        req.session.regenerate((err) => {           // new session ID at login — always
+          if (err) return res.status(500).send('Login failed. Please try again.');
+          req.session.userId = user.id;
+          req.session.role = user.role;
+          res.redirect('/dashboard');
+        });
+      });
+
+      // POST /logout — destroy the session on the server
+      app.post('/logout', (req, res) => {
+        req.session.destroy(() => {
+          res.clearCookie('connect.sid');
+          res.redirect('/');
+        });
+      });
+
+      app.listen(3000, () => console.log('Listening on port 3000'));
+    </script>
+    <p><strong>Expected behavior</strong> (this assembled example was not captured as a single run — it combines the verified pieces above):</p>
+    <ul>
+      <li>A <code>POST</code> to <code>/login</code> with the right password redirects to <code>/dashboard</code> and sets a fresh session cookie.</li>
+      <li>The same request with a wrong password — or an unknown username — returns <code>401</code> with the same generic message either way.</li>
+      <li>While the session lives, requests arrive with <code>req.session.userId</code> and <code>req.session.role</code> already filled in.</li>
+      <li>After <code>POST /logout</code>, the old session cookie no longer identifies anyone, because the server-side record is gone.</li>
+    </ul>
+
+    <aside class="callout warn">
+      <strong>Three session rules that are not optional</strong>
+      <ul>
+        <li><strong>Regenerate at login.</strong> Always replace the session ID when a visitor logs in, as the code above does, so a pre-login ID can never become a logged-in ID.</li>
+        <li><strong>The secret comes from the environment.</strong> The <code>secret</code> signs session cookies so visitors cannot forge them. The Week 3 demo hard-coded <code>'dev-secret'</code> so you could read it; real apps read it from an environment variable (Section 4.5) and never commit it to Git.</li>
+        <li><strong>Never store the password in the session.</strong> Store the user ID and role. The session is not the place for passwords, hashes, or anything else you would not want exposed if a session record leaks.</li>
+      </ul>
+    </aside>
+
+    <aside class="callout warn">
+      <strong>The secure-cookie trap on localhost</strong>
+      <p>If you set the session cookie’s <code>secure</code> flag — the setting that says “only send this cookie over HTTPS” — while developing on plain <code>http://localhost</code>, the browser will refuse to store the cookie and login will “mysteriously” never stick. Secure cookies belong on HTTPS sites (Section 4.5), so leave the flag off in local development and turn it on only when the site is served over HTTPS.</p>
+    </aside>
+
+    <h3>How long does a session live?</h3>
+    <p>A session is not forever, and it should not be. Two different endings are normal:</p>
+    <ul>
+      <li><strong>Logout</strong> ends it immediately, as you saw in step 6: the record is destroyed and the ID becomes worthless at once.</li>
+      <li><strong>Expiry</strong> ends it quietly. Session middleware can give each session a maximum lifetime, and many apps also end a session after a period of inactivity. That is why a site you left open overnight asks you to log in again in the morning — the session aged out, which limits how long a copied session ID stays useful to anyone else.</li>
+    </ul>
+    <p>Keep the two halves straight, because beginners constantly swap them:</p>
+    <div class="tabs">
+      <div data-tab="The cookie">
+        <p><strong>Lives in:</strong> the browser. <strong>Contains:</strong> the session ID, and nothing else of value. <strong>Travels:</strong> automatically, on every request to the site that set it. <strong>If it is copied:</strong> the copier can present the ID and be treated as that session until the session is destroyed or expires — which is why session cookies must only travel over HTTPS.</p>
+      </div>
+      <div data-tab="The session">
+        <p><strong>Lives in:</strong> the server (in memory in the demos; in a store or database in larger apps). <strong>Contains:</strong> whatever your code puts there — here, <code>userId</code> and <code>role</code>. <strong>Travels:</strong> never. <strong>If the server restarts:</strong> the default in-memory store forgets every session and everyone is logged out — acceptable for a class project, and the reason production apps use a persistent session store.</p>
+      </div>
+    </div>
+
+    <div class="order" data-title="Put the login flow in order">
+      <script type="application/json">
+      {"prompt": "Drag (or use the arrows) until the steps run in the order a real login happens.",
+       "items": [
+         "You submit your username and password",
+         "The server hashes the attempt and compares it with the stored hash",
+         "The server creates a session and stores your user ID in it",
+         "The response sets a cookie holding the session ID",
+         "Later requests send the cookie and are recognized as you",
+         "Logout destroys the session on the server"
+       ],
+       "explain": "Identification happens once, at login. After that, the **cookie and the server-side session** do the remembering — the password is never sent again."}
+      </script>
+    </div>
+
+    <div class="quiz" data-title="Check your understanding: sessions and login">
+      <script type="application/json">
+      [
+        {"q": "What does the session cookie in the browser actually contain?", "shuffle": true, "choices": ["Your username and password", "Only the session ID", "Your role and permissions", "A copy of the whole session record"], "answer": 1, "explain": "The cookie carries just the ID. The data itself — user ID, role, visit count — stays in the session record on the server."},
+        {"q": "In `session-demo.js`, why does the last request (with no cookie) print `Visit number 1` again?", "shuffle": true, "choices": ["The server restarted", "The counter is stored in the cookie, and the cookie was cleared", "Without a session ID the server starts a brand-new session", "Sessions only count three visits"], "answer": 2, "explain": "No cookie means no session ID, so the server cannot find the old record. It creates a new session, whose counter starts at 1."},
+        {"q": "True or false: logging out only needs to delete the cookie in the browser.", "answer": false, "explain": "Logout must destroy the session record on the server. If it only cleared the cookie, anyone holding a copy of the session ID could keep using it."},
+        {"q": "Why does the login route call `req.session.regenerate()` before storing the user ID?", "shuffle": true, "choices": ["To make the session load faster", "So the logged-in session uses a fresh ID that no one could have planted or copied before login", "Because sessions expire after one request otherwise", "To clear the visit counter from Week 3"], "answer": 1, "explain": "Regenerating issues a brand-new session ID at the exact moment the session becomes valuable — when it starts proving who you are."},
+        {"q": "A login attempt fails. Which response is safest?", "shuffle": true, "choices": ["`That username does not exist`", "`That password is wrong for this username`", "`Wrong username or password`", "`Login failed, try a different password`"], "answer": 2, "explain": "One generic message either way. Saying which half failed lets an attacker first collect valid usernames, then attack only those accounts."}
+      ]
+      </script>
+    </div>
+  </section>
+
+  <!-- ===================================================== 4.3 -->
+  <section class="lesson" id="s4-3">
+    <h2>Tokens and JSON Web Tokens</h2>
+    <p>Sessions ask the server to remember you. A <strong>token</strong> takes the opposite approach: a token is a string the server hands you after login that carries proof of who you are, signed so the server can check it later <em>without remembering anything</em>. You present the token with each request, the server verifies the signature, and if the signature is valid it trusts what the token says. Nothing is stored on the server between requests.</p>
+    <p>Why have both? Sessions fit classic server-rendered apps, where one server serves its own pages. Tokens fit APIs: a mobile app, a single-page app, or several different servers can all accept the same token, because verifying it needs only the secret — no shared session store. You will meet both in real jobs, so this week you learn the token format the industry standardized on.</p>
+    <p>A <strong>JSON Web Token</strong> (JWT, pronounced “jot”) is a token format built from JSON. A JWT has exactly three parts, joined by dots:</p>
+    <div class="grid-3">
+      <div class="card">
+        <p><strong>1 · Header</strong></p>
+        <p>A small JSON object saying what kind of token this is and which signing algorithm was used — here, <code>HS256</code>.</p>
+      </div>
+      <div class="card">
+        <p><strong>2 · Payload</strong></p>
+        <p>A JSON object with the claims — the facts the token asserts, such as who the user is (<code>sub</code>) and their role. The payload also carries <code>iat</code> (issued at) and <code>exp</code> (expires at) timestamps.</p>
+      </div>
+      <div class="card">
+        <p><strong>3 · Signature</strong></p>
+        <p>A value computed from the header, the payload, and a secret key only the server knows. Change even one character of the payload and the signature no longer matches.</p>
+      </div>
+    </div>
+    <p>The header and payload are not encrypted. They are <strong>Base64URL-encoded</strong> — rewritten in a URL-safe alphabet so the token can travel in headers — and anyone can decode them, as you will do yourself in a moment. The signature is the only thing protecting the contents, and it protects them against <em>changes</em>, not against <em>reading</em>.</p>
+    <p>Here is a real token, captured from this week’s demo run. It was signed with the demo secret <code>dev-secret-do-not-use-in-production</code> — a teaching secret printed here on purpose; a real secret would never appear on a page like this.</p>
+    <div class="c4-token"><span class="h">eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9</span>.<span class="p">eyJzdWIiOiJ1c2VyLTQyIiwibmFtZSI6IkFkYSIsInJvbGUiOiJzdHVkZW50IiwiaWF0IjoxNzk1MDQ3MTExLCJleHAiOjE3OTUwNTA3MTF9</span>.<span class="s">EUEe-kTVH_9DOfOtEtJeOch2gXWoaSqqyk1EpxAhGYU</span></div>
+    <p>The first segment is the header, the second is the payload, the third is the signature. The demo that produced it is short:</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="jwt-demo.js">
+      const jwt = require('jsonwebtoken');
+
+      const secret = 'dev-secret-do-not-use-in-production';
+      const token = jwt.sign({ sub: 'user-42', name: 'Ada', role: 'student' }, secret, { expiresIn: '1h' });
+      console.log('Token:');
+      console.log(token);
+
+      const decoded = jwt.verify(token, secret);
+      console.log('Verified payload keys:', Object.keys(decoded).join(', '));
+      console.log('Subject:', decoded.sub, '| Role:', decoded.role);
+
+      try {
+        jwt.verify(token, 'wrong-secret');
+      } catch (err) {
+        console.log('Wrong secret rejected:', err.message);
+      }
+    </script>
+    <p>Captured run (Node v26.13.1, Express 5.3.0). A token’s exact string differs on every run, because the <code>iat</code> and <code>exp</code> timestamps change — but the header and payload always decode to the same claims, and a wrong secret is always rejected.</p>
+    <div class="output">Token:
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLTQyIiwibmFtZSI6IkFkYSIsInJvbGUiOiJzdHVkZW50IiwiaWF0IjoxNzk1MDQ3MTExLCJleHAiOjE3OTUwNTA3MTF9.EUEe-kTVH_9DOfOtEtJeOch2gXWoaSqqyk1EpxAhGYU
+Verified payload keys: sub, name, role, iat, exp
+Subject: user-42 | Role: student
+Wrong secret rejected: invalid signature</div>
+    <p>Two lines do all the work. <code>jwt.sign</code> builds the token from your claims, adds <code>iat</code> and <code>exp</code> for you (here, an expiry one hour after issue), and signs it. <code>jwt.verify</code> re-checks the signature <em>and</em> the expiry, and throws an error if either fails — which is why the wrong-secret attempt lands in the <code>catch</code> block with the message <code>invalid signature</code>.</p>
+
+    <h3>Decode one yourself</h3>
+    <p>Prove the “anyone can read it” claim. This playground runs only in your browser. It splits the real token on its dots, Base64URL-decodes the first two parts, and prints them as JSON. It never checks the signature — decoding is not verifying — and that is exactly the point.</p>
+
+    <div class="playground" data-preview="false" data-title="Try it: decode the Week 4 token" data-height="340">
+      <textarea data-lang="js">// The real token from jwt-demo.js (signed with the demo secret).
+const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLTQyIiwibmFtZSI6IkFkYSIsInJvbGUiOiJzdHVkZW50IiwiaWF0IjoxNzk1MDQ3MTExLCJleHAiOjE3OTUwNTA3MTF9.EUEe-kTVH_9DOfOtEtJeOch2gXWoaSqqyk1EpxAhGYU';
+
+// Base64URL uses - and _ instead of + and /, and drops the = padding.
+// Undo both, then atob() can decode it.
+function decodePart(part) {
+  const base64 = part.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+  return JSON.parse(atob(padded));
+}
+
+const parts = token.split('.');
+console.log('Parts found:', parts.length);
+
+const header = decodePart(parts[0]);
+const payload = decodePart(parts[1]);
+
+console.log('Header:', JSON.stringify(header));
+console.log('Payload:', JSON.stringify(payload));
+console.log('Who is this? sub =', payload.sub, '| name =', payload.name);
+console.log('Role:', payload.role);
+console.log('Expires one hour after issue? exp - iat =', payload.exp - payload.iat, 'seconds');
+
+// Exposed so the checks below can confirm what you decoded:
+window.decodedHeader = header;
+window.decodedPayload = payload;
+
+// Your turn: the signature is parts[2]. You cannot verify it here —
+// that needs the secret, and the secret never leaves the server.</textarea>
+      <script type="application/json" class="checks">
+      [
+        {"label": "The token splits into exactly 3 parts", "test": "return /split\\s*\\(\\s*['\"]\\.['\"]\\s*\\)/.test(code.js)"},
+        {"label": "Header decodes to `alg` `HS256`", "test": "return !!(win.decodedHeader && win.decodedHeader.alg === 'HS256')"},
+        {"label": "Payload `sub` is `user-42`", "test": "return !!(win.decodedPayload && win.decodedPayload.sub === 'user-42')"},
+        {"label": "Payload `role` is `student`", "test": "return !!(win.decodedPayload && win.decodedPayload.role === 'student')"},
+        {"label": "Payload carries `iat` and `exp`, with `exp` after `iat`", "test": "return !!(win.decodedPayload && win.decodedPayload.exp > win.decodedPayload.iat)"}
+      ]
+      </script>
+    </div>
+
+    <p>Be blunt about what you just did: decoding a token proves nothing. Anyone can decode any token, including a forged one that was never issued by your server, so a decoded payload is just a claim written by whoever handed you the token. The payload only becomes trustworthy after the server verifies the signature with its secret — that verification, not the decoding, is what earns trust.</p>
+    <p>One piece of verification hygiene belongs in your own code: pin which algorithm the server accepts, so an attacker cannot swap in a different algorithm from the one you signed with. In your own code, verify like this:</p>
+    <script type="text/plain" class="code" data-lang="js" data-title="Verifying with a pinned algorithm (your own code)">const decoded = jwt.verify(token, secret, { algorithms: ['HS256'] });</script>
+
+    <aside class="callout warn">
+      <strong>Signing is not encryption</strong>
+      <p>You just read a signed token’s payload with three lines of code — no secret, no permission. A signature proves a token was issued by your server and has not been changed since. It hides nothing. Never put anything private in a JWT payload: no passwords, no hashes, no personal details you would not print on a poster. Keep payloads to IDs, roles, and timestamps.</p>
+    </aside>
+    <p>One payload claim deserves its own sentence. <strong><code>exp</code></strong> is the expiry time, written as a Unix timestamp (seconds since 1 January 1970). In this token, <code>exp</code> is exactly 3,600 seconds — one hour — after <code>iat</code>, because the demo signed it with <code>expiresIn: '1h'</code>. After that moment, <code>jwt.verify</code> rejects the token even though its signature is genuine. Expiry is what limits the damage when a token is copied: a stolen session cookie can sometimes be cancelled on the server, but a stolen token cannot be un-issued, so it is kept short-lived instead.</p>
+
+    <h3>How a token travels</h3>
+    <p>After login, the client keeps the token and presents it on every request, conventionally in the <code>Authorization</code> header, in this exact shape:</p>
+    <script type="text/plain" class="code" data-lang="text" data-title="A request carrying a JWT">
+      GET /api/my-grades HTTP/1.1
+      Host: example.com
+      Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLTQyIiwibmFtZSI6IkFkYSIsInJvbGUiOiJzdHVkZW50IiwiaWF0IjoxNzk1MDQ3MTExLCJleHAiOjE3OTUwNTA3MTF9.EUEe-kTVH_9DOfOtEtJeOch2gXWoaSqqyk1EpxAhGYU
+    </script>
+    <p>The word <code>Bearer</code> means “whoever bears (carries) this token” — the server does not ask for anything else. Middleware on the server reads the header, runs the same <code>verify</code> you saw in the demo, and — if it passes — copies the claims onto the request (often as <code>req.user</code>), so route handlers and role guards can use <code>sub</code> and <code>role</code> exactly the way the session version used <code>req.session</code>. Same authorization logic, different delivery van.</p>
+    <p>The claim names are short because tokens travel with every request. Make sure you can read them fluently:</p>
+
+    <div class="match" data-title="Match each JWT claim to its meaning">
+      <script type="application/json">
+      {"leftTitle": "Claim", "rightTitle": "Meaning", "pairs": [
+        ["`sub`", "Subject: who the token is about — here, `user-42`"],
+        ["`name`", "A human-readable name claim — here, `Ada`"],
+        ["`role`", "The user’s authorization level — here, `student`"],
+        ["`iat`", "Issued at: the time the token was created, as a Unix timestamp"],
+        ["`exp`", "Expires at: the time after which the token must be rejected"],
+        ["`alg` (in the header)", "The signing algorithm used — here, `HS256`"]
+      ]}
+      </script>
+    </div>
+
+    <div class="quiz" data-title="Check your understanding: tokens and JWTs">
+      <script type="application/json">
+      [
+        {"q": "What are the three parts of a JWT, in order?", "shuffle": true, "choices": ["Header, payload, signature", "Username, password, session ID", "Cookie, session, token", "Header, body, footer"], "answer": 0, "explain": "A JWT is `header.payload.signature`, joined by dots. The first two parts are Base64URL-encoded JSON; the third is computed from them plus the secret."},
+        {"q": "True or false: because a JWT is signed, nobody can read its payload without the secret.", "answer": false, "explain": "Signing is not encryption. The payload is only Base64URL-encoded, and you decoded it yourself in the playground above — no secret needed. The signature stops changes, not reading."},
+        {"q": "A request arrives with the Week 4 token, but someone changed `role` from `student` to `admin` in the payload. What happens at `jwt.verify`?", "shuffle": true, "choices": ["It succeeds, because the payload is readable", "It succeeds, because roles are not checked", "It fails with `invalid signature`, because the signature no longer matches the changed payload", "It fails, because the token has expired"], "answer": 2, "explain": "The signature was computed over the original header and payload. Any edit — even one character — makes verification fail. That tamper-evidence is the whole point of signing."},
+        {"q": "What does the `exp` claim tell the server?", "shuffle": true, "choices": ["The user’s experience level", "When the token expires and must stop being accepted", "Which exports the user may download", "The expected role of the user"], "answer": 1, "explain": "`exp` is the expiry timestamp. In the demo token it is one hour after `iat`. `jwt.verify` rejects expired tokens even when the signature is valid."},
+        {"q": "Sessions and tokens remember login in different places. Where does a JWT keep its state?", "shuffle": true, "choices": ["In a server-side session record", "In a database table the server checks on every request", "Inside the token itself, which the client presents with each request", "In the browser’s cookies only"], "answer": 2, "explain": "That is the trade: the server stores nothing and verifies the signature instead. A session keeps the data on the server and gives the browser only an ID."}
+      ]
+      </script>
+    </div>
+  </section>
+
+  <!-- ===================================================== 4.4 -->
+  <section class="lesson" id="s4-4">
+    <h2>Authorization: Roles and Protected Routes</h2>
+    <p>Authentication told you who is asking. Now the server has to decide, on every route that matters, whether <em>this</em> user may do <em>this</em> thing. The standard way to organize those decisions is a <strong>role</strong>: a named level of permission attached to an account, such as <code>student</code>, <code>instructor</code>, or <code>admin</code>. You assign each user one role when their account is created, store it with their account (and copy it into their session or token at login), and write each route’s rule in terms of roles instead of individual names.</p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col">In a course app, who…</th><th scope="col">Student</th><th scope="col">Instructor</th><th scope="col">Admin</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Views course pages</th><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+          <tr><th scope="row">Views their own grades</th><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+          <tr><th scope="row">Submits homework</th><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+          <tr><th scope="row">Enters and edits grades</th><td><span class="pill bad">No</span></td><td>Yes</td><td>Yes</td></tr>
+          <tr><th scope="row">Deletes a course</th><td><span class="pill bad">No</span></td><td><span class="pill bad">No</span></td><td>Yes</td></tr>
+          <tr><th scope="row">Manages user accounts</th><td><span class="pill bad">No</span></td><td><span class="pill bad">No</span></td><td>Yes</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>A table like this is called a <strong>permission matrix</strong>: actions down one side, roles across the top, and a yes or no in every cell. Writing it down before you code is not paperwork — it <em>is</em> the authorization design. Every guard you write next is just one cell of this table turned into code.</p>
+
+    <h3>Guards: authorization as middleware</h3>
+    <p>Week 2 taught you that middleware is a function that runs before your route handler and can stop the request. That makes middleware the natural home for authorization checks. A small guard function that protects routes is often called a <strong>guard</strong>. You need two:</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="Guard middleware: requireLogin and requireRole">
+      // Guard 1: you must be signed in. (Authentication)
+      function requireLogin(req, res, next) {
+        if (!req.session.userId) {
+          return res.status(401).send('Please log in first');
+        }
+        next();
+      }
+
+      // Guard 2: you must hold one specific role. (Authorization)
+      function requireRole(role) {
+        return (req, res, next) => {
+          if (!req.session.userId) {
+            return res.status(401).send('Please log in first');
+          }
+          if (req.session.role !== role) {
+            return res.status(403).send('You are not allowed to do this');
+          }
+          next();
+        };
+      }
+
+      // Using the guards: they run before the handler, in order.
+      app.get('/my-grades', requireLogin, (req, res) => {
+        res.send('Grades for user ' + req.session.userId);
+      });
+
+      app.post('/grades', requireRole('instructor'), (req, res) => {
+        res.send('Grade saved');
+      });
+
+      app.delete('/courses/:id', requireRole('admin'), (req, res) => {
+        res.send('Course deleted');
+      });
+    </script>
+    <p>Read <code>requireRole</code> closely: it is a function that <em>returns</em> a middleware function, which is how the role you want — <code>'instructor'</code>, <code>'admin'</code> — gets baked into that route’s guard. And notice the order inside it: identity first, permission second. You cannot check what someone may do until you know who they are.</p>
+
+    <h3>401 vs 403: two different kinds of “no”</h3>
+    <p>The guards above answer with two different status codes, and using the right one matters to the client on the other end:</p>
+    <ul>
+      <li><strong><code>401 Unauthorized</code></strong> — “You have not proven who you are.” Nobody is logged in (or the session or token is invalid), so the app cannot even start the permission question. The usual client response is to show a login page. Despite its name, 401 is about <em>authentication</em>.</li>
+      <li><strong><code>403 Forbidden</code></strong> — “I know exactly who you are, and you still may not do this.” The user is authenticated, but their role does not allow this action. Showing a login page would be pointless; they are already logged in.</li>
+    </ul>
+
+    <div class="match" data-title="Match each situation to its status code">
+      <script type="application/json">
+      {"leftTitle": "Situation", "rightTitle": "Response", "monoLeft": false, "pairs": [
+        ["A visitor with no session cookie requests `/my-grades`", "`401` — not signed in"],
+        ["A signed-in student sends `POST /grades`", "`403` — signed in, but students cannot enter grades"],
+        ["A request presents a token with an invalid signature", "`401` — identity not proven"],
+        ["A signed-in instructor tries to delete a whole course", "`403` — only admins may do that"],
+        ["A signed-in instructor sends `POST /grades` with a valid session", "`200` — allowed, the handler runs"]
+      ]}
+      </script>
+    </div>
+
+    <h3>Try the permission matrix</h3>
+    <p>This playground holds the course app’s matrix as data and answers permission questions with a <code>can(role, action)</code> function — the same yes/no logic your guard middleware performs, with no server involved. Run it, read the answers, then change the matrix: give instructors <code>delete course</code> and watch the checks react.</p>
+
+    <div class="playground" data-preview="false" data-title="Try it: a permission matrix with can(role, action)" data-height="330">
+      <textarea data-lang="js">// The permission matrix from the table above, as data.
+// Each role maps to the list of actions it is allowed to do.
+const PERMISSIONS = {
+  student: ['view courses', 'view grades', 'submit homework'],
+  instructor: ['view courses', 'view grades', 'submit homework', 'edit grades', 'post announcements'],
+  admin: ['view courses', 'view grades', 'submit homework', 'edit grades', 'post announcements', 'delete course', 'manage users']
+};
+
+// Answer one cell of the matrix. An unknown role can do nothing.
+function can(role, action) {
+  const allowed = PERMISSIONS[role];
+  if (!allowed) return false;
+  return allowed.includes(action);
+}
+
+// Exposed so the checks below can ask the same questions:
+window.can = can;
+window.PERMISSIONS = PERMISSIONS;
+
+console.log('student, view grades:    ', can('student', 'view grades'));
+console.log('student, edit grades:    ', can('student', 'edit grades'));
+console.log('instructor, edit grades: ', can('instructor', 'edit grades'));
+console.log('instructor, delete course:', can('instructor', 'delete course'));
+console.log('admin, delete course:    ', can('admin', 'delete course'));
+console.log('guest, view grades:      ', can('guest', 'view grades'));</textarea>
+      <script type="application/json" class="checks">
+      [
+        {"label": "A student can `view grades`", "test": "return typeof win.can === 'function' && win.can('student', 'view grades') === true"},
+        {"label": "A student cannot `edit grades`", "test": "return typeof win.can === 'function' && win.can('student', 'edit grades') === false"},
+        {"label": "An instructor can `edit grades`", "test": "return typeof win.can === 'function' && win.can('instructor', 'edit grades') === true"},
+        {"label": "An instructor cannot `delete course`", "test": "return typeof win.can === 'function' && win.can('instructor', 'delete course') === false"},
+        {"label": "An admin can `delete course`", "test": "return typeof win.can === 'function' && win.can('admin', 'delete course') === true"},
+        {"label": "An unknown role can do nothing", "test": "return typeof win.can === 'function' && win.can('guest', 'view grades') === false"}
+      ]
+      </script>
+    </div>
+
+    <aside class="callout warn">
+      <strong>Hide it in the UI <em>and</em> enforce it on the server</strong>
+      <p>It is good design not to show a student an “Enter grades” button they cannot use. It is <em>not</em> security. Anyone can send a hand-written request to <code>POST /grades</code> without ever opening your page — you did exactly that with <code>curl</code> in Weeks 1 and 2. Hiding a button is courtesy; the guard middleware on the server is the actual lock. Real apps do both, every time.</p>
+    </aside>
+
+    <h3>Least privilege: give each role only what it needs</h3>
+    <p>When you fill in your own permission matrix, work by one rule: <strong>least privilege</strong> — every role gets the smallest set of permissions that lets it do its job, and nothing more. A student role that can also edit grades “just in case” is not convenient; it is a bug waiting for a curious student. Start every cell at <em>no</em>, and make each <em>yes</em> earn its place by naming the real task that needs it. If nobody can name the task, the answer stays no.</p>
+    <p>Roles are coarse, though — “members may edit” is not enough on its own, because it does not say <em>whose</em> records a member may edit. The server also checks <strong>ownership</strong>: a member may edit only their own records, by comparing the record’s owner id with the signed-in user’s id from the session (<code>req.session.userId</code>). For example, a student in the course app may edit a book on their own list, but if they change the id in the request to reach another student’s book, the owner ids will not match and the server must refuse. An instructor or admin role is the exception: that role may touch everyone’s records, because reviewing and managing the whole class is its job.</p>
+    <p>Complete the guard below. It is the same pattern as the code above, with the decision points left blank.</p>
+
+    <div class="fill" data-title="Complete the role guard" data-explain="No identity means 401. The wrong role means 403. Only a known user with the right role reaches next(), which hands the request to the handler.">
+      <script type="text/plain">
+function requireRole(role) {
+  return (req, res, next) => {
+    if (!req.session.userId) {
+      return res.status([[401]]).send('Please log in first');
+    }
+    if (req.session.role !== role) {
+      return res.status([[403]]).send('You are not allowed to do this');
+    }
+    [[next]]();
+  };
+}
+      </script>
+    </div>
+
+    <div class="quiz" data-title="Check your understanding: roles and protected routes">
+      <script type="application/json">
+      [
+        {"q": "A signed-in student sends a request to a route guarded by `requireRole('instructor')`. What comes back?", "shuffle": true, "choices": ["`200`, because the student is logged in", "`401`, because the role is wrong", "`403`, because the student is known but not allowed", "`404`, because the route is hidden"], "answer": 2, "explain": "Authentication already succeeded — the server knows this is a student. Failing the permission check for a known user is 403 Forbidden."},
+        {"q": "What is a permission matrix?", "shuffle": true, "choices": ["A list of every user’s password hash", "A table of actions versus roles, with a yes or no in each cell", "The order middleware runs in", "A diagram of the database tables"], "answer": 1, "explain": "Actions on one side, roles on the other. Each guard you write enforces one cell of that table."},
+        {"q": "True or false: if the front end hides the admin button from students, the admin routes are secure.", "answer": false, "explain": "Hiding a button stops clicks, not requests. Anyone can send the request directly with `curl`. Only the server-side guard actually enforces the rule."},
+        {"q": "Why does `requireRole` check `req.session.userId` before it checks the role?", "shuffle": true, "choices": ["Because role checks are slower than login checks", "Because authorization comes after authentication — you must know who someone is before deciding what they may do", "Because the session stores the role inside the user ID", "It does not matter; the order is a style choice"], "answer": 1, "explain": "A request with no identity gets 401. Only a request from a known user can meaningfully pass or fail a role check and earn a 403."},
+        {"q": "Which code protects the route `POST /grades` so only instructors can use it?", "code": "app.post('/grades', (req, res) => { /* save the grade */ });", "lang": "js", "shuffle": true, "choices": ["Leave it as shown; the button is hidden in the UI", "Add `requireRole('instructor')` as middleware before the handler", "Rename the route so students cannot guess it", "Check the role in the browser after the response arrives"], "answer": 1, "explain": "The guard runs on the server, before the handler, on every request — including requests sent by hand that never touched your UI."}
+      ]
+      </script>
+    </div>
+  </section>
+
+  <!-- ===================================================== 4.5 -->
+  <section class="lesson" id="s4-5">
+    <h2>Security Hygiene: HTTPS, Secrets and Common Attacks</h2>
+    <p>This section is enrichment: five habits that sit underneath everything else in this week. None of them is a big feature. All of them are the difference between a class project and an app you could responsibly put in front of real users. Treat them as a pre-flight checklist you run on every project from now on.</p>
+
+    <h3>1 · HTTPS: a sealed envelope instead of a postcard</h3>
+    <p>Plain <strong>HTTP</strong> sends requests and responses as readable text. Anyone positioned along the path — a compromised router, a hostile Wi-Fi hotspot — can read them, including passwords and session cookies, and can even change them in transit. <strong>HTTPS</strong> is HTTP carried inside <strong>TLS</strong> (Transport Layer Security), which encrypts the connection: the two sides agree on keys at the start, and everything after that is scrambled to everyone in between. The server also proves its identity with a <strong>certificate</strong>, a digitally signed ID card issued by a trusted authority, so your browser knows it reached your real server and not an impostor.</p>
+    <p>For this course the practical rules are simple: logins and sessions must never travel over plain HTTP, hosting platforms enable HTTPS for you (usually with free certificates), and on your own server you redirect every HTTP request to its HTTPS address. A session cookie sent over plain HTTP is a house key mailed on a postcard.</p>
+
+    <h3>2 · Secrets live in environment variables, never in code</h3>
+    <p>A <strong>secret</strong> is any value that grants power: a session-signing secret, a JWT secret, a database password, an API key. You met the pattern in Week 3 and used it in Section 4.2: the code reads the value from an <strong>environment variable</strong> — a setting supplied by the machine the program runs on, not written in the source.</p>
+    <script type="text/plain" class="code" data-lang="js" data-title="Reading secrets from the environment">
+      // Good: the value comes from the environment, not the source file.
+      const sessionSecret = process.env.SESSION_SECRET;
+      const jwtSecret = process.env.JWT_SECRET;
+
+      // Bad: a real secret written into code will end up in Git history,
+      // in every clone, and in every screenshot of this file. Do not do this.
+      // const sessionSecret = 'super-secret-value-written-in-code';
+    </script>
+    <p>Why the fuss? Code gets copied: into Git, onto teammates’ laptops, into error reports. A secret committed once stays in the repository’s history even after you delete the line. Environment variables keep the secret in exactly one place — the server’s configuration — and let every developer use a different throwaway value on their own machine. If a real secret ever does leak, the fix is to <em>rotate</em> it: generate a new one, deploy it, and the leaked value becomes worthless.</p>
+
+    <h3>3 · SQL injection — and why Week 3’s placeholders stop it</h3>
+    <p><strong>SQL injection</strong> is an attack where a visitor types database commands into an ordinary form field and a careless server runs them. It happens when code builds a query by gluing strings together:</p>
+    <script type="text/plain" class="code" data-lang="js" data-title="Vulnerable vs safe: building a query">
+      // VULNERABLE: the input becomes part of the SQL itself.
+      // If username is  ' OR '1'='1  the query matches every row.
+      const badSql = "SELECT * FROM users WHERE name = '" + username + "'";
+
+      // SAFE (Week 3 pattern): the ? is a placeholder. The driver sends the
+      // value separately, as data, and the database never treats it as SQL.
+      const [rows] = await db.execute(
+        'SELECT * FROM users WHERE name = ?',
+        [username]
+      );
+    </script>
+    <p>The placeholder is the whole defense, and it is structural: with placeholders, the database receives the query shape and the values through separate channels, so a value can never rewrite the query — even if it contains quotes, SQL keywords, or an entire second statement. The rule is absolute: <strong>never build SQL by joining strings with user input; always use placeholders</strong> (or your library’s equivalent). The same habit protects MongoDB queries, where you pass values as data in query objects rather than building query strings.</p>
+
+    <h3>4 · XSS: user content is data, not code</h3>
+    <p><strong>Cross-site scripting (XSS)</strong> is the front-end cousin of injection: an attacker stores a piece of JavaScript as ordinary content — say, in a comment or a display name — and your page later inserts it into the HTML as markup instead of text, so it <em>runs</em> in every visitor’s browser, with their session. The defense mirrors the back-end rule: treat everything a user typed as data. Escape it when you insert it into a page (turning <code>&lt;</code> into <code>&amp;lt;</code> so the browser shows it instead of obeying it), prefer <code>textContent</code> over <code>innerHTML</code> in your own scripts, and let your framework or template engine escape by default. This course’s own components follow the rule — it is why the authoring guide escapes text in interactive activities.</p>
+
+    <h3>5 · Keep dependencies updated</h3>
+    <p>Your app stands on packages you did not write, and vulnerabilities are found in popular packages regularly. Node ships with a scanner for exactly this: running <code>npm audit</code> in a project compares your installed dependency versions against a database of known vulnerabilities and reports what it finds, with suggested fixes (often <code>npm audit fix</code>, or updating the package yourself). Be honest about what it is: <code>npm audit</code> is a scanner, not a shield. It can only flag problems that are already known and catalogued, and a clean report does not prove your app is secure. Run it before every deployment anyway — it catches the known, fixable problems, which are the embarrassing ones to ship.</p>
+
+    <h3>Four more habits on the same checklist</h3>
+    <ul class="c4-checklist">
+      <li><b>Watch for CSRF</b> <strong>Cross-site request forgery (CSRF)</strong> is an attack where a malicious page tricks your browser into sending a request to a site you are logged into, and your browser helpfully attaches your session cookie, so the request looks like yours. First defenses are <code>SameSite</code> cookies (<code>Lax</code> or <code>Strict</code>, from Week 3), which limit when cookies travel with cross-site requests, and a simple rule: never change anything important in response to a <code>GET</code> request.</li>
+      <li><b>Throttle login attempts</b> Without a limit, an attacker can guess passwords as fast as the server answers — thousands of tries before you notice. Slow them down: delay responses, or temporarily lock an account, after repeated failed logins. Libraries such as <code>express-rate-limit</code> exist for exactly this, so you do not have to build the counting yourself.</li>
+      <li><b>Never send hashes back</b> An API response must never include the stored password hash, or the salt that goes with it. Leave those fields out of every user object you return, even to the account owner themselves. A hash handed out in a response is a hash an attacker can take away and guess against offline, at their leisure.</li>
+      <li><b>Watch for NoSQL injection</b> If a login route feeds a JSON body straight into a MongoDB query, an attacker can send an object instead of a string: a username of <code>{"$ne": null}</code> means “not equal to null” as a query condition, and can match the first user in the database. The defense is the Week 3 rule applied again: check the type of every value — here, that the username and password really are strings — before it goes into a query.</li>
+    </ul>
+
+    <h3>Spot the bad practice</h3>
+    <p>Flip through these cards. Each front shows a habit; decide whether it is safe or a problem before you flip it over.</p>
+    <div class="flashcards" data-title="Spot the bad practice" data-front="Habit" data-back="Verdict">
+      <script type="application/json">
+      [
+        {"front": "The JWT secret is written directly in `server.js` and pushed to GitHub", "back": "**Bad practice.** A committed secret lives in Git history and every clone. Read it from an environment variable, and rotate the leaked one."},
+        {"front": "A login query is built as `\"SELECT ... WHERE name = '\" + username + \"'\"`", "back": "**Bad practice.** String-built SQL is injectable. Use `?` placeholders and pass the value separately, as in Week 3."},
+        {"front": "Before deploying, you run `npm audit` and update the flagged packages", "back": "**Good practice.** The audit only finds known vulnerabilities, but those are real, fixable risks. Scanning before every deployment is the habit."},
+        {"front": "A comment from a user is inserted into the page with `innerHTML`, unescaped", "back": "**Bad practice.** That is how XSS happens: user text becomes running code. Insert it as text (`textContent`) or escape it."},
+        {"front": "The login page and session cookie are served over plain HTTP to save time", "back": "**Bad practice.** Passwords and session IDs cross the network readable by anyone in between. Auth requires HTTPS."},
+        {"front": "Passwords are stored as `salt:hash` values made with a slow password hash", "back": "**Good practice.** That is Section 4.1 working as intended: one-way, salted, and expensive to guess."},
+        {"front": "The grade-entry button is hidden from students, and there is no server-side check", "back": "**Bad practice.** Hiding is not enforcing. A hand-sent request skips the UI entirely; the route needs its guard middleware."}
+      ]
+      </script>
+    </div>
+
+    <details class="reveal">
+      <summary>The five-line pre-flight checklist (open to copy it into your project notes)</summary>
+      <ul class="c4-checklist">
+        <li><b>HTTPS everywhere it matters</b> Logins, sessions and tokens never travel over plain HTTP.</li>
+        <li><b>No secrets in code or Git</b> Session secrets, JWT secrets and database passwords come from environment variables.</li>
+        <li><b>Placeholders for every query</b> User input is always data, never part of the SQL string.</li>
+        <li><b>Escape user content</b> Anything a user typed is inserted into pages as text, not markup.</li>
+        <li><b><code>npm audit</code> before deploying</b> Known vulnerabilities in dependencies get fixed before users arrive.</li>
+      </ul>
+    </details>
+
+    <h3>Match the attack to its defense</h3>
+    <p>Every attack in this section has one primary defense from this week. If you can pair them without thinking, you understand the section.</p>
+    <div class="match" data-title="Match each attack to the habit that stops it">
+      <script type="application/json">
+      {"leftTitle": "Attack", "rightTitle": "Defense", "monoLeft": false, "pairs": [
+        ["Reading passwords off the network on café Wi-Fi", "HTTPS: TLS encrypts the connection end to end"],
+        ["Typing `' OR '1'='1` into the login form", "Placeholders: input travels as data, never as SQL"],
+        ["A stored display name that runs script in visitors’ browsers", "Escaping: user content is inserted as text, not markup"],
+        ["Guessing passwords from a leaked user table", "Salted, slow hashing: no plain passwords, expensive guesses"],
+        ["Reusing a session ID copied before the victim logged in", "Regenerating the session ID at login"],
+        ["Exploiting a known flaw in an old npm package", "Running `npm audit` and updating before deploying"]
+      ]}
+      </script>
+    </div>
+
+    <div class="quiz" data-title="Check your understanding: security hygiene">
+      <script type="application/json">
+      [
+        {"q": "Which habit makes this code unsafe?", "code": "const token = jwt.sign(payload, 'my-real-secret', { expiresIn: '1h' });", "lang": "js", "shuffle": true, "choices": ["Signing a token at all", "A real secret written directly in the source code", "Setting an expiry on the token", "Using a payload variable"], "answer": 1, "explain": "The secret belongs in an environment variable (`process.env.JWT_SECRET`). In source, it will be copied everywhere the code goes — including Git history."},
+        {"q": "An attacker types `' OR '1'='1` into a username field. Which code is protected against it?", "shuffle": true, "choices": ["A query built by joining strings with the username", "A query with a `?` placeholder, with the username passed separately as a value", "A query that rejects usernames containing spaces", "A query run over HTTPS"], "answer": 1, "explain": "Placeholders keep the value in the data channel, so the database never parses it as SQL. HTTPS protects data in transit; it does nothing about injection."},
+        {"q": "True or false: a clean `npm audit` report proves your application is secure.", "answer": false, "explain": "`npm audit` is a scanner for *known* vulnerabilities in your dependencies. A clean report is good news, not a proof — your own code can still have bugs it knows nothing about."},
+        {"q": "What does HTTPS add that plain HTTP does not have?", "shuffle": true, "choices": ["Faster page loads on every network", "Encryption in transit and proof of the server’s identity via its certificate", "Protection against SQL injection", "Automatic password hashing"], "answer": 1, "explain": "TLS encrypts the connection and the certificate identifies the server. Injection and hashing are separate problems with separate fixes — this section covered each one."},
+        {"q": "A user’s display name contains markup that tries to run a script in other visitors’ browsers when the page displays it. What should your page do with that name?", "shuffle": true, "choices": ["Insert it with `innerHTML` so it displays correctly", "Escape it or insert it as text, so the browser shows it instead of running it", "Store it but never display names again", "Reject every name containing letters"], "answer": 1, "explain": "User content is data, not code. Escaped (or set via `textContent`), the name appears as harmless text. Inserted raw, it runs in other visitors’ browsers — that is XSS."}
+      ]
+      </script>
+    </div>
+  </section>
+
+  <!-- ===================================================== 4.6 -->
+  <section class="lesson" id="s4-6">
+    <h2>Capstone Walkthrough: A Complete Full-Stack App</h2>
+    <p>Four weeks ago you wrote a Node program that printed three lines. This section assembles everything since then into one working application, so you can see the whole course as a single machine before you build your final project. The app is a <strong>course book tracker</strong>: students sign in, keep a personal list of the books for their courses, and add, edit, and remove entries. Instructors can view every list. Small — but every layer you learned is in it, doing its real job.</p>
+    <p>Here is the stack, one line per week. <strong>Week 1:</strong> an Express server in Node. <strong>Week 2:</strong> a REST API with middleware, plus a small front end that fetches it. <strong>Week 3:</strong> the book lists stored in a real database — MongoDB or MySQL — with full CRUD, and sessions for state. <strong>Week 4:</strong> password hashing, a login flow, and roles guarding the routes. Nothing new is introduced in this section; the point is how the pieces connect.</p>
+
+    <h3>The project, as files</h3>
+    <script type="text/plain" class="code" data-lang="text" data-title="course-book-tracker/ — the whole app at a glance">
+      course-book-tracker/
+      ├── package.json            Week 1: project manifest; lists express, express-session
+      ├── .env                    Secrets live here, never in Git (Week 4 hygiene)
+      ├── server.js               Week 1: creates the app, mounts everything, listens
+      ├── middleware/
+      │   └── auth.js             Week 2 + 4: requireLogin and requireRole guards
+      ├── routes/
+      │   ├── auth.js             Week 4: POST /login, POST /logout
+      │   └── books.js            Week 2: the REST API — GET/POST/PUT/DELETE /api/books
+      ├── db.js                   Week 3: database connection (MongoDB or MySQL)
+      └── public/
+          ├── index.html          Week 2: the page the browser loads
+          ├── app.js              Week 2: fetch() calls to the API; renders the list
+          └── styles.css          Week 2: presentation
+    </script>
+    <p>Read the tree as a map of the course: every file exists because one week’s idea needed a home. Routes never talk to the database directly without passing the middleware folder first, and the browser never talks to the database at all — only to the API.</p>
+
+    <h3>One request, end to end</h3>
+    <p>Follow a single action — a signed-in student adding a book — through every layer. This is the journey your final project’s requests will take, whatever your app is about.</p>
+
+    <div class="stepper" data-title="Adding a book while signed in">
+      <div class="stepper-stage">
+        <div class="c4-flow">
+          <div class="c4-node" data-on="1-7" data-active="1"><b>Browser</b><span>The form sends a fetch() POST with the session cookie attached.</span></div>
+          <div class="c4-node" data-on="2-7" data-active="2"><b>Middleware</b><span>Body parsing and the session middleware run first.</span></div>
+          <div class="c4-node" data-on="3-7" data-active="3"><b>Auth check</b><span>requireLogin confirms a signed-in user.</span></div>
+          <div class="c4-node" data-on="4-7" data-active="4"><b>Route</b><span>POST /api/books validates the input.</span></div>
+          <div class="c4-node" data-on="5-7" data-active="5"><b>Database</b><span>The new book is inserted, owned by this user.</span></div>
+          <div class="c4-node" data-on="6-7" data-active="6"><b>JSON response</b><span>201 Created, with the saved book as JSON.</span></div>
+          <div class="c4-node" data-on="7" data-active="7"><b>Update</b><span>The front end adds the book to the page — no reload.</span></div>
+        </div>
+      </div>
+      <ol class="steps">
+        <li><p><strong>The browser sends the request.</strong> The student fills in a title and author and clicks Add. <code>app.js</code> sends <code>POST /api/books</code> with a JSON body. Because the page and the API share a site, the browser attaches the session cookie automatically — the front end never handles the session ID itself.</p></li>
+        <li><p><strong>Middleware runs first.</strong> The request passes down the Week 2 assembly line: the JSON body parser turns the body into <code>req.body</code>, and the session middleware reads the cookie and loads this student’s session, so <code>req.session.userId</code> is ready before any route sees the request.</p></li>
+        <li><p><strong>The guard checks identity.</strong> The route is mounted behind <code>requireLogin</code>. No valid session would mean <code>401</code> here and the journey would end. This student is signed in, so the request continues. (Adding your <em>own</em> book needs no special role; viewing <em>everyone’s</em> lists is the instructor route, guarded by <code>requireRole('instructor')</code>.)</p></li>
+        <li><p><strong>The route handler validates and prepares.</strong> The handler checks that a title and author are actually present — input from the network is never trusted — and builds the record to store, stamping it with the owner’s ID taken from the session, never from the request body. A client that claims someone else’s ID in the body is ignored.</p></li>
+        <li><p><strong>The database stores it.</strong> Week 3’s CRUD does its one job: an insert — a MongoDB <code>insertOne</code> or a MySQL <code>INSERT</code> with placeholders — and the database returns the new record, including its generated ID.</p></li>
+        <li><p><strong>The API answers with JSON.</strong> Following Week 2’s REST conventions, the route replies <code>201 Created</code> and sends the saved book back as JSON. If anything had failed, the answer would be an honest status code — <code>400</code> for bad input, <code>401</code> or <code>403</code> from the guards — never a silent success.</p></li>
+        <li><p><strong>The page updates itself.</strong> The <code>fetch</code> promise resolves, and <code>app.js</code> adds the new book to the list already on screen. No reload, no second page load: the front end and the back end each did the half they are good at.</p></li>
+      </ol>
+    </div>
+
+    <h3>The two ends of the journey, as code</h3>
+    <p>Here are the two code fragments that meet in the middle of that journey. On the server, the books route — Week 2’s REST shape, Week 3’s database call with a placeholder-style value list, Week 4’s guard in front:</p>
+    <script type="text/plain" class="code" data-lang="js" data-title="routes/books.js — POST /api/books (capstone sketch)">
+      const express = require('express');
+      const { requireLogin } = require('../middleware/auth');
+      const db = require('../db');
+
+      const router = express.Router();
+
+      // Create one book for the signed-in user.
+      router.post('/api/books', requireLogin, async (req, res) => {
+        const { title, author } = req.body;
+        if (!title || !author) {
+          return res.status(400).json({ error: 'title and author are required' });
+        }
+        // The owner comes from the session — never from the request body.
+        const book = await db.insertBook({
+          title,
+          author,
+          ownerId: req.session.userId
+        });
+        res.status(201).json(book);
+      });
+
+      module.exports = router;
+    </script>
+    <p>And in the browser, the front end that calls it. Notice what the browser code does <em>not</em> do: it never touches the session cookie, never names a user ID, and never talks to the database. It asks the API, and renders what comes back.</p>
+    <script type="text/plain" class="code" data-lang="js" data-title="public/app.js — adding a book from the page (capstone sketch)">
+      async function addBook(title, author) {
+        const res = await fetch('/api/books', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, author })
+        });
+        if (res.status === 401) {
+          // The guard answered: the session is gone, so go log in again.
+          window.location = '/login.html';
+          return;
+        }
+        const book = await res.json();   // the 201 response: the saved book
+        renderBook(book);                // add it to the list already on screen
+      }
+    </script>
+    <p>These two fragments are labeled sketches — they assemble the verified patterns from each week into capstone shape, the same way Section 4.2’s login route did. The patterns themselves (the REST responses, the session fields, the guard) are the ones you ran for real in each week’s demos.</p>
+
+    <h3>Where every piece came from</h3>
+    <div class="table-wrap">
+      <table class="data-table c4-tree">
+        <thead><tr><th scope="col">Piece of the capstone</th><th scope="col">Week</th><th scope="col">Objective</th><th scope="col">What it contributes</th></tr></thead>
+        <tbody>
+          <tr><td>Node runtime and the Express server</td><td>Week 1</td><td>Obj 2, 3</td><td>Server-side JavaScript; routes that answer requests</td></tr>
+          <tr><td>Middleware pipeline and routers</td><td>Week 2</td><td>Obj 4</td><td>Body parsing, sessions and guards run in order, before handlers</td></tr>
+          <tr><td>REST API design and JSON responses</td><td>Week 2</td><td>Obj 5</td><td><code>/api/books</code> with honest status codes: 200, 201, 400, 401, 403, 404</td></tr>
+          <tr><td>The front end that fetches the API</td><td>Week 2</td><td>Obj 1</td><td>A dynamic page that updates without reloading</td></tr>
+          <tr><td>Cookies and server-side sessions</td><td>Week 3</td><td>Obj 7</td><td>The browser carries an ID; the server keeps the state</td></tr>
+          <tr><td>MongoDB or MySQL storage with CRUD</td><td>Week 3</td><td>Obj 8</td><td>Book lists that survive restarts, queried with placeholders</td></tr>
+          <tr><td>Salted password hashing</td><td>Week 4</td><td>Obj 6</td><td>Accounts without stored passwords</td></tr>
+          <tr><td>Login flow, roles and guard middleware</td><td>Week 4</td><td>Obj 6</td><td>Students keep their own lists; instructors see all of them</td></tr>
+          <tr><td>HTTPS, environment secrets, <code>npm audit</code></td><td>Week 4</td><td>Obj 6</td><td>The hygiene checklist from Section 4.5, applied to the whole app</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <aside class="callout project">
+      <strong>From walkthrough to your final project</strong>
+      <p>Your final project is this same skeleton wearing different clothes. Pick your own subject, but keep the load-bearing parts: an Express server, a REST API with middleware, a database doing real CRUD, hashed passwords, a session login, at least two roles enforced by guards on the server, and the Section 4.5 checklist run before you submit. If a request in your app cannot be traced through the seven steps above, that is the part to build next. You have seen every piece work on its own — the project is where you prove they work together.</p>
+    </aside>
+    <p>One last encouragement, because it is true: nothing in this app is beyond what you have already typed, run, and debugged in the last four weeks. Professional back-end work is mostly this — the same patterns, at larger scale, with more care. You are not missing a secret chapter. You have the whole machine.</p>
+
+    <div class="quiz" data-title="Capstone check: the whole course in five questions">
+      <script type="application/json">
+      [
+        {"q": "In the add-a-book journey, which step runs the `requireLogin` guard?", "shuffle": true, "choices": ["In the browser, before the fetch is sent", "On the server, after the session middleware and before the route handler", "In the database, before the insert", "After the JSON response is sent"], "answer": 1, "explain": "Guards are server-side middleware (Week 2’s pipeline, Week 4’s rules). They run after the session is loaded — they need `req.session` — and before the handler they protect."},
+        {"q": "The route stamps the new book with an owner ID. Where must that ID come from?", "shuffle": true, "choices": ["The request body, as sent by the front end", "A hidden form field", "The session, which the server filled in at login", "The database’s previous record"], "answer": 2, "explain": "Anything in the request can be forged by hand. The session’s user ID was established by the server at login, after the password check — that is what makes it trustworthy."},
+        {"q": "Which status code should `POST /api/books` return when a book is successfully created?", "shuffle": true, "choices": ["200 OK", "201 Created", "204 No Content", "302 Found"], "answer": 1, "explain": "Week 2’s REST conventions — the same ones the verified `rest-api.js` used when a POST created a book and answered 201."},
+        {"q": "A student asks why the app needs a database at all, when the Week 2 API kept books in an array. The best answer is:", "shuffle": true, "choices": ["Arrays are not allowed in Express", "An in-memory array vanishes when the server restarts; a database is the persistence mechanism that keeps data consistent and durable", "Databases make pages load faster", "The database is only needed for passwords"], "answer": 1, "explain": "That is Objective 7 and 8’s whole point: state and persistence. The array demo was for learning routes; real data has to survive the process."},
+        {"q": "Your capstone is feature-complete the night before it is due. Which remaining step belongs to this week?", "shuffle": true, "choices": ["Rewriting the front end in a new framework", "Running the Section 4.5 checklist: HTTPS, secrets in the environment, placeholders, escaping, `npm audit`", "Adding a third role for decoration", "Moving the passwords into the session so login is faster"], "answer": 1, "explain": "Security hygiene is part of the build, not a polish step — and passwords never go in the session, in any week."}
+      ]
+      </script>
+    </div>
+  </section>
+
+  <!-- ===================================================== Review -->
+  <section class="lesson" id="s4-review">
+    <h2>Week 4 Review</h2>
+    <p>This week you gave your app a memory for people. You separated the two questions every protected system must answer — <strong>authentication</strong> (who are you?) and <strong>authorization</strong> (what may you do?) — and you built both: salted password hashes checked at login, sessions that carry identity from request to request, signed tokens the server can verify without remembering anything, and role guards that answer 401 and 403 correctly. You finished with the hygiene habits that keep all of it safe, and a capstone that assembled the whole course into one app.</p>
+    <p><strong>What comes next:</strong> the <strong>final exam</strong> and the <strong>posttest</strong> follow this week. Use the flashcards and the quiz below as your self-check before you sit them — if a card or a question stops you, that section is the one to re-read. The capstone walkthrough in Section 4.6 is also your map for the final project.</p>
+
+    <details class="reveal">
+      <summary>Your pre-exam checklist: can you do each of these without looking?</summary>
+      <ul>
+        <li>Explain authentication and authorization to a classmate, with the building-badge analogy, in under a minute.</li>
+        <li>Say what a stored password value looks like (<code>salt:hash</code>, 161 characters in the demo), why the salt is random per user, and why the real password is never stored.</li>
+        <li>Walk the six login steps in order, including where the session record lives, what the cookie holds, and why the session ID is regenerated at login and destroyed at logout.</li>
+        <li>Split a JWT into its three parts, decode the header and payload, and explain why being able to read them is not a bug.</li>
+        <li>Given any request, decide between 401 and 403 — and name the guard middleware that produces each.</li>
+        <li>Recite the five hygiene habits: HTTPS, secrets in the environment, placeholders, escaping, and <code>npm audit</code>.</li>
+        <li>Trace one capstone request from the browser to the database and back, naming the week each layer came from.</li>
+      </ul>
+      <p>If every box feels easy, you are ready. If one does not, its section number is your study plan — each item above maps to exactly one section of this week.</p>
+    </details>
+
+    <div class="flashcards" data-title="Week 4 key terms" data-front="Term" data-back="Definition">
+      <script type="application/json">
+      [
+        {"front": "Authentication", "back": "Proving who a user is — for example, checking a password against the stored hash at login. It answers: **who are you?**"},
+        {"front": "Authorization", "back": "Deciding what an already-identified user is allowed to do. It answers: **what may you do?** It always comes after authentication."},
+        {"front": "Hash", "back": "A one-way fingerprint of data, produced by a hash function. You can check a password against its hash, but you cannot turn the hash back into the password."},
+        {"front": "Salt", "back": "A random value generated per user and mixed into the password before hashing. It makes identical passwords store differently and defeats precomputed tables. Stored openly next to the hash."},
+        {"front": "Session", "back": "A record the server keeps about one visitor, found by a random session ID. The browser carries only the ID, in a cookie; the data stays on the server."},
+        {"front": "Token", "back": "A string handed to a client after login that carries signed proof of identity. The client presents it with each request; the server verifies it without storing anything."},
+        {"front": "JWT (JSON Web Token)", "back": "A standardized token format: `header.payload.signature`, joined by dots. Header and payload are Base64URL-encoded JSON that anyone can read; the signature proves they have not been changed."},
+        {"front": "Signature", "back": "A value computed from a token’s header and payload using a secret only the server knows. If any part of the token changes, verification fails with `invalid signature`."},
+        {"front": "Role", "back": "A named level of permission attached to an account — `student`, `instructor`, `admin`. Routes state their rules in roles, and guard middleware enforces them."},
+        {"front": "401 Unauthorized", "back": "The status for **identity not proven**: nobody is logged in, or the session or token is invalid. Despite the name, it is the authentication failure."},
+        {"front": "403 Forbidden", "back": "The status for **known but not allowed**: the user is authenticated, and their role still does not permit this action."},
+        {"front": "HTTPS", "back": "HTTP carried inside TLS encryption, with the server proving its identity by certificate. Passwords, cookies and tokens must never travel without it."},
+        {"front": "Injection", "back": "An attack where user input is treated as commands — SQL injection in a query, or script injection (XSS) in a page. The defense is the same everywhere: input is data, never code — placeholders for queries, escaping for pages."}
+      ]
+      </script>
+    </div>
+
+    <div class="quiz" data-title="Week 4 review quiz">
+      <script type="application/json">
+      [
+        {"q": "Which pair matches each concept to its question?", "shuffle": true, "choices": ["Authentication — what may you do? · Authorization — who are you?", "Authentication — who are you? · Authorization — what may you do?", "Authentication — where are you? · Authorization — who are you?", "Authentication — who are you? · Authorization — where are you?"], "answer": 1, "explain": "Authentication proves identity; authorization decides permission for an identified user. The whole week hangs on keeping them in that order."},
+        {"q": "A database of plain-text passwords leaks. What is the worst consequence?", "shuffle": true, "choices": ["Users must pick longer passwords", "Every account is immediately compromised, including other sites where the same passwords were reused", "The hashes must be recomputed", "Nothing — passwords can be un-leaked by changing the table name"], "answer": 1, "explain": "That is why Section 4.1 stores `salt:hash` values instead: a leaked hash table does not hand out the passwords themselves."},
+        {"q": "In `hash-demo.js`, the stored value is 161 characters. What are its two parts?", "shuffle": true, "choices": ["Username and password", "Salt and hash, joined by a colon", "Header and signature", "Session ID and role"], "answer": 1, "explain": "A 32-character random salt, a colon, and a 128-character scrypt hash. The salt is stored openly; its job is uniqueness, not secrecy."},
+        {"q": "True or false: a session cookie contains the user’s ID and role, which is how the server knows who is asking.", "answer": false, "explain": "The cookie contains only the session ID. The user ID and role live in the session record on the server, which the ID looks up."},
+        {"q": "What happens to a session ID when a user logs in, in a correctly built app?", "shuffle": true, "choices": ["It stays the same, for convenience", "It is regenerated, so the logged-in session has a fresh ID", "It is sent to the user by email", "It is stored inside the password hash"], "answer": 1, "explain": "Regeneration at login means an ID that existed before authentication — possibly planted or copied — can never become a logged-in ID."},
+        {"q": "You decode a JWT’s payload and find `role: student`. A classmate says the token must be broken, because you were not supposed to be able to read that. Are they right?", "shuffle": true, "choices": ["Yes — payloads are encrypted, so reading one means the secret leaked", "No — payloads are only encoded, and anyone can read them; the signature prevents changes, not reading", "Yes — only the server can decode Base64URL", "No — because this token has no signature"], "answer": 1, "explain": "You proved this in the Section 4.3 playground. Signing is tamper-evidence, not secrecy — which is why private data never belongs in a payload."},
+        {"q": "A token was signed with `expiresIn: '1h'` and is presented two hours later with a perfect signature. What does `jwt.verify` do?", "shuffle": true, "choices": ["Accepts it — the signature is what matters", "Accepts it, but warns", "Rejects it — the `exp` claim has passed", "Refreshes it automatically"], "answer": 2, "explain": "Verification checks the expiry as well as the signature. A short lifetime is what limits the damage from a copied token."},
+        {"q": "A signed-in instructor tries to open the account-management page, which is admin-only. Correct response?", "shuffle": true, "choices": ["401, because instructors are not admins", "403, because the instructor is identified but not allowed", "404, because the page should be hidden", "200, because any staff role is close enough"], "answer": 1, "explain": "Known user, insufficient permission: 403. 401 is reserved for requests whose identity has not been proven at all."},
+        {"q": "Which line belongs in a real project, and why?", "code": "const a = process.env.SESSION_SECRET;\nconst b = 'dev-secret';", "lang": "js", "shuffle": true, "choices": ["Line `a` — secrets are read from the environment, never written into source", "Line `b` — short secrets are easier to type", "Both — they are equivalent", "Neither — sessions do not need secrets"], "answer": 0, "explain": "A secret in source code ends up in Git and every clone. The Week 3 demo used a visible value for teaching; Section 4.2’s login route switched to the environment, and real projects stay there."},
+        {"q": "Your capstone’s grade route hides its button from students. What else is required before it is actually protected?", "shuffle": true, "choices": ["Nothing — a hidden button cannot be clicked", "A server-side guard such as `requireRole('instructor')` on the route itself", "A longer, harder-to-guess route name", "A warning in the page footer"], "answer": 1, "explain": "Requests can be sent by hand, skipping the UI entirely. Hiding is courtesy; the guard is the lock. Both, every time."}
+      ]
+      </script>
+    </div>
+  </section>
+</main>
+<script>
+  WD1.ready(() => {
+    // Week 4 has no custom widgets beyond the standard components:
+    // steppers, buckets, match, order, fill, flashcards, playgrounds and quizzes
+    // are all mounted by course.js.
+  });
+</script>
+</body>
+</html>
