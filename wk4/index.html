@@ -85,6 +85,18 @@
     </ul>
     <p>At login you never recover the real password. You hash the attempt and compare fingerprints. If they match, the attempt almost certainly came from someone who knows the password — and your database never held the password itself.</p>
 
+    <p><strong>Example — the same leaked users table, stored two ways:</strong></p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col"></th><th scope="col">Stored in plain text</th><th scope="col">Stored as a salted scrypt hash</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">What the leaked row shows</th><td><code>ada</code> &middot; password: <code>correct horse battery staple</code>, readable as-is</td><td><code>ada</code> &middot; password_hash: <code>f72847f6&hellip;:c4212967&hellip;</code> (the full 161-character <code>salt:hash</code>)</td></tr>
+          <tr><th scope="row">What the attacker can do at once</th><td>Log in as Ada immediately — and try the same password on her email and bank accounts, where she may have reused it</td><td>Nothing. There is no password in the row to type into a login form</td></tr>
+          <tr><th scope="row">The attacker&rsquo;s remaining work</th><td>None — the secret itself was handed over</td><td>Guess a password, re-run slow scrypt with that user&rsquo;s salt, compare, repeat — per user, per guess, at scrypt&rsquo;s deliberately slow speed</td></tr>
+        </tbody>
+      </table>
+    </div>
+
     <h3>The salt: one random extra ingredient per user</h3>
     <p>Hashing alone has a weakness. Two users who both chose <code>hunter2</code> would get the <em>same</em> hash, and an attacker who pre-computes hashes for common passwords (a precomputed list is often called a rainbow table) can match them in bulk.</p>
     <p>A <strong>salt</strong> fixes that. A salt is a random value generated fresh for each user and mixed into the password before hashing. That randomness must come from a cryptographic random source — in the demo below, <code>crypto.randomBytes</code> — never from a counter, a timestamp, or the username, all of which an attacker can predict or guess. You store the salt right next to the hash — the salt is not a secret — and you use it again at login time. Now two users with the same password store completely different values, and precomputed tables are useless because every user’s mixture is unique.</p>
@@ -145,6 +157,19 @@ Wrong password accepted: false</div>
     <p>Three things changed. <code>promisify</code> turns Node’s callback-style <code>crypto.scrypt</code> into a function you can <code>await</code>, so both helpers are now <code>async</code> and every caller has to <code>await</code> them. The last line exports the pair so a route file can <code>require</code> it. And there is a <code>COST</code> object, which the demo did not have.</p>
     <p><code>scrypt</code> is slow on purpose, and <code>COST</code> sets how slow. <code>N</code> is the cost parameter: double it and every guess takes twice the time and twice the memory. Leave the options out, as <code>hash-demo.js</code> does, and Node uses <code>N = 16384</code>, <code>r = 8</code>, <code>p = 1</code> — fine for a demo, but below what current guidance asks for. The OWASP Password Storage Cheat Sheet, the standard reference for this decision, sets the bar for scrypt at “a minimum CPU/memory cost parameter of (2^17), a minimum block size of 8 (1024 bytes), and a parallelization parameter of 1” — the first three numbers in <code>COST</code>, where <code>2 ** 17</code> is JavaScript for 2 to the power 17. The fourth, <code>maxmem</code>, is there because Node refuses an <code>N</code> that large until you raise its memory limit: one hash at these settings needs about 128 MiB. (On the machine this code was tested on, one hash took about 20 milliseconds at Node’s default and about 170 at these settings.) Whatever settings you choose, hash and check with the same ones: a stored hash made with one <code>N</code> never matches a check run with another.</p>
 
+    <p><strong>Example — two users who both chose <code>hunter2</code>:</strong></p>
+    <script type="text/plain" class="code" data-lang="js" data-title="Same password, two salts">
+      const first = hashPassword('hunter2');   // user 1 chooses hunter2
+      const second = hashPassword('hunter2');  // user 2 chooses hunter2 too
+      console.log('User 1 stored:', first);
+      console.log('User 2 stored:', second);
+      console.log('Same stored value?', first === second);
+    </script>
+    <p>Captured run (Node v26.13.1), using the <code>hashPassword</code> function from the demo above. The salts are random on every run, so your two stored values will differ from these — what matters is that they differ from <em>each other</em>, even though the password was identical.</p>
+    <div class="output">User 1 stored: f72847f6d9d2fe39a027dcf5b3f02a6d:c421296713159a713240c076b32102f35c2620827503c8e2e52ed23001ed2236494f1c8998a7d7b9823f73369e4bbe1e41f157be611a7b1b33f9495097ba0075
+User 2 stored: e0150e59307f5d9f135f397c19907ba6:442a0e93518df4ab314b5d602690c1e4fc54884b30d85b114f3b40553d1d3ee2f2a61af06b9b5413490e24acee6410e3f742198ce7da5714950a38bd3f4e6e21
+Same stored value? false</div>
+
     <h3>What the server actually stores</h3>
     <p>Put the pieces together and a row of your <code>users</code> table — one you build the same way you built <code>books</code> in Week 3 — looks like this. Notice what is <em>not</em> in it: the password itself appears nowhere, and it never will.</p>
     <div class="table-wrap">
@@ -158,6 +183,18 @@ Wrong password accepted: false</div>
         </tbody>
       </table>
     </div>
+    <p><strong>Example — one stored record, taken apart:</strong></p>
+    <div class="output">password_hash for user 1 above (161 characters total):
+algorithm : scrypt, producing a 64-byte key (128 hex characters)
+salt      : f72847f6d9d2fe39a027dcf5b3f02a6d   (32 hex characters, stored openly)
+hash      : c421296713159a713240c076b32102f35c2620827503c8e2e52ed23001ed2236494f1c8998a7d7b9823f73369e4bbe1e41f157be611a7b1b33f9495097ba0075
+stored as : salt + ':' + hash, in a single column</div>
+    <p>And the check that runs at every login, using exactly those parts:</p>
+    <ol>
+      <li>Look up the row by username and split <code>password_hash</code> at the colon into its salt and its hash.</li>
+      <li>Run scrypt on the password that was just typed, using that stored salt and the same 64-byte key length.</li>
+      <li>Compare the two hashes with <code>timingSafeEqual</code>. Equal means the typed password is right — and the real password was never stored, recovered, or compared directly.</li>
+    </ol>
     <p>Students often ask why the app does not simply <em>encrypt</em> the passwords instead. The tabs below draw the line, because the difference decides whether a leak is embarrassing or catastrophic.</p>
     <div class="tabs">
       <div data-tab="Hashing (what you do)">
@@ -375,6 +412,26 @@ Listening on port 3000</div>
       </div>
     </div>
 
+    <p><strong>Example — setting a lifetime, and the three ways a session ends:</strong></p>
+    <script type="text/plain" class="code" data-lang="js" data-title="Giving the session cookie a maximum age">
+      app.use(session({
+        secret: process.env.SESSION_SECRET,
+        resave: false,
+        saveUninitialized: false,
+        cookie: { maxAge: 60 * 60 * 1000 }   // one hour, in milliseconds
+      }));
+    </script>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col">Ending</th><th scope="col">What happens</th><th scope="col">When</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Browser-session cookie (no <code>maxAge</code> set)</th><td>The browser keeps the session ID only while it stays open; closing the browser throws the ID away, and the next visit starts as a stranger</td><td>When the browser closes</td></tr>
+          <tr><th scope="row"><code>maxAge</code> expiry (one hour, as above)</th><td>The browser stops sending the cookie once the hour is up, so the server no longer recognizes the visitor — this is the overnight re-login from the prose above</td><td>One hour after the session was created</td></tr>
+          <tr><th scope="row">Explicit logout</th><td><code>req.session.destroy()</code> deletes the server-side record at once; the ID is worthless immediately, even if someone kept a copy of it</td><td>The moment the user logs out</td></tr>
+        </tbody>
+      </table>
+    </div>
+
     <div class="order" data-title="Put the login flow in order">
       <script type="application/json">
       {"prompt": "Drag (or use the arrows) until the steps run in the order a real login happens.",
@@ -503,6 +560,15 @@ console.log('Two parts only:', JSON.stringify(decodeToken(twoParts)));</textarea
       </script>
     </div>
 
+    <p><strong>Example — decode a second, freshly made token:</strong></p>
+    <p>This token was generated for this page with Node&rsquo;s built-in <code>crypto</code> module (an HMAC-SHA256 signature — the same <code>HS256</code> algorithm), so its signature really verifies — this is a working token, not a typed-out illustration. It was signed with a throwaway example secret, and its payload is different from the demo token&rsquo;s above: two deliberately harmless claims. Split on the dots and decode the first two parts exactly as you just did:</p>
+    <div class="c4-token"><span class="h">eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9</span>.<span class="p">eyJzdWIiOiI0MiIsInJvbGUiOiJtZW1iZXIifQ</span>.<span class="s">WGmAz8CWb_uTudGTE7b6OGhGqMAbRHNFO15B534iqQY</span></div>
+    <div class="output">Header (part 1, decoded):  {"alg":"HS256","typ":"JWT"}
+Payload (part 2, decoded): {"sub":"42","role":"member"}
+Signature (part 3):        not decoded — it is the HMAC of parts 1 and 2,
+                           computed with the secret; there is nothing to read in it</div>
+    <p>Notice what this payload does <em>not</em> carry: no <code>iat</code> or <code>exp</code>, because nothing added them — the demo token above got its timestamps from the <code>jsonwebtoken</code> library&rsquo;s <code>expiresIn</code> option. A token asserts only the claims that were put into it. Leaving <code>exp</code> out keeps this example short, but treat that as a shortcut for the page, never as a pattern: a real token should always carry an <code>exp</code>, because expiry is what limits the damage when a token is copied.</p>
+
     <p>Be blunt about what you just did: decoding a token proves nothing. Anyone can decode any token, including a forged one that was never issued by your server — you just decoded one that claims to be an admin — so a decoded payload is just a claim written by whoever handed you the token. The payload only becomes trustworthy after the server verifies the signature with its secret — that verification, not the decoding, is what earns trust.</p>
     <p>One piece of verification hygiene belongs in your own code: pin which algorithm the server accepts, so an attacker cannot swap in a different algorithm from the one you signed with. In your own code, verify like this:</p>
     <script type="text/plain" class="code" data-lang="js" data-title="Verifying with a pinned algorithm (your own code)">const decoded = jwt.verify(token, secret, { algorithms: ['HS256'] });</script>
@@ -537,6 +603,22 @@ console.log('Two parts only:', JSON.stringify(decodeToken(twoParts)));</textarea
       ]}
       </script>
     </div>
+
+    <p><strong>Example — the same protected route, with and without a valid token:</strong></p>
+    <p>What comes back when the request above reaches a route that requires a verified token:</p>
+    <div class="output">With the header:  Authorization: Bearer &lt;valid, unexpired token&gt;
+
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{"sub":"user-42","grades":[{"course":"Web Development II","grade":"A"}]}</div>
+    <div class="output">Without the header (or with a token whose signature fails):
+
+HTTP/1.1 401 Unauthorized
+Content-Type: application/json
+
+{"error":"Missing or invalid token"}</div>
+    <p>Same route, same server — the only difference is whether a verifiable token arrived with the request. A 200 means the signature checked out and the claims could be trusted; a 401 means identity was never proven, exactly as it did for sessions in Section 4.2.</p>
 
     <div class="quiz" data-title="Check your understanding: tokens and JWTs">
       <script type="application/json">
@@ -654,6 +736,27 @@ console.log('Two parts only:', JSON.stringify(decodeToken(twoParts)));</textarea
       </script>
     </div>
 
+    <p><strong>Example — two requests, two different kinds of &ldquo;no&rdquo;:</strong></p>
+    <script type="text/plain" class="code" data-lang="text" data-title="No session at all: the answer is 401">
+      GET /my-grades HTTP/1.1
+      Host: example.com
+      (no session cookie sent with this request)
+
+      HTTP/1.1 401 Unauthorized
+
+      Please log in first
+    </script>
+    <script type="text/plain" class="code" data-lang="text" data-title="A signed-in student on an instructor route: the answer is 403">
+      POST /grades HTTP/1.1
+      Host: example.com
+      Cookie: connect.sid=<a student's live session ID>
+
+      HTTP/1.1 403 Forbidden
+
+      You are not allowed to do this
+    </script>
+    <p>Both responses come straight from the guard code above, including the message text. The first request never got its identity checked because there was no identity to check; the second passed authentication and failed authorization — the student is known, and still not allowed.</p>
+
     <h3>Try the permission matrix</h3>
     <p>This playground holds the course app’s matrix as data. Your task is to finish <code>can(role, action)</code> so that it answers one cell of the matrix: <code>true</code> when that role’s list includes the action, <code>false</code> otherwise — the same yes/no decision your guard middleware makes, with no server involved. Right now it answers <code>false</code> to everything. That is the safe place to start, because nobody gets a permission by accident, but nobody can work either. Keep that <code>false</code> for a role or an action the matrix has never heard of.</p>
 
@@ -700,6 +803,16 @@ console.log('guest, view grades:       ', can('guest', 'view grades'));</textare
     <h3>Least privilege: give each role only what it needs</h3>
     <p>When you fill in your own permission matrix, work by one rule: <strong>least privilege</strong> — every role gets the smallest set of permissions that lets it do its job, and nothing more. A student role that can also edit grades “just in case” is not convenient; it is a bug waiting for a curious student. Start every cell at <em>no</em>, and make each <em>yes</em> earn its place by naming the real task that needs it. If nobody can name the task, the answer stays no.</p>
     <p>Roles are coarse, though — “members may edit” is not enough on its own, because it does not say <em>whose</em> records a member may edit. The server also checks <strong>ownership</strong>: a member may edit only their own records, by comparing the record’s owner id with the signed-in user’s id from the session (<code>req.session.userId</code>). For example, a student in the course app may edit a book on their own list, but if they change the id in the request to reach another student’s book, the owner ids will not match and the server must refuse. An instructor or admin role is the exception: that role may touch everyone’s records, because reviewing and managing the whole class is its job.</p>
+    <p><strong>Example — the same copied student session, under two different permission sets:</strong></p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col">Case</th><th scope="col">Permissions the session carries</th><th scope="col">What happens at <code>POST /grades</code></th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Overprivileged: the student role also includes &ldquo;edit grades, just in case&rdquo;</th><td>View courses, view own grades, submit homework, <em>and</em> edit grades</td><td>The guard passes — the role really does hold the permission — so grades can be changed. The damage reaches every student&rsquo;s record, and least privilege was the only thing that could have prevented it</td></tr>
+          <tr><th scope="row">Scoped by least privilege</th><td>View courses, view own grades, submit homework — nothing else</td><td>The guard answers <code>403</code>. The copied session can still act as that one student on their own account, but the grade book is out of reach</td></tr>
+        </tbody>
+      </table>
+    </div>
     <p>Complete the guard below. It is the same pattern as the code above, with the decision points left blank.</p>
 
     <div class="fill" data-title="Complete the role guard" data-explain="No identity means 401. A role that is not on the route’s list means 403. Only a known user with an allowed role reaches next(), which hands the request to the handler.">
@@ -740,6 +853,19 @@ function requireRole(...roles) {
     <p>Plain <strong>HTTP</strong> sends requests and responses as readable text. Anyone positioned along the path — a compromised router, a hostile Wi-Fi hotspot — can read them, including passwords and session cookies, and can even change them in transit. <strong>HTTPS</strong> is HTTP carried inside <strong>TLS</strong> (Transport Layer Security), which encrypts the connection: the two sides agree on keys at the start, and everything after that is scrambled to everyone in between. The server also proves its identity with a <strong>certificate</strong>, a digitally signed ID card issued by a trusted authority, so your browser knows it reached your real server and not an impostor.</p>
     <p>For this course the practical rules are simple: logins and sessions must never travel over plain HTTP, hosting platforms enable HTTPS for you (usually with free certificates), and on your own server you redirect every HTTP request to its HTTPS address. A session cookie sent over plain HTTP is a house key mailed on a postcard.</p>
 
+    <p><strong>Example — what someone listening on the café Wi-Fi sees when Ada logs in:</strong></p>
+    <p>Over plain HTTP, the whole login request is readable text, password included:</p>
+    <div class="output">POST /login HTTP/1.1
+Host: example.com
+Content-Type: application/x-www-form-urlencoded
+
+username=ada&amp;password=hunter2</div>
+    <p>Over HTTPS, the same request crosses the same network as TLS ciphertext — no readable method, headers, or body (illustrative bytes):</p>
+    <div class="output">e148b9d85c691db06377a8832ab39a1a23e3422b973da1631cc84145b3790dbc1
+eb2b48df232a7b2a5cdcf0f9ba69e33f9dffd2c08e92e378cb7fed0281a95b02
+1185d6bf6a13ee5b9be8d07a203ef82ba7ba7c7ef0334e67d9de2e4acb10493 &hellip;</div>
+    <p>Only the two endpoints — Ada&rsquo;s browser and the real server, whose identity the certificate vouched for — can turn the second version back into the first.</p>
+
     <h3>2 · Secrets live in environment variables, never in code</h3>
     <p>A <strong>secret</strong> is any value that grants power: a session-signing secret, a JWT secret, a database password, an API key. You met the pattern in Week 3 and used it in Section 4.2: the code reads the value from an <strong>environment variable</strong> — a setting supplied by the machine the program runs on, not written in the source.</p>
     <script type="text/plain" class="code" data-lang="js" data-title="Reading secrets from the environment">
@@ -757,6 +883,8 @@ function requireRole(...roles) {
       node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
     </script>
 
+    <p>The full setup — the <code>.env</code> file, the <code>.gitignore</code> line that keeps it out of Git, and reading the values back with <code>process.env</code> — lives in <a href="../wk3/index.html#s3-6">Section 3.6</a>, and it is not repeated here. This section adds only the rule: if a value would grant power to whoever holds it, it belongs in the environment, never in the source.</p>
+
     <h3>3 · SQL injection — and why Week 3’s placeholders stop it</h3>
     <p><strong>SQL injection</strong> is an attack where a visitor types database commands into an ordinary form field and a careless server runs them. It happens when code builds a query by gluing strings together:</p>
     <script type="text/plain" class="code" data-lang="js" data-title="Vulnerable vs safe: building a query">
@@ -771,13 +899,55 @@ function requireRole(...roles) {
         [username]
       );
     </script>
+    <p>What the database actually receives from the vulnerable version, when the username field contains <code>' OR '1'='1</code>:</p>
+    <div class="output">SELECT * FROM users WHERE name = '' OR '1'='1'</div>
+    <p>The attacker&rsquo;s first quote closes the name string early, and the rest of the input becomes part of the condition. <code>'1'='1'</code> is always true, so the <code>WHERE</code> clause matches <em>every</em> row in the table — the query the server meant to run for one user now runs for all of them. With the placeholder version in the safe code above, that same input is compared, as data, against actual names, matches nobody, and changes nothing.</p>
     <p>The placeholder is the whole defense, and it is structural: with placeholders, the database receives the query shape and the values through separate channels, so a value can never rewrite the query — even if it contains quotes, SQL keywords, or an entire second statement. The rule is absolute: <strong>never build SQL by joining strings with user input; always use placeholders</strong> (or your library’s equivalent). MongoDB has no SQL string to break, but that does not make it safe by default. It needs a rule of its own — every value that goes into a query must be the type you expect — and the NoSQL injection item in the checklist below shows why.</p>
 
     <h3>4 · XSS: user content is data, not code</h3>
     <p><strong>Cross-site scripting (XSS)</strong> is the front-end cousin of injection: an attacker stores a piece of JavaScript as ordinary content — say, in a comment or a display name — and your page later inserts it into the HTML as markup instead of text, so it <em>runs</em> in every visitor’s browser, with their session. The defense mirrors the back-end rule: treat everything a user typed as data. Escape it when you insert it into a page (turning <code>&lt;</code> into <code>&amp;lt;</code> so the browser shows it instead of obeying it), prefer <code>textContent</code> over <code>innerHTML</code> in your own scripts, and let your framework or template engine escape by default. This course’s own components follow the rule — it is why the authoring guide escapes text in interactive activities.</p>
 
+    <p><strong>Example — displaying one stored display name, the dangerous way and the safe way:</strong></p>
+    <script type="text/plain" class="code" data-lang="js" data-title="innerHTML vs textContent">
+      // A stored display name, typed by a user — so it is data, not code:
+      const displayName = '<img src="x" onerror="alert(1)">';
+
+      // Don't (VULNERABLE): innerHTML parses the string as markup.
+      // The browser builds the img element and runs its onerror handler
+      // in the page of everyone who views this profile.
+      profileEl.innerHTML = displayName;
+
+      // Fix: textContent inserts the same string as plain text.
+      // Visitors see the characters; nothing is built and nothing runs.
+      profileEl.textContent = displayName;
+    </script>
+    <script type="text/plain" class="code" data-lang="html" data-title="The same rule in Vue: {{ }} vs v-html">
+      <!-- Fix: {{ }} escapes by default — the name shows as text. -->
+      <p>{{ displayName }}</p>
+
+      <!-- Don't (VULNERABLE): v-html inserts the string as markup,
+           exactly like innerHTML above. -->
+      <p v-html="displayName"></p>
+    </script>
+
     <h3>5 · Keep dependencies updated</h3>
     <p>Your app stands on packages you did not write, and vulnerabilities are found in popular packages regularly. Node ships with a scanner for exactly this: running <code>npm audit</code> in a project compares your installed dependency versions against a database of known vulnerabilities and reports what it finds, with suggested fixes (often <code>npm audit fix</code>, or updating the package yourself). Be honest about what it is: <code>npm audit</code> is a scanner, not a shield. It can only flag problems that are already known and catalogued, and a clean report does not prove your app is secure. Run it before every deployment anyway — it catches the known, fixable problems, which are the embarrassing ones to ship.</p>
+
+    <p><strong>Example — what an audit report with something to fix looks like</strong> (illustrative sample — your packages, versions and counts will differ):</p>
+    <div class="output">$ npm audit
+
+# npm audit report
+
+example-lib  &lt;2.0.0
+Severity: high: example-lib vulnerable to prototype pollution
+node_modules/example-lib
+  fix available via `npm audit fix`
+
+1 high severity vulnerability
+
+To address all issues, run:
+  npm audit fix</div>
+    <p>One flagged package, a plain statement of the problem, and the suggested fix — that is the whole interaction. Run the fix (or update the package yourself), then run <code>npm audit</code> again to confirm the report is clean before you deploy.</p>
 
     <h3>Four more habits on the same checklist</h3>
     <ul class="c4-checklist">

@@ -39,6 +39,19 @@
     <p>Picture a coat check at a theatre. You hand over your coat, and the attendant hands you a small numbered ticket. The attendant does not remember your face, your name, or which coat is yours. Later, you hand back the ticket, and the number on it is enough to find your coat. Every visit works the same way: no memory, just a ticket presented each time.</p>
     <p>The web works like that. The "ticket" is a <strong>cookie</strong>: a small piece of text — a name and a value, like <code>visited=yes</code> — that a server asks your browser to store. Your browser keeps it and then automatically sends it back with every later request to that site. The server never has to remember you. It just reads the ticket you present.</p>
 
+    <p><strong>Example — the coat check, translated to the web:</strong></p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col">At the coat check</th><th scope="col">On the web</th></tr></thead>
+        <tbody>
+          <tr><td>The attendant takes your coat and hands you ticket #42.</td><td>The server's response carries a <code>Set-Cookie</code> header — "browser, store this."</td></tr>
+          <tr><td>You keep the ticket in your pocket.</td><td>The browser stores the cookie, like <code>visited=yes</code>.</td></tr>
+          <tr><td>Later, you hand ticket #42 back.</td><td>The browser sends the cookie back in a <code>Cookie</code> header on the next request.</td></tr>
+          <tr><td>The attendant reads the number and finds your coat.</td><td>The server reads the cookie's value and answers based on it — no face or name needed.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
     <h3>How a cookie round trip works</h3>
     <p>Two headers do all the work. A <strong>header</strong> is a line of extra information attached to an HTTP request or response, separate from the page itself:</p>
     <ul>
@@ -124,6 +137,17 @@ Listening on port 3000</div>
         sameSite: 'lax'
       });
     </script>
+
+    <p><strong>Example — one <code>Set-Cookie</code> line, read flag by flag:</strong></p>
+    <div class="output">Set-Cookie: sid=k9f2x; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=3600
+
+sid=k9f2x     the cookie itself: name sid, value k9f2x
+HttpOnly      page JavaScript may not read it
+Secure        sent only over HTTPS
+SameSite=Lax  not sent on most cross-site requests
+Path=/        sent to every page on the site
+Max-Age=3600  keep it for 3600 seconds (one hour), then discard it</div>
+    <p class="wk3-note">One unit trap: in the header, <code>Max-Age</code> counts <em>seconds</em>, but in <code>res.cookie()</code> the <code>maxAge</code> option counts <em>milliseconds</em> — the one day in the code above is <code>24 * 60 * 60 * 1000</code>, not <code>86400</code>.</p>
 
     <aside class="callout warn">
       <strong>Cookies live on the visitor's machine — never trust them</strong>
@@ -237,6 +261,15 @@ Visit number 1
 Listening on port 3000</div>
     <p class="wk3-note">Real output — captured from running this code (Node v26.13.1, Express 5.3.0). The count climbs 1, 2, 3 while the jar presents the same session ID, because the number itself lives on the server. Drop the cookie and the server has no ticket to look up, so it starts a brand-new session at 1. Notice the visitor never sees the count in their cookie — only the ID travels. Repeating that last request with <code>-i</code>, in the same captured run, showed the ticket itself: <code>Set-Cookie: connect.sid=s%3A…; Path=/; HttpOnly; SameSite=Lax</code> (the long random ID is shortened here). A signed ID, the two attributes from the <code>cookie</code> setting, and no count anywhere.</p>
 
+    <p><strong>Example — the two sides of one session, side by side:</strong></p>
+    <div class="output">IN THE BROWSER — the whole cookie is just the ticket:
+Cookie: sid=k9f2x
+
+ON THE SERVER — the data stored under that ID:
+sessions["k9f2x"] = { "visits": 3, "cart": ["Dune", "Emma"] }</div>
+    <p class="wk3-note">The browser side holds nothing worth stealing or editing — <code>k9f2x</code> is meaningless on its own. Everything that matters, the visit count and the cart, sits in the server-side entry, and it only ever changes there.</p>
+    <p class="wk3-note">A simplification, disclosed: the snapshot shortens the cookie to <code>sid=k9f2x</code> so the ticket idea stays readable. With the <code>express-session</code> setup above, the cookie you would actually see in DevTools is named <code>connect.sid</code> and looks like <code>connect.sid=s%3A&lt;id&gt;.&lt;signature&gt;</code> — the session ID plus a signature proving it came from your server. And because that setup uses <code>saveUninitialized: true</code>, the cookie is set on the first response of a visit — it does not wait until login, so a brand-new visitor gets a session (and a ticket) straight away.</p>
+
     <h3>One lookup, step by step</h3>
     <p>Step through a single request arriving at a server that uses sessions:</p>
 
@@ -307,6 +340,21 @@ Lines: 2</div>
       <li><strong>No sharing, no searching.</strong> A file is one long stretch of text. Finding "every book by Jane Austen" means reading the whole file and picking through it yourself, every time. Two parts of your program writing at once can tangle their changes together.</li>
       <li><strong>Fragile.</strong> One bad write — the program stops halfway through saving — can leave the file half-old, half-new, and unreadable. There is no undo and no safety net.</li>
     </ul>
+
+    <p><strong>Example — two updates to one file at the same time, and one of them vanishes:</strong></p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col">Step</th><th scope="col">What happens</th><th scope="col"><code>books.json</code> on disk afterwards</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Request A reads the file — 3 books — so it can add <em>Dune Messiah</em>.</td><td>3 books</td></tr>
+          <tr><td>2</td><td>Request B reads the same file — still 3 books — so it can add <em>Persuasion</em>.</td><td>3 books</td></tr>
+          <tr><td>3</td><td>A writes its copy back: its 3 books plus <em>Dune Messiah</em>.</td><td>4 books, including <em>Dune Messiah</em></td></tr>
+          <tr><td>4</td><td>B writes <em>its</em> copy back: its 3 books plus <em>Persuasion</em> — overwriting A's file completely.</td><td>4 books, including <em>Persuasion</em> — <em>Dune Messiah</em> is gone, and nobody saw an error</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Both requests did everything "right." The file was simply never designed to be shared — each writer replaced the whole thing with the version it had read, and the later write silently erased the earlier one. That lost update is the sharing problem in miniature.</p>
+
     <p>You need a program whose whole job is storing data well: keeping it safe, finding any piece of it quickly, and serving many programs at once. That program is a database, and it is where this week goes next.</p>
 
     <div class="quiz" data-title="Check your understanding: sessions and files">
@@ -333,9 +381,49 @@ Lines: 2</div>
     <p>Before any data goes in, you declare the table's <strong>schema</strong>: the plan that says what columns exist and what kind of value each holds (text, whole numbers, dates). The database then enforces the plan — a book with no title, or a price written as words, gets rejected. One column is special: the <strong>primary key</strong>, a value that uniquely identifies each row, like an ID number. No two rows share a primary key, so you can always point at exactly one row.</p>
     <p>The word "relational" comes from tables being able to point at each other: an orders table can hold the primary key of a row in the customers table, linking the two. The language you use to talk to a relational database is <strong>SQL</strong> (Structured Query Language, usually pronounced "sequel" or spelled out). MySQL, which you will use in Section 3.5, is a relational database.</p>
 
+    <p><strong>Example — authors and books as two linked tables:</strong></p>
+    <p>The <code>authors</code> table — one row per author, and <code>id</code> is the primary key:</p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col">id (primary key)</th><th scope="col">name</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Frank Herbert</td></tr>
+          <tr><td>2</td><td>Jane Austen</td></tr>
+          <tr><td>3</td><td>J.R.R. Tolkien</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The <code>books</code> table — instead of repeating the author's name, each book stores the author's <code>id</code> in an <code>author_id</code> column:</p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col">id (primary key)</th><th scope="col">title</th><th scope="col">author_id</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Dune</td><td>1</td></tr>
+          <tr><td>2</td><td>Emma</td><td>2</td></tr>
+          <tr><td>3</td><td>The Hobbit</td><td>3</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>That <code>author_id</code> is the link in action: to find who wrote <em>Emma</em>, read its <code>author_id</code> — 2 — then look up row 2 in <code>authors</code>. The name itself is stored exactly once, in the <code>authors</code> table, and every book points at it.</p>
+
     <h3>Non-relational: data in documents</h3>
     <p>A <strong>non-relational database</strong> stores data as <strong>documents</strong> instead of rows. A document is a self-contained bundle of named fields and values — the same shape as a JavaScript object, or the JSON you have been sending all course. Documents that belong together live in a <strong>collection</strong>, the document world's rough equivalent of a table.</p>
     <p>There is usually no strict schema. Two documents in one collection can carry different fields: one book can have a <code>subtitle</code> and another need not. Each document still gets a unique ID — in MongoDB, the database you will use in Section 3.4, it is stored in a field named <code>_id</code> and generated automatically if you do not supply one.</p>
+
+    <p><strong>Example — one book as a document, with data nested inside it:</strong></p>
+    <script type="text/plain" class="code" data-lang="js" data-title="One book document">
+      {
+        _id: 'bk-1042',
+        title: 'Dune',
+        author: 'Frank Herbert',
+        genres: ['Science fiction', 'Adventure'],
+        editions: {
+          paperback: { pages: 688, inStock: true },
+          ebook: { format: 'EPUB', inStock: true }
+        }
+      }
+    </script>
+    <p>Notice what a table would struggle to hold: <code>genres</code> is a list of two values inside one field, and <code>editions</code> is a whole object nested inside the document. Nothing had to be declared in advance — the document simply carries the shape this particular book needs, and the next book's document may carry a different one.</p>
 
     <h3>The same book, both ways</h3>
     <p>Here is the running example for the rest of the week — the little book collection from your Week 2 REST API, with <em>Dune</em>, <em>Emma</em> and <em>The Hobbit</em> — stored each way. Switch tabs and compare:</p>
@@ -387,6 +475,20 @@ Lines: 2</div>
       </div>
     </div>
     <p>Neither family is "better." Banks and airlines run on relational databases; catalogs, content sites and activity feeds often run on document databases. Plenty of real systems use both. What matters is knowing which picture fits your data.</p>
+
+    <p><strong>Example — four data sets, each matched to a home:</strong></p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col">Scenario</th><th scope="col">Better home</th><th scope="col">Why</th></tr></thead>
+        <tbody>
+          <tr><td>A library's loans: every loan links one member, one book and a due date, and fines must come out exact.</td><td>Relational</td><td>Fixed shape, records linked by keys, money that must be right.</td></tr>
+          <tr><td>A recipe collection: one recipe has 4 ingredients and 3 steps; the next has 19 ingredients, photos and a video link.</td><td>Document</td><td>Fields and lists vary from record to record; each recipe is self-contained.</td></tr>
+          <tr><td>Concert seat sales: a seat can be sold only once, and the sold count must never disagree with the payments.</td><td>Relational</td><td>Linked records whose numbers have to agree with each other, always.</td></tr>
+          <tr><td>A photo app's posts: some carry a location, some a filter name, some a poll with its own options nested inside.</td><td>Document</td><td>Every post is a bundle with different extras attached.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
     <p>The two families mostly rename the same ideas. Keep this translation table nearby for the next two sections:</p>
 
     <div class="table-wrap">
@@ -479,6 +581,8 @@ Lines: 2</div>
       });
       console.log('Inserted a document.');
     </script>
+    <p>What comes back (the <code>insertedId</code> is generated fresh on every run — yours will differ):</p>
+    <div class="output">{ acknowledged: true, insertedId: new ObjectId("6a05f1c2b8d4e5f60718293a") }</div>
     <p>What comes back is a small report object from the driver. In prose: the driver reports <code>acknowledged: true</code> — the server confirmed the write — and hands back the new document's generated <code>id</code> in <code>result.insertedId</code>. That ID was added to your document as its <code>_id</code>; MongoDB generates one automatically whenever you do not supply it. <code>insertMany</code> does the same job for an array of documents at once.</p>
 
     <h3>Read: <code>find</code> and <code>findOne</code></h3>
@@ -516,6 +620,8 @@ Lines: 2</div>
         { $set: { title: 'Dune (revised)' } }     // what to change
       );
     </script>
+    <p>What comes back:</p>
+    <div class="output">{ acknowledged: true, matchedCount: 1, modifiedCount: 1, upsertedCount: 0, upsertedId: null }</div>
     <p>That is the same edit your Week 2 API made with <code>PUT /api/books/1</code> — the revised title, the author untouched. The driver's report tells you how many documents matched and how many were actually modified, so your code can check that the update found something. (<code>updateMany</code> applies the same change to every match.)</p>
 
     <h3>Delete: <code>deleteOne</code></h3>
@@ -523,6 +629,8 @@ Lines: 2</div>
     <script type="text/plain" class="code" data-lang="js" data-title="DELETE — deleteOne">
       await books.deleteOne({ title: 'Emma' });
     </script>
+    <p>What comes back:</p>
+    <div class="output">{ acknowledged: true, deletedCount: 1 }</div>
     <p>One query, one document gone. The report's <code>deletedCount</code> tells you whether anything was actually deleted — <code>0</code> means your query matched nothing, which usually means a typo worth knowing about. <code>deleteMany</code> removes every match, and deserves a careful look at the query before you run it.</p>
 
     <h3>The same four operations you already know</h3>
@@ -716,6 +824,14 @@ Lines: 2</div>
     <p>And <code>SELECT * FROM books WHERE id = 2;</code>, run before the delete, returns exactly one row: <code>2 · Emma · Jane Austen</code> — the same book your Week 2 API answered for <code>GET /api/books/2</code>.</p>
 
     <p>When MySQL answers a <code>SELECT</code> through the Node driver in the next example, each row arrives as a plain JavaScript object whose properties are the column names — <code>{ id: 2, title: 'Emma', author: 'Jane Austen' }</code>. That is no accident: it is the same book your API has been returning as JSON all along, which is why wiring a real database under a REST API changes so little of the code around it.</p>
+
+    <p><strong>Example — what the driver hands your code, for a read and for a write:</strong></p>
+    <p>What comes back from a <code>SELECT</code> — an array of row objects, one per row:</p>
+    <div class="output">[ { id: 1, title: 'Dune', author: 'Frank Herbert' },
+  { id: 2, title: 'Emma', author: 'Jane Austen' },
+  { id: 3, title: 'The Hobbit', author: 'J.R.R. Tolkien' } ]</div>
+    <p>What comes back from a write, like an <code>INSERT</code> — no rows at all, just a short report. The two fields you will actually read are <code>affectedRows</code> (how many rows the write changed) and <code>insertId</code> (the <code>AUTO_INCREMENT</code> id the new row was given — here, a fourth book going in):</p>
+    <div class="output">{ affectedRows: 1, insertId: 4 }</div>
 
     <h3>Sending SQL from Node: mysql2 and placeholders</h3>
     <p>From Node, the package is <code>mysql2</code> — install it with <code>npm install mysql2</code> — and its <code>/promise</code> version lets you <code>await</code> each query. Here is the full CRUD cycle, run against the table as the three <code>INSERT</code> statements above left it: Dune, Emma and The Hobbit, ids 1 to 3. It adds a fourth book, reads, then makes the same update and delete you just wrote by hand. Read the queries closely: none of them glue values into the SQL text. Wherever a value belongs, the SQL has a <code>?</code> instead, and the value travels separately, in an array:</p>
@@ -919,6 +1035,31 @@ console.log('Year too big:', validateBook({ title: 'The Hobbit', author: 'J.R.R.
     <h3>Consistency: one fact, one home</h3>
     <p>Validation keeps bad values out. <strong>Consistency</strong> is the companion idea: the data you have should agree with itself. The simplest way to protect it is <strong>one source of truth</strong> — each fact is stored in exactly one place, and everything else looks it up from there.</p>
     <p>Suppose every order stores a copy of the customer's email address, and the customer changes their email. Now you must find and fix every copy. Miss one, and your database disagrees with itself: two places claim to know the email, and they say different things. Which is right? Nobody knows — that disagreement <em>is</em> inconsistency. Relational databases fight this with the links from Section 3.3: the order stores only the customer's primary key, the email lives once in the customers table, and a change happens in exactly one place. Document databases make the same trade differently, often copying a fact into a document on purpose for speed — but then the copying is a deliberate choice with a plan for updates, never an accident.</p>
+
+    <p><strong>Example — an author's name, stored twice vs stored once:</strong></p>
+    <p>Stored twice: the author's name lives in the books table <em>and</em> is copied into a staff-picks list. The name is corrected from <code>J. Austen</code> to <code>Jane Austen</code> in the books table — but the copy is missed, and now the site disagrees with itself:</p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col">Where you look</th><th scope="col">Title</th><th scope="col">Author shown</th></tr></thead>
+        <tbody>
+          <tr><td>Books table</td><td>Emma</td><td>Jane Austen (corrected)</td></tr>
+          <tr><td>Staff-picks list</td><td>Emma</td><td>J. Austen (the stale copy)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Stored once: the name lives in exactly one row — the authors row, as in Section 3.3 — and everything else points at it. The books row keeps only the author's <code>id</code>, and the staff-picks entry keeps only the book's <code>id</code>:</p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col">Where it lives</th><th scope="col">What is stored</th></tr></thead>
+        <tbody>
+          <tr><td>Authors table, one row</td><td><code>{ id: 2, name: 'Jane Austen' }</code> — the author's name lives only here</td></tr>
+          <tr><td>Books table, one row</td><td><code>{ id: 2, title: 'Emma', author_id: 2 }</code> — the book points at the author, never copies the name</td></tr>
+          <tr><td>Staff-picks list, one entry</td><td><code>{ book_id: 2 }</code> — the pick points at the book, and the name is looked up through it: book, then <code>author_id</code>, then the authors row</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>With one home for the fact, the correction happens once, in the authors row, and every page that looks the book up — following its <code>author_id</code> — shows the new name. There is no second copy to miss.</p>
+
     <p>The same principle runs your whole week. The session ID is a pointer to one server-side record, not a copy of it. The book's title is changed with one <code>$set</code> or one <code>UPDATE</code>, in one row or document. Whenever you catch yourself storing the same fact twice, stop and ask which copy is the truth — and how the other one gets updated.</p>
 
     <h3>Configuration: settings live outside the code</h3>
@@ -949,6 +1090,13 @@ console.log('Year too big:', validateBook({ title: 'The Hobbit', author: 'J.R.R.
       <p>A password typed into a <code>.js</code> file gets copied everywhere the code goes — including GitHub, where automated scanners find committed secrets within minutes and strangers use them. So: secrets live in environment variables and the <code>.env</code> file, the <code>.env</code> file is listed in <code>.gitignore</code> so Git never commits it, and a secret that <em>has</em> been committed is treated as leaked — change it, don't just delete the line. Week 4 returns to this when sessions and logins make the stakes real.</p>
     </aside>
     <p>A <code>.gitignore</code> file — a plain list of names Git should leave out of commits — keeps <code>node_modules</code> and <code>.env</code> out of Git: you commit a <code>.env.example</code> file with the variable names and placeholder values, never the real values.</p>
+
+    <p><strong>Example — a project's <code>.gitignore</code>, complete:</strong></p>
+    <script type="text/plain" class="code" data-title=".gitignore — what stays out of Git">
+      node_modules/
+      .env
+    </script>
+    <p>Two lines do the whole job: dependencies are never committed (they are rebuilt from <code>package.json</code>), and the real <code>.env</code> — with its real password and secret — never leaves your machine.</p>
 
     <div class="quiz" data-title="Check your understanding: validation, consistency, configuration">
       <script type="application/json">

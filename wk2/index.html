@@ -459,9 +459,55 @@ GET /missing-test 404 1.073 ms - 26</div>
       </table>
     </div>
     <p>If you guessed all six, you have understood REST better than any definition could teach it: the design is a <em>convention</em>, and conventions pay off precisely when strangers — teammates, future you, a front end written by someone else — can rely on them without asking.</p>
+    <p><strong>Example — run the same drill on an <code>authors</code> resource, then check yourself:</strong></p>
+    <details class="reveal">
+      <summary>Check your answer: the <code>/authors</code> route table</summary>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th scope="col">You want to…</th><th scope="col">You send</th><th scope="col">Success answer</th></tr></thead>
+          <tbody>
+            <tr><td>List all authors</td><td><code>GET /api/authors</code></td><td>200, a JSON array</td></tr>
+            <tr><td>Read author 7</td><td><code>GET /api/authors/7</code></td><td>200, one author as JSON</td></tr>
+            <tr><td>Create an author</td><td><code>POST /api/authors</code> with a JSON body</td><td>201, the created author</td></tr>
+            <tr><td>Replace author 7</td><td><code>PUT /api/authors/7</code> with a JSON body</td><td>200, the updated author</td></tr>
+            <tr><td>Delete author 7</td><td><code>DELETE /api/authors/7</code></td><td>204, no body</td></tr>
+            <tr><td>Read an author that does not exist</td><td><code>GET /api/authors/999</code></td><td>404, a JSON error</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
 
     <h3>JSON: the language of APIs</h3>
     <p><strong>JSON</strong> (JavaScript Object Notation) is a text format for structured data: objects with <code>"key": value</code> pairs, arrays in square brackets, strings in double quotes, numbers and <code>true</code>/<code>false</code> bare. It looks like a JavaScript object because it grew out of one, but it is plain text, so every language can read and write it. When your handler calls <code>res.json(books)</code>, Express converts the JavaScript value to JSON text and labels it with the <code>application/json</code> content type. When a client sends JSON to you, <code>express.json()</code> — the translator from Section 2.3 — converts it back. JSON out, JSON in: that round trip is the heartbeat of every API you will build or consume.</p>
+    <p><strong>Example — one valid book, one broken book, and the error the broken one causes:</strong></p>
+    <div class="grid-2">
+      <script type="text/plain" class="code" data-title="Valid JSON: one book">
+        {
+          "id": 3,
+          "title": "The Hobbit",
+          "author": "J.R.R. Tolkien"
+        }
+      </script>
+      <script type="text/plain" class="code" data-title="Broken JSON: spot the mistake">
+        {
+          "title": "The Hobbit",
+          "author": "J.R.R. Tolkien",
+        }
+      </script>
+    </div>
+    <p>The difference is one character: the comma after the last pair in the broken sample. JavaScript object literals forgive a trailing comma; JSON does not. Hand the broken text to <code>JSON.parse</code> — the function <code>express.json()</code> uses to translate request bodies — and it refuses the whole document:</p>
+    <script type="text/plain" class="code" data-lang="js" data-title="parse-book.js">
+      const text = `{
+        "title": "The Hobbit",
+        "author": "J.R.R. Tolkien",
+      }`;
+      const book = JSON.parse(text);
+    </script>
+    <p class="wk2-cap"><strong>Real output</strong> — captured by running this exact program (Node 26):</p>
+    <div class="output wk2-output">$ node parse-book.js
+SyntaxError: Expected double-quoted property name in JSON at position 57 (line 4 column 1)
+    at JSON.parse (&lt;anonymous&gt;)</div>
+    <p>Read the error like a map: the parser accepted both good lines and tripped at line 4, column 1 — the closing brace — because after that comma it expected another <code>"key": value</code> pair and found the end of the object instead. One stray character, and no part of the document is delivered. That strictness is a feature: better to fail loudly on malformed data than to silently guess at it.</p>
 
     <h3>The complete API</h3>
     <p>Here is the whole thing: a book collection API with all five operations. The data lives in an ordinary array in memory — no database yet (that is Week 3), so restarting the server resets the collection to the two starter books. One line near the top is not for the API at all: <code>app.use(express.static('public'))</code> serves whatever is in a folder named <code>public</code> next to this file. That folder can be missing for now; Section 2.5 puts a front-end page in it.</p>
@@ -897,6 +943,14 @@ loadBooks();</textarea>
         res.status(404).json({ error: 'Not found' });
       });
     </script>
+    <p class="wk2-cap"><strong>Real output</strong> — captured by running the organized app assembled from this section's excerpts (Node 26, Express 5). Compare the two 404s: book 99 matches a route but names no book, while <code>/nope</code> matches nothing at all and falls through to this last station:</p>
+    <div class="output wk2-output">$ curl http://localhost:3000/api/books/99 -w " [status %{http_code}]"
+{"error":"Book not found"} [status 404]
+$ curl http://localhost:3000/nope -w " [status %{http_code}]"
+{"error":"Not found"} [status 404]
+--- server console ---
+Listening on port 3000</div>
+    <p>Same status, different sender: the router answered the first (its route matched; the collection simply has no book 99), and the final 404 handler answered the second (no route anywhere matched, so the request travelled the whole line unanswered). Position is what makes the handler safe — registered last, it only ever sees requests nothing else claimed.</p>
     <p>Second, the <strong>error-handling middleware</strong>. Ordinary stations have three arguments; an error handler has <strong>four</strong> — <code>(err, req, res, next)</code> — and that extra first argument is how Express recognizes it. It never runs during a normal request. It runs when an earlier handler calls <code>next(err)</code> with an error, or throws one: Express skips every remaining ordinary station and jumps straight here. Its job is to answer with the right status. Some errors arrive already knowing theirs: when a client sends malformed JSON, <code>express.json()</code> raises an error whose <code>err.status</code> is 400, because the mistake is the client's, not yours. So the handler uses the error's own status when it has one and falls back to 500 when it does not. A 4xx error keeps its message, which tells the client what to fix; a 5xx is logged on the server (where only you can see it) and the client gets a calm, generic reply:</p>
     <script type="text/plain" class="code" data-lang="js" data-title="The error-handling middleware (registered last)">
       app.use((err, req, res, next) => {

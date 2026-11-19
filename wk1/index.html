@@ -52,9 +52,31 @@
       </div>
     </div>
 
+    <p><strong>Example — the same request, two kinds of answer:</strong></p>
+    <div class="output">Static — the vending machine. Everyone asks for the same ready-made file:
+GET /about.html
+Response body: the saved about.html file — identical for Ada, for Grace, for everyone
+
+Dynamic — the short-order cook. The program reads each order before answering:
+GET /greeting?name=Ada
+Response body: Hello, Ada!
+GET /greeting?name=Grace
+Response body: Hello, Grace!</div>
+
     <h3>Client and server, in plain words</h3>
     <p>A <strong>client</strong> is the program that asks for something. On the web, that is usually your browser. A <strong>server</strong> is a program that waits for requests, does work, and sends back a <strong>response</strong> — the answer to one request. The word "server" also gets used for the computer the program runs on, which causes endless confusion. In this course, when we say "your server," we almost always mean <em>your program</em>.</p>
     <p>The conversation is always the same shape: the client sends a <strong>request</strong> (a message that says what it wants, like "GET /about"), and the server sends back one response (the page, some data, or an error). The client always speaks first. A server sitting alone in a room says nothing until somebody asks.</p>
+
+    <p><strong>Example — one raw request and its response:</strong></p>
+    <div class="output">Request (the client speaks first):
+GET /about HTTP/1.1
+Host: localhost:3000
+
+Response (the server's one answer):
+HTTP/1.1 200 OK
+Content-Type: text/plain
+
+About page</div>
 
     <aside class="callout tip">
       <strong>Why does the work move to the server at all?</strong>
@@ -81,10 +103,30 @@
 
     <p>So "server-side logic with a JavaScript runtime" — the wording of Objective 2 for this course — simply means: <em>your JavaScript, running in Node, on the server, deciding what each response should be.</em> Same language as the browser, different toolbox, different job.</p>
 
+    <p><strong>Example — Node running one line of JavaScript:</strong></p>
+    <script type="text/plain" class="code" data-lang="js" data-title="Terminal">
+      node -e "console.log(2 + 2)"
+    </script>
+    <p class="wk1-caption">Real output — captured by running this exact program (Node 26, Express 5).</p>
+    <div class="output">4</div>
+    <p>No browser, no page, no file — the runtime itself carried out the instruction and printed the answer. The <code>-e</code> flag tells Node "run the code in these quotes," which makes it perfect for tiny tests like this one.</p>
+
     <h3>One worker, a waiting line, and non-blocking work</h3>
     <p>Node runs your code on a <strong>single thread</strong>. A thread is one sequence of instructions being carried out — picture a single worker who can only do one thing at a time. That sounds like a terrible design for a server with a thousand visitors, until you notice what a server actually spends its time doing: <em>waiting</em>. Waiting for the database to answer, waiting for a file to load, waiting for the network. The work itself — deciding what to send — is usually quick.</p>
     <p>Node's answer is <strong>non-blocking input/output</strong>, usually shortened to <strong>non-blocking I/O</strong>. Input/output (I/O) means any operation that talks to something outside your code: a disk, a database, the network. When your code starts an I/O operation, Node does not sit and stare at it. It hands the waiting to the system, puts a note on a list — "when this finishes, run this little function," called a <strong>callback</strong> — and the worker moves on to the next request. When the I/O finishes, the callback joins a waiting line called the <strong>event queue</strong>, and the <strong>event loop</strong> — the worker's endless routine of "check the line, run the next job, check again" — picks it up.</p>
     <p>Think of a coffee shop with one barista. A blocking barista would pour a slow drip coffee and stand watching it drip while the line grows. A non-blocking barista starts the drip, takes the next three orders, and hands the coffee over when it is ready. One worker, many customers, no standing around. The catch: if one order itself takes the barista five full minutes of continuous work — a huge calculation, say — everyone waits, because the worker truly is busy. Node is excellent at waiting-heavy work (which is most web work) and poor at long, continuous calculations.</p>
+
+    <p><strong>Example — a callback waits its turn in line:</strong></p>
+    <script type="text/plain" class="code" data-lang="js" data-title="nonblocking-order.js">
+      console.log(1);
+      setTimeout(() => console.log(2), 0);
+      console.log(3);
+    </script>
+    <p class="wk1-caption">Real output — captured by running this exact program (Node 26, Express 5).</p>
+    <div class="output">1
+3
+2</div>
+    <p>Read the order carefully. <code>setTimeout</code> does not run its callback on the spot — it hands the waiting to the system and registers the callback for later, so the worker moves straight on to <code>console.log(3)</code>. Only when the current job finishes does the event loop pick the callback up, and <code>2</code> prints last — even though its wait was zero milliseconds.</p>
 
     <aside class="callout warn">
       <strong>The one rule that follows from this</strong>
@@ -269,6 +311,19 @@ Server listening on http://localhost:3000</div>
     </div>
     <p>Two servers cannot listen on the same port at the same time on one machine — a fact Section 1.6 turns into your first famous error message.</p>
 
+    <p><strong>Example — taking one address apart:</strong></p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col">Part</th><th scope="col">In <code>http://localhost:3000/books</code></th><th scope="col">What it picks out</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Protocol</th><td><code>http://</code></td><td>How the two programs talk — plain HTTP here, so port 80 is the quiet default unless one is written</td></tr>
+          <tr><th scope="row">Host</th><td><code>localhost</code></td><td>Which computer — "this machine," the one you are sitting at</td></tr>
+          <tr><th scope="row">Port</th><td><code>3000</code></td><td>Which listening program on that computer — your server's numbered door</td></tr>
+          <tr><th scope="row">Path</th><td><code>/books</code></td><td>What is being asked for on that program — the part your routes match against</td></tr>
+        </tbody>
+      </table>
+    </div>
+
     <h3>Status codes, briefly</h3>
     <p>Every response carries a status code, grouped by its first digit:</p>
     <div class="table-wrap">
@@ -409,6 +464,19 @@ server.[[listen]](3000);
     </div>
     <p>The practical test: <em>if this package vanished on the day your site goes live, would visitors notice?</em> If yes, it is a dependency. If only you would notice, it is a devDependency.</p>
 
+    <p><strong>Example — both lists in one project's package.json:</strong></p>
+    <script type="text/plain" class="code" data-lang="js" data-title="package.json (excerpt)">
+      {
+        "dependencies": {
+          "express": "^5.3.0"
+        },
+        "devDependencies": {
+          "nodemon": "^3.1.0"
+        }
+      }
+    </script>
+    <p>Trace the two packages. <code>express</code> sits in <code>dependencies</code> because your server code loads it with <code>require('express')</code> every time it runs — a visitor-facing program breaks without it. <code>nodemon</code> sits in <code>devDependencies</code> because nothing in your running code ever loads it; it is a tool for you, the developer, and Section 1.6 shows what it does.</p>
+
     <h3>Version numbers: semantic versioning</h3>
     <p>Every package version is three numbers — <code>5.3.0</code> — following <strong>semantic versioning</strong> ("semver"), a promise about what changed:</p>
     <div class="table-wrap">
@@ -423,6 +491,17 @@ server.[[listen]](3000);
     </div>
     <p>That is why <code>package.json</code> records <code>"express": "^5.3.0"</code> with a caret (<code>^</code>). The caret means "5.3.0 or anything newer that keeps the same major number" — so the range allows 5.4.2, but never 6.0.0. Fixes and features can come in; breaking changes never sneak in. An exact <code>"5.3.0"</code> with no symbol means that version and no other; a tilde (<code>~5.3.0</code>) allows only patch updates.</p>
     <p>The range is not the whole story, though. Once a <code>package-lock.json</code> exists, plain <code>npm install</code> keeps installing the exact version recorded in it, on every machine. The caret only gets a say when there is no lock file yet, or when you ask for newer versions on purpose by running <code>npm update</code>.</p>
+
+    <p><strong>Example — what each range accepts and rejects:</strong></p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col">Range in package.json</th><th scope="col">Accepts</th><th scope="col">Rejects</th><th scope="col">Why</th></tr></thead>
+        <tbody>
+          <tr><th scope="row"><code>^5.1.0</code></th><td><code>5.4.2</code></td><td><code>6.0.0</code></td><td>Same major number: new features and fixes may arrive, but a breaking new major never sneaks in</td></tr>
+          <tr><th scope="row"><code>~5.1.0</code></th><td><code>5.1.7</code></td><td><code>5.2.0</code></td><td>Patch updates only — even a minor feature release (5.2.0) waits until you ask for it</td></tr>
+        </tbody>
+      </table>
+    </div>
 
     <h3>The three artifacts, side by side</h3>
     <p>After your first install, your project folder holds three things students constantly confuse. Keep them straight:</p>
@@ -580,10 +659,28 @@ Server listening on http://localhost:3000</div>
       </div>
     </div>
 
+    <p><strong>Example — the two verbs as raw requests:</strong></p>
+    <div class="output">GET /books HTTP/1.1
+Host: localhost:3000
+
+POST /books HTTP/1.1
+Host: localhost:3000
+Content-Type: application/x-www-form-urlencoded
+
+title=Dune&amp;author=Frank+Herbert</div>
+    <p>Same path, different verb, different luggage. The GET is just a request line and headers — there is nowhere else for data to ride. The POST adds a <code>Content-Type</code> header announcing the body's format, a blank line, and then the body itself: one book, packed as <code>name=value</code> pairs.</p>
+
     <h3>GET data: the query string</h3>
     <p>If GET has no body, how does a search page send your words to the server? In the address. A <strong>query string</strong> is the part of a URL after a <code>?</code>: a list of <code>name=value</code> pairs joined by <code>&amp;</code>, like this:</p>
     <div class="output">http://localhost:3000/search?q=express+tips&amp;page=2</div>
     <p>That address asks for the path <code>/search</code> and carries two pieces of data: <code>q</code> is <code>express tips</code> (in a URL, a space is written <code>+</code>) and <code>page</code> is <code>2</code>. Query strings are visible to anyone who can see the address — in the browser bar, in history, in logs — which is exactly why passwords and other secrets must never travel in one. Use GET and query strings for reading and searching; use POST for anything private or anything that changes data.</p>
+
+    <p><strong>Example — a search address becomes an object on the server:</strong></p>
+    <div class="output">Address: /search?term=vue&amp;page=2
+
+What Express hands your handler as req.query:
+{ term: 'vue', page: '2' }</div>
+    <p>Notice the quotes on the <code>'2'</code>. Everything in an address is text, so <code>page</code> arrives as the string <code>'2'</code>, not the number 2 — if your code needs to do arithmetic with it, converting it is your job.</p>
 
     <h3>POST data: forms pack, the server unpacks</h3>
     <p>Quick recap from Web Dev I, because everything here hangs on it. When a visitor submits an HTML form, the browser packs each form control into a <code>name=value</code> pair — and the <code>name</code> attribute is the label on each package. <strong>A control with no <code>name</code> is left out entirely</strong>, no matter what the visitor typed. With <code>method="post"</code>, those pairs are joined with <code>&amp;</code> and placed in the request body: <code>name=Ada&amp;plan=free</code>.</p>
@@ -624,6 +721,15 @@ Listening on port 3000</div>
     <p>Three curl flags do the work in those commands. <code>-X POST</code> sets the method. <code>-d</code> supplies the body — and, used alone, it also labels that body as form data (<code>Content-Type: application/x-www-form-urlencoded</code>), just as a browser form does. <code>-H</code> adds a header of your choosing, and the second command uses it to relabel its body as JSON. That label is the only reason the JSON example works: leave out the <code>-H</code> and the form translator claims the body, misreads the whole JSON text as one oddly named field, and the JSON translator never looks at it.</p>
 
     <p>Two different body formats went in; the same shape of answer came out, because <code>req.body</code> held <code>{ name: 'Ada', plan: 'free' }</code> the first time and <code>{ name: 'Ada', plan: 'pro' }</code> the second. Forget both translators and <code>req.body</code> is <code>undefined</code>: nothing translated the body, so there is no object at all, and the first line that reads a field from it — <code>req.body.name</code>, say — fails with <span class="wk1-err">TypeError: Cannot read properties of undefined</span>. That is the single most common beginner bug with POST, and now you know its cause before you ever meet it.</p>
+
+    <p><strong>Example — one book, from body text to req.body:</strong></p>
+    <div class="output">Body as it arrives (form encoding, exactly as the raw POST above sent it):
+title=Dune&amp;author=Frank+Herbert
+
+req.body after express.urlencoded has translated it:
+{ title: 'Dune', author: 'Frank Herbert' }</div>
+    <p>The <code>+</code> in the body is an encoded space — the same encoding you met in query strings — so <code>Frank+Herbert</code> reaches your code as <code>Frank Herbert</code>. The pairs split on <code>&amp;</code>, each name becomes a property, and your handler reads <code>req.body.title</code> and <code>req.body.author</code> without ever touching the raw text.</p>
+    <p><code>express.urlencoded()</code> is middleware; s2-3 explains where it comes from. Without it, <code>req.body</code> is undefined in Express 5.</p>
 
     <aside class="callout warn">
       <strong>req.body is untrusted mail</strong>
@@ -713,6 +819,22 @@ request this form would send to the server in express-post.js.</p></textarea>
       <li><strong>Ignore the rest, for now.</strong> The frames below yours are the machinery that called your code. They matter for library authors. For you, headline + your line is almost always enough.</li>
     </ol>
 
+    <p><strong>Example — a real stack trace, read the section's way:</strong></p>
+    <script type="text/plain" class="code" data-lang="js" data-title="account.js">
+      const account = undefined;
+      console.log(account.balance);
+    </script>
+    <p class="wk1-caption">Real output — captured by running this exact program (Node 26).</p>
+    <div class="output">account.js:2
+console.log(account.balance);
+                    ^
+
+TypeError: Cannot read properties of undefined (reading 'balance')
+    at Object.&lt;anonymous&gt; (account.js:2:21)
+    at Module._compile (node:internal/modules/cjs/loader:…)
+    … (more of Node's own frames — the part you can ignore for now)</div>
+    <p>Now annotate it. Node first re-prints the line that failed — line 2, the <code>console.log</code> — with a caret under the exact spot. The headline says what went wrong: the code tried to read <code>balance</code> off a value that is <code>undefined</code>, because <code>account</code> was never given a real object. And the first frame naming your file, <code>account.js:2:21</code>, confirms the place: line 2, column 21. Headline plus your frame was enough to find and understand this bug; the frames below belong to Node's module machinery.</p>
+
     <h3>Rule two: console.log is a flashlight</h3>
     <p>When the error message is not enough, make the program tell you what it is doing. Sprinkle <code>console.log</code> lines at the points you are unsure about — the value of <code>req.url</code> when a request arrives, the contents of <code>req.body</code> inside a POST handler — run it, trigger the problem, and read what prints in the server's terminal. Then <em>remove</em> the logs you no longer need; a server that narrates every request forever buries real errors in noise. Professional loggers exist, and Week 2 mentions one, but the flashlight comes first.</p>
 
@@ -734,6 +856,14 @@ request this form would send to the server in express-post.js.</p></textarea>
       <li><strong>Run the same test again.</strong> If the error is gone, you know which edit fixed it. If it is still there, undo the edit and try your next guess.</li>
     </ol>
     <p>Two cautions. Every edit, a log line as much as a fix, only takes effect once you restart the server. And the fourth step is the one beginners skip: change three things at once and, when the error vanishes, you cannot tell which change mattered — or whether one of the other two planted a new bug.</p>
+
+    <p><strong>Example — the flashlight off, then on:</strong></p>
+    <div class="output">Without the log line, a visitor submits the signup form and the server terminal shows:
+(nothing new — a running server prints nothing per request unless you tell it to)
+
+After adding console.log('Body received:', req.body) to the handler, the same submission shows:
+Body received: { name: 'Ada', plan: 'free' }</div>
+    <p>Same request, same handler — the only difference is that now the program reports what it actually received, and a guess ("is the form even sending anything?") becomes a fact you can act on.</p>
 
     <h3>Three classic beginner errors</h3>
     <p>You will meet all three of these. Recognizing them on sight turns a half-hour panic into a ten-second fix. Open each one:</p>
@@ -766,6 +896,27 @@ request this form would send to the server in express-post.js.</p></textarea>
       <p><strong>What it means:</strong> your code asked Node to load a file or package that is not there. In this example the file is named <code>server.js</code> but the code says <code>sever</code> — a one-letter typo. The same message appears when you <code>require('express')</code> in a project where you never ran <code>npm install</code>: the module genuinely is not there to find.</p>
       <p><strong>The fix:</strong> read the name in the message and compare it, letter by letter, with the real file name or package name. If the name is right, check the location: are you running the command from the project folder, and does <code>node_modules</code> exist? Nine times out of ten it is spelling; the tenth time it is a forgotten install.</p>
     </details>
+
+    <p><strong>Example — all three headlines, exactly as Node prints them:</strong></p>
+    <p><strong>1 · The port is already taken</strong> (a second copy of the server tries to listen on 3000):</p>
+    <p class="wk1-caption">Real output — captured by running this exact program (Node 26). Internal frames trimmed.</p>
+    <div class="output">Error: listen EADDRINUSE: address already in use :::3000
+    at Object.&lt;anonymous&gt; (server.js:3:3)</div>
+    <p><strong>2 · A module that is not there</strong> (the code asks for <code>./sever</code>, the file is <code>server.js</code>):</p>
+    <p class="wk1-caption">Real output — captured by running this exact program (Node 26). Internal frames trimmed.</p>
+    <div class="output">Error: Cannot find module './sever'
+Require stack:
+- app.js
+    at Object.&lt;anonymous&gt; (app.js:1:16)</div>
+    <p><strong>3 · A name that was never defined</strong> (the code prints a variable nobody declared):</p>
+    <p class="wk1-caption">Real output — captured by running this exact program (Node 26). Internal frames trimmed.</p>
+    <div class="output">total.js:1
+console.log(total);
+            ^
+
+ReferenceError: total is not defined
+    at Object.&lt;anonymous&gt; (total.js:1:13)</div>
+    <p>Each panel keeps the two parts Rule one taught you to read — the headline, and the first frame naming your own file with its line and column. The full traces continue below with Node's internal frames, which is exactly the part you now know you can skip.</p>
 
     <h3>Catching errors on purpose: try / catch</h3>
     <p>Some failures you can predict. Code that calls a method on a value that turned out to be <code>undefined</code>, uses <code>JSON.parse</code> to turn text a visitor typed into an object, or reads a file that might not exist <em>will</em> fail sometimes. JavaScript's answer is <code>try / catch</code>: put risky code in a <code>try</code> block; if anything inside it <strong>throws</strong> an error (raises it, deliberately or by accident), execution jumps straight to the <code>catch</code> block, which receives the error as a value — its <code>message</code> property is the headline text — and the program carries on.</p>

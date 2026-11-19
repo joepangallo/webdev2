@@ -41,6 +41,18 @@
       <div data-tab="Recipe box"><p>A shared recipe collection with ingredients and steps. <strong>Data:</strong> recipes with ingredients, time and difficulty. <strong>Public:</strong> search and read recipes. <strong>Private:</strong> cooks contribute and edit their own.</p></div>
       <div data-tab="Local business API"><p>A small business — a food truck, a repair shop, a salon — with a menu or service list and a request form. <strong>Data:</strong> offerings and customer requests. <strong>Public:</strong> browse offerings, send a request. <strong>Private:</strong> the owner views and answers requests.</p></div>
     </div>
+    <p><strong>Example — one theme, worked:</strong></p>
+    <p>Take the <strong>Collection tracker</strong>, tracking a shelf of books. The one main collection is <strong>books</strong>: each book has a title, a category, a year and a note. Browsing is public; adding, editing and deleting belong to the owner (that last part switches on at Milestone 4). Its routes:</p>
+    <div class="table-wrap"><table class="data-table">
+      <thead><tr><th scope="col">Verb</th><th scope="col">URL</th><th scope="col">Purpose</th></tr></thead>
+      <tbody>
+        <tr><td>GET</td><td><code>/api/books</code></td><td>List every book in the collection (public)</td></tr>
+        <tr><td>GET</td><td><code>/api/books/:id</code></td><td>Show one book (public)</td></tr>
+        <tr><td>POST</td><td><code>/api/books</code></td><td>Add a book (owner only)</td></tr>
+        <tr><td>PUT</td><td><code>/api/books/:id</code></td><td>Edit a book (owner only)</td></tr>
+        <tr><td>DELETE</td><td><code>/api/books/:id</code></td><td>Remove a book (owner only)</td></tr>
+      </tbody>
+    </table></div>
     <p>Whichever theme you choose, write down — before any code — the <strong>one main collection</strong> your app stores (books, events, slots, recipes, requests). Every milestone revolves around it.</p>
   </section>
 
@@ -58,6 +70,19 @@
         <tr><td>Not found</td><td>An unknown address gets a clear "not found" response, not a crash or a hang</td></tr>
       </tbody>
     </table></div>
+    <p><strong>Done looks like:</strong></p>
+    <script type="text/plain" class="code" data-title="Request — POST /api/books">
+      POST /api/books HTTP/1.1
+      Host: localhost:3000
+      Content-Type: application/json
+
+      { "title": "Dune", "category": "Sci-fi", "year": 1965 }
+    </script>
+    <p>What comes back:</p>
+    <div class="output">HTTP/1.1 200 OK
+Content-Type: application/json
+
+{ "title": "Dune", "category": "Sci-fi", "year": 1965 }</div>
     <p><strong>Deliverable:</strong> your project folder (or repo link) plus a one-paragraph note naming your theme and your main collection.</p>
     <div class="quiz" data-title="Milestone 1 self-check">
       <script type="application/json">
@@ -118,6 +143,19 @@
         <tr><td>Organization</td><td>Routes for the collection live in their own router file, mounted with <code>app.use</code></td></tr>
       </tbody>
     </table></div>
+    <p><strong>Done looks like:</strong></p>
+    <script type="text/plain" class="code" data-title="Request — POST /api/books">
+      POST /api/books HTTP/1.1
+      Host: localhost:3000
+      Content-Type: application/json
+
+      { "title": "The Left Hand of Darkness", "category": "Sci-fi", "year": 1969, "note": "First edition" }
+    </script>
+    <p>What comes back:</p>
+    <div class="output">HTTP/1.1 201 Created
+Content-Type: application/json
+
+{ "id": 3, "title": "The Left Hand of Darkness", "category": "Sci-fi", "year": 1969, "note": "First edition" }</div>
     <p><strong>Deliverable:</strong> the updated project, plus a short list of your endpoints (method + path + what it does).</p>
     <div class="quiz" data-title="Milestone 2 self-check">
       <script type="application/json">
@@ -178,6 +216,18 @@
         <tr><td>Seed data</td><td>A documented way to load a few starter records, so a fresh clone is not an empty app</td></tr>
       </tbody>
     </table></div>
+    <p><strong>Done looks like:</strong></p>
+    <script type="text/plain" class="code" data-lang="js" data-title="One book, as stored in MongoDB">
+      {
+        "_id": "66f1c2a4b8e3d5f60718293a",
+        "title": "The Left Hand of Darkness",
+        "category": "Sci-fi",
+        "year": 1969,
+        "note": "First edition"
+      }
+    </script>
+    <p>MongoDB generates the <code>_id</code> when the record is saved — yours will differ. Restart the server and this record is still there; that is the milestone.</p>
+    <p class="muted">A note on ids: the milestone checks keep illustrating the API with the simple numeric ids from the in-memory stage (Milestone 2). In the MongoDB version, the document's <code>_id</code> — that 24-character ObjectId — is what plays the id role in the URL.</p>
     <p><strong>Deliverable:</strong> the updated project; your README now includes setup steps that end with a running app and visible seed data.</p>
     <div class="quiz" data-title="Milestone 3 self-check">
       <script type="application/json">
@@ -238,6 +288,45 @@
         <tr><td>Hygiene pass</td><td>Secrets in environment variables, cookie flags set sensibly (<code>httpOnly</code>, <code>sameSite</code>, a lifetime), dependencies checked, no passwords or keys in the repo</td></tr>
       </tbody>
     </table></div>
+    <p><strong>Done looks like:</strong></p>
+    <p>Ask to edit a book with no login cookie, and the server refuses before anything is touched:</p>
+    <script type="text/plain" class="code" data-title="Request — PUT /api/books/3, signed out">
+      PUT /api/books/3 HTTP/1.1
+      Host: localhost:3000
+      Content-Type: application/json
+
+      { "note": "First edition, good condition" }
+    </script>
+    <div class="output">HTTP/1.1 401 Unauthorized
+Content-Type: application/json
+
+{ "error": "Please log in" }</div>
+    <p>The same request with the session cookie from logging in as the book's owner (your session id will differ):</p>
+    <script type="text/plain" class="code" data-title="Request — PUT /api/books/3, signed in as the owner">
+      PUT /api/books/3 HTTP/1.1
+      Host: localhost:3000
+      Cookie: sid=9f2e7a1c
+      Content-Type: application/json
+
+      { "note": "First edition, good condition" }
+    </script>
+    <div class="output">HTTP/1.1 200 OK
+Content-Type: application/json
+
+{ "id": 3, "title": "The Left Hand of Darkness", "category": "Sci-fi", "year": 1969, "note": "First edition, good condition" }</div>
+    <p>Signed in is not always enough. The same request carrying a different user's session cookie — someone signed in, but not the book's owner — is refused as well, and the stored book is left unchanged:</p>
+    <script type="text/plain" class="code" data-title="Request — PUT /api/books/3, signed in as a non-owner">
+      PUT /api/books/3 HTTP/1.1
+      Host: localhost:3000
+      Cookie: sid=4b8c1d9e
+      Content-Type: application/json
+
+      { "note": "First edition, good condition" }
+    </script>
+    <div class="output">HTTP/1.1 403 Forbidden
+Content-Type: application/json
+
+{ "error": "Only the owner can edit this book" }</div>
     <p><strong>Deliverable:</strong> the finished project, a README with setup and test accounts (a demo member and a demo admin — give the admin its role in your seed data, not through sign-up), and a half-page reflection: what your app does, and which course idea was hardest to make real.</p>
     <div class="quiz" data-title="Milestone 4 self-check">
       <script type="application/json">
