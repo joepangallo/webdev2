@@ -5,9 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Final Project · Web Dev II</title>
 <meta name="description" content="The Web Development II final project: one full-stack web app, built a milestone at a time — Express server, REST API, database persistence, and logins with roles.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/course.css">
 <script src="../assets/js/course.js"></script>
 </head>
@@ -69,10 +66,10 @@
     "q": "Your server answers at `http://localhost:3000` on your machine. A classmate on another computer types the same address and gets nothing. Why?",
     "shuffle": true,
     "choices": [
-      "Your code is broken",
+      "Your server crashed the moment a second visitor tried to connect to it",
       "`localhost` means *this* computer — theirs points at their own machine",
-      "Express only serves one visitor",
-      "The port is too low"
+      "Express answers one visitor at a time, and you were already using it",
+      "Port 3000 is reserved, so other computers are not allowed to ask for it"
     ],
     "answer": 1,
     "explain": "`localhost` always means the machine you are sitting at. Sharing your running app with others is a deployment step, not a code fix."
@@ -90,16 +87,16 @@
     "explain": "`package.json` lists dependencies; `npm install` rebuilds `node_modules` from it. You share the list, never the folder."
   },
   {
-    "q": "Your POST route receives a form but `req.body` is empty. The most likely cause is…",
+    "q": "Your POST route receives a form, but `req.body` is `undefined`. The most likely cause is…",
     "shuffle": true,
     "choices": [
-      "The form used GET",
+      "Form fields always arrive in `req.query`, so `req.body` stays unset for every form you submit",
       "The body-parsing middleware (`express.urlencoded`) is missing or runs after the route",
-      "POST routes cannot read forms",
-      "The port is already in use"
+      "The handler is missing its `next` argument, so Express never fills in the body",
+      "Port 3000 was already in use, so the request reached a different program"
     ],
     "answer": 1,
-    "explain": "Express does not unpack form bodies until the matching middleware has run — and middleware only applies to routes defined after it."
+    "explain": "Express does not unpack form bodies until the matching middleware has run — and middleware only applies to routes defined after it. Until then `req.body` is `undefined`, so reading a field from it crashes."
   }
 ]
       </script>
@@ -141,10 +138,10 @@
     "q": "Your front end shows the list but the add-form reloads the whole page. What is missing?",
     "shuffle": true,
     "choices": [
-      "A bigger server",
+      "An `express.static` line on the server, so the browser stops asking for a whole new page",
       "JavaScript that intercepts the submit, sends the data with `fetch`, and updates the page",
-      "A second HTML file",
-      "A database"
+      "A second HTML file for the form, loaded into the page each time a book is added",
+      "A `201` status on the POST route, which tells the browser to stay on the page it is showing"
     ],
     "answer": 1,
     "explain": "A plain form submit always navigates. Single-page behavior comes from JavaScript handling the event and talking to the API itself."
@@ -153,10 +150,10 @@
     "q": "Why move the book routes into a router file instead of leaving everything in the server file?",
     "shuffle": true,
     "choices": [
-      "Routers run faster",
+      "Express matches routes in a router file faster than routes in the server file",
       "Each file stays about one thing, so the app remains readable as it grows",
-      "Express requires exactly two files",
-      "Routers hide the code from users"
+      "Express refuses to start once one file defines more than a handful of routes",
+      "Code in a router file is hidden from visitors; the server file is public"
     ],
     "answer": 1,
     "explain": "Organization is about the humans. The API answers identically either way — you proved that in Week 2 — but a one-topic file is far easier to change safely."
@@ -189,10 +186,10 @@
     "q": "You restart your server and the items your classmate added are gone. What does that tell you?",
     "shuffle": true,
     "choices": [
-      "The database is down",
+      "The database server stopped along with your app and erased its tables",
       "The data was still living in an in-memory array, not the database",
-      "The browser cleared its cookies",
-      "The port changed"
+      "The browser cleared its cookies, so the server forgot the items",
+      "The items were saved, but the restart moved the database to a new port"
     ],
     "answer": 1,
     "explain": "Memory dies with the process. Surviving a restart is the whole point of persistence — it is also the fastest test that your API really uses the database."
@@ -201,10 +198,10 @@
     "q": "Why must the server validate data the browser form already checked?",
     "shuffle": true,
     "choices": [
-      "Browsers check badly",
+      "Browsers skip their own checks whenever a form is submitted with the Enter key",
       "Anyone can send requests without your form — the server is the last line of defense",
-      "Validation is faster on the server",
-      "It is required by HTML"
+      "Validation rules written in HTML stop working once Express serves the page",
+      "Repeating the checks on the server is what lets the response come back sooner"
     ],
     "answer": 1,
     "explain": "Your form is a courtesy, not a guard. Tools like curl can POST anything; server-side validation is what actually protects the data."
@@ -213,10 +210,10 @@
     "q": "Your database password is sitting in `server.js`, which you pushed to a public repo. What now?",
     "shuffle": true,
     "choices": [
-      "Nothing — passwords in code are normal",
-      "Delete the file from the repo and relax",
-      "Treat the password as leaked: change it, move secrets to environment variables, and keep them out of Git from now on",
-      "Rename the variable so nobody notices"
+      "Make the repo private right away — a secret only counts as leaked while the repo is public",
+      "Delete the file in a new commit — once the latest version is clean, the password is safe again",
+      "Treat it as leaked: change the password, then move secrets into environment variables kept out of Git",
+      "Rename the variable and store the value in Base64, so it no longer reads as a password"
     ],
     "answer": 2,
     "explain": "Once a secret is pushed, assume it is copied. Changing the password is the fix; removing the file alone does not un-leak it."
@@ -234,14 +231,14 @@
     <div class="table-wrap"><table class="data">
       <thead><tr><th>Requirement</th><th>What "done" looks like</th></tr></thead>
       <tbody>
-        <tr><td>Accounts</td><td>Register and log in; passwords stored only as salted hashes (never plain text, never reversible)</td></tr>
+        <tr><td>Accounts</td><td>Register and log in; passwords stored only as salted hashes (never plain text, never reversible); a new account's role is set by the server, never read from the sign-up form</td></tr>
         <tr><td>Sessions</td><td>Login creates a session; the browser carries only the session ID cookie; logout truly ends it</td></tr>
         <tr><td>Authorization</td><td>At least two roles (for example member and admin, or owner and visitor) with different powers, enforced on the server</td></tr>
         <tr><td>Protected routes</td><td>Creating/editing/deleting through the API requires the right login and role: 401 when signed out, 403 when signed in but not allowed</td></tr>
-        <tr><td>Hygiene pass</td><td>Secrets in environment variables, cookie flags set sensibly, dependencies checked, no passwords or keys in the repo</td></tr>
+        <tr><td>Hygiene pass</td><td>Secrets in environment variables, cookie flags set sensibly (<code>httpOnly</code>, <code>sameSite</code>, a lifetime), dependencies checked, no passwords or keys in the repo</td></tr>
       </tbody>
     </table></div>
-    <p><strong>Deliverable:</strong> the finished project, a README with setup and test accounts (a demo member and a demo admin), and a half-page reflection: what your app does, and which course idea was hardest to make real.</p>
+    <p><strong>Deliverable:</strong> the finished project, a README with setup and test accounts (a demo member and a demo admin — give the admin its role in your seed data, not through sign-up), and a half-page reflection: what your app does, and which course idea was hardest to make real.</p>
     <div class="quiz" data-title="Milestone 4 self-check">
       <script type="application/json">
 [
@@ -249,10 +246,10 @@
     "q": "Your UI hides the Delete button from members, but a member deletes an item by sending a DELETE request directly. What went wrong?",
     "shuffle": true,
     "choices": [
-      "The button was not hidden well enough",
+      "The button was hidden with CSS instead of being removed from the HTML, so the browser could still send it",
       "Authorization was only done in the interface — the server must check the role on every protected request",
-      "Members should not know URLs",
-      "The session cookie was too short"
+      "The session cookie lasted too long, so the member kept permissions that belonged to an earlier admin",
+      "DELETE requests skip middleware in Express, so the role check has to be repeated in the front end"
     ],
     "answer": 1,
     "explain": "Hiding a button is presentation. The server is the authority: every protected route verifies who is asking and what they may do."
@@ -261,7 +258,7 @@
     "q": "A signed-in member tries to open the admin page. Which response is correct?",
     "shuffle": true,
     "choices": [
-      "200 with an apology",
+      "200",
       "401",
       "403",
       "404"
@@ -273,10 +270,10 @@
     "q": "Why store a salted hash of a password instead of the password itself?",
     "shuffle": true,
     "choices": [
-      "Hashes are shorter",
-      "If the database leaks, attackers get fingerprints they cannot log in with — and the salt stops precomputed guessing",
-      "Browsers require it",
-      "It makes login faster"
+      "A hash is far shorter than the password, so the users table stays small and every login finishes sooner",
+      "A leaked database then holds only fingerprints nobody can log in with, and salt defeats precomputed guesses",
+      "The server can turn the hash back into the password later, but only while it still holds the matching salt value",
+      "Browsers refuse to send a password to any server that stores it without hashing and salting it first"
     ],
     "answer": 1,
     "explain": "The server never needs the password again — only the ability to check a new attempt against the stored fingerprint. Salt makes identical passwords store differently."

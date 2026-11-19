@@ -5,9 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Node &amp; Express Foundations · Web Dev II</title>
   <meta name="description" content="Week 1: why servers exist, Node and the JavaScript runtime, your first programs with the http module, npm and package.json, and your first Express app with GET and POST routes.">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=JetBrains+Mono:wght@400;700&display=swap">
   <link rel="stylesheet" href="../assets/css/course.css">
   <script src="../assets/js/course.js"></script>
   <style>
@@ -91,7 +88,7 @@
 
     <aside class="callout warn">
       <strong>The one rule that follows from this</strong>
-      <p>Never make the worker stand and watch. Later in this course you will see pairs of functions like <code>readFile</code> (non-blocking: starts the read, runs your callback later) and <code>readFileSync</code> (blocking: the worker waits). The <code>Sync</code> versions are fine in tiny scripts and startup code. In a request handler, they stall every other visitor.</p>
+      <p>Never make the worker stand and watch. Node's file tools come in pairs like <code>readFile</code> (non-blocking: starts the read, runs your callback later) and <code>readFileSync</code> (blocking: the worker waits). Later in this course you will use the <code>Sync</code> versions, because they keep a short example easy to follow, and they are fine in tiny scripts and startup code. In a request handler, they stall every other visitor.</p>
     </aside>
 
     <h3>Two halves of every web app</h3>
@@ -154,11 +151,11 @@
     <div class="quiz" data-title="Check your understanding: why servers?">
       <script type="application/json">
       [
-        {"q": "What makes a page **dynamic** rather than static?", "shuffle": true, "choices": ["It contains JavaScript in the browser", "A program builds the response when each request arrives, so it can differ per visitor", "It is stored on a server instead of a laptop", "It uses a database-shaped file name"], "answer": 1, "explain": "Dynamic means the answer is computed at request time. A static file was finished before anyone asked and is identical for every visitor."},
-        {"q": "In the client/server conversation, who speaks first?", "shuffle": true, "choices": ["The server, by announcing itself", "The client, by sending a request", "Whichever program started most recently", "They take turns, server first on even days"], "answer": 1, "explain": "The client always initiates: it sends a request, and the server sends back exactly one response to that request."},
-        {"q": "A **runtime** is best described as…", "shuffle": true, "choices": ["The time a program takes to finish", "The environment that executes your code and provides the tools it may use", "A faster kind of computer", "The file extension of a JavaScript program"], "answer": 1, "explain": "The browser and Node are both runtimes for JavaScript. They share the V8 engine but offer very different tools — and very different fences."},
+        {"q": "What makes a page **dynamic** rather than static?", "shuffle": true, "choices": ["It contains JavaScript that runs in the browser and animates parts of the page", "A program builds the response when each request arrives, so it can differ per visitor", "It is stored on a public web server instead of in a folder on your own laptop", "Its content changes whenever the owner edits the file and uploads a fresh copy of it"], "answer": 1, "explain": "Dynamic means the answer is computed at request time. A static file was finished before anyone asked and is identical for every visitor."},
+        {"q": "In the client/server conversation, who speaks first?", "shuffle": true, "choices": ["The server, by announcing itself", "The client, by sending a request", "Whichever program started most recently", "Either side, since both can open the conversation"], "answer": 1, "explain": "The client always initiates: it sends a request, and the server sends back exactly one response to that request."},
+        {"q": "A **runtime** is best described as…", "shuffle": true, "choices": ["The length of time a program takes to run from its first line to its last", "The environment that executes your code and provides the tools it may use", "The programming language that a program's instructions are written in", "The computer in a data center where a program is installed and kept running"], "answer": 1, "explain": "The browser and Node are both runtimes for JavaScript. They share the V8 engine but offer very different tools — and very different fences."},
         {"q": "True or false: Node lets JavaScript read files and listen for network connections because it is a server-side runtime, not a browser.", "answer": true, "explain": "Correct. Node pairs the V8 engine with extras like the `fs` and `http` modules — powers browsers deliberately deny to web pages."},
-        {"q": "Your Node server is waiting for a slow database. Thanks to non-blocking I/O, what is the worker doing meanwhile?", "shuffle": true, "choices": ["Sleeping until the database replies", "Serving other requests; the database callback runs when the answer arrives", "Restarting itself for each request", "Asking the visitor's browser to run the query"], "answer": 1, "explain": "Non-blocking I/O hands the waiting to the system. When the result is ready, the callback joins the event queue and the event loop runs it."}
+        {"q": "Your Node server is waiting for a slow database. Thanks to non-blocking I/O, what is the worker doing meanwhile?", "shuffle": true, "choices": ["Pausing all work until the database replies, so answers arrive in order", "Serving other requests; the database callback runs when the answer arrives", "Starting a new thread for each waiting request, so every visitor gets one", "Sending the same query again every few milliseconds until an answer comes back"], "answer": 1, "explain": "Non-blocking I/O hands the waiting to the system. When the result is ready, the callback joins the event queue and the event loop runs it."}
       ]
       </script>
     </div>
@@ -168,7 +165,14 @@
   <section class="lesson" id="s1-2">
     <h2>Your First Node Program and the http Module</h2>
     <p>Time to run JavaScript with no browser anywhere in sight. A Node program is just a text file of JavaScript. You run it from a <strong>terminal</strong> — the text-only window where you type commands to your computer — with the command <code>node</code> followed by the file name. Whatever your program prints with <code>console.log</code> appears in the terminal, and then the program ends.</p>
-    <p>Here is your first one. It stores two values, prints a greeting built from them, and does a small calculation. Nothing here is new JavaScript — and that is exactly the point.</p>
+
+    <aside class="callout">
+      <strong>Before you start</strong>
+      <p>Install Node 26 (the LTS release) from nodejs.org. Then open a terminal and type <code>node --version</code>: it should answer with a version number that starts with <code>v26</code>. If the terminal says it cannot find <code>node</code>, close it and open a new one — a terminal only learns about newly installed programs when it starts.</p>
+      <p>Later on this page you will test your servers with <code>curl</code>, a tool that sends requests from the terminal. Those commands are written for the macOS and Linux terminals and for Git Bash. On Windows, use Git Bash, which installs with Git for Windows, and every command works exactly as written. If you stay in PowerShell instead, type <code>curl.exe</code> rather than <code>curl</code>: in Windows PowerShell 5.1, plain <code>curl</code> is an alias for a different command.</p>
+    </aside>
+
+    <p>Here is your first program. It stores two values, prints a greeting built from them, and does a small calculation. Nothing here is new JavaScript — and that is exactly the point.</p>
 
     <script type="text/plain" class="code" data-lang="js" data-title="node-hello.js">
       const name = 'Ada';
@@ -240,7 +244,7 @@ Server listening on http://localhost:3000</div>
         <tbody>
           <tr><th scope="row"><code>require('http')</code></th><td>Load Node's built-in <code>http</code> module and keep its tools in the variable <code>http</code>. No download needed — core modules come with Node.</td></tr>
           <tr><th scope="row"><code>http.createServer((req, res) =&gt; { … })</code></th><td>Create a server. The function you pass is the <strong>request handler</strong>: Node calls it once for every request that arrives. It is a callback, run by the event loop — Section 1.1's waiting line in action.</td></tr>
-          <tr><th scope="row"><code>req</code></th><td>The <strong>request object</strong>: everything about what the client asked for. Here we only use <code>req.url</code>, the path part of the address (<code>/</code>, <code>/about</code>). It also carries the method (<code>req.method</code>) and headers.</td></tr>
+          <tr><th scope="row"><code>req</code></th><td>The <strong>request object</strong>: everything about what the client asked for. Here we only use <code>req.url</code>: everything in the address after the host and port — the path plus any query string (in these examples, just <code>/</code> or <code>/about</code>). It also carries the method (<code>req.method</code>) and headers.</td></tr>
           <tr><th scope="row"><code>res</code></th><td>The <strong>response object</strong>: your handle for building the answer that goes back to this one client.</td></tr>
           <tr><th scope="row"><code>res.writeHead(200, { 'Content-Type': 'text/plain' })</code></th><td>Send the status line and headers. The <strong>status code</strong> is a number that sums up how the request went (200 = OK). <code>Content-Type</code> tells the client what kind of content the body is, so it knows how to treat it.</td></tr>
           <tr><th scope="row"><code>res.end('Home page')</code></th><td>Send the body — the actual content — and finish this response. Forgetting <code>res.end</code> is a classic beginner bug: the browser waits forever for an answer you never finished.</td></tr>
@@ -249,7 +253,7 @@ Server listening on http://localhost:3000</div>
       </table>
     </div>
 
-    <p>Look at the shape of the handler once more. It is a chain of <code>if / else if / else</code> tests on <code>req.url</code> — that chain <em>is</em> routing, done by hand. Every path needs its own branch, its own <code>writeHead</code>, its own <code>end</code>. Two pages took twenty lines. Imagine forty pages, plus forms, plus JSON. Hold that thought until Section 1.4.</p>
+    <p>Look at the shape of the handler once more. It is a chain of <code>if / else if / else</code> tests on <code>req.url</code> — that chain <em>is</em> routing, done by hand. Every path needs its own branch, its own <code>writeHead</code>, its own <code>end</code>. Two pages and one fallback took sixteen lines of code. Imagine forty pages, plus forms, plus JSON. Hold that thought until Section 1.4.</p>
 
     <h3>Ports: the numbered doors</h3>
     <p>One computer runs many programs that use the network, so an address alone is not enough — the request also names a <strong>port</strong>, a number from 0 to 65535 that identifies which listening program should receive it. You met ports in Web Dev I with addresses like <code>localhost:5500</code>. Three ports matter this week:</p>
@@ -285,11 +289,13 @@ Server listening on http://localhost:3000</div>
     </aside>
 
     <h3>Rebuild the server's brain, safely in the browser</h3>
-    <p>The playground below cannot run a real server — this page works from disk, with no server behind it — but it <em>can</em> run the server's decision-making. This function copies the handler's logic: look at the path, pick the response string. Run it, check the console, then add a <code>/contact</code> path of your own.</p>
+    <p>The playground below cannot run a real server — this page works from disk, with no server behind it — but it <em>can</em> run the server's decision-making. The function <code>respond()</code> copies the handler's logic: look at the path, pick the response string. Read the console first. The site has no contact page yet, so <code>/contact</code> falls through to "Page not found".</p>
+    <p><strong>Your task:</strong> add a contact page. Give <code>respond()</code> one more branch, so that <code>respond('/contact')</code> returns <code>Contact page</code> and every other path answers exactly as it does now. The checks under the editor call your function with real paths, so they turn green only when it actually returns the right strings.</p>
 
     <div class="playground" data-title="Try it: the URL-to-response mapping" data-preview="false" data-height="300">
       <textarea data-lang="js">// This function copies what the raw http server does:
 // it looks at the path and picks a response string.
+// Your task: add a branch so '/contact' returns 'Contact page'.
 function respond(path) {
   if (path === '/') {
     return 'Home page';
@@ -302,14 +308,14 @@ function respond(path) {
 
 console.log('/ -> ' + respond('/'));
 console.log('/about -> ' + respond('/about'));
-console.log('/missing -> ' + respond('/missing'));
-
-// Try it: add a new path, like '/contact', and log its response too.</textarea>
+console.log('/contact -> ' + respond('/contact'));
+console.log('/missing -> ' + respond('/missing'));</textarea>
       <script type="application/json" class="checks">
       [
-        {"label": "Handles the `/` path", "test": "return code.js.indexOf('/') > -1"},
-        {"label": "Handles the `/about` path", "test": "return code.js.indexOf('/about') > -1"},
-        {"label": "Has a fallback that returns `Page not found`", "test": "return code.js.indexOf('Page not found') > -1"}
+        {"label": "`respond('/')` still returns `Home page`", "test": "return win.respond('/') === 'Home page'"},
+        {"label": "`respond('/about')` still returns `About page`", "test": "return win.respond('/about') === 'About page'"},
+        {"label": "`respond('/contact')` returns `Contact page`", "test": "return win.respond('/contact') === 'Contact page'"},
+        {"label": "Paths the site does not have, like `/missing` and `/contacts`, still get `Page not found`", "test": "return win.respond('/missing') === 'Page not found' && win.respond('/contacts') === 'Page not found'"}
       ]
       </script>
     </div>
@@ -331,9 +337,9 @@ server.[[listen]](3000);
       <script type="application/json">
       [
         {"q": "What command runs the file `server.js` with Node?", "shuffle": true, "choices": ["`open server.js`", "`node server.js`", "`run js server.js`", "`browser server.js`"], "answer": 1, "explain": "You run a Node program from the terminal with `node` followed by the file name."},
-        {"q": "Why does `node-hello.js` exit when it finishes, but `http-server.js` keeps running?", "shuffle": true, "choices": ["Servers are written in a different language", "The server has registered work to wait for — listening for requests — so the event loop stays alive", "Node never exits if the file name contains a hyphen", "The server file is larger"], "answer": 1, "explain": "A plain script ends when its last line runs. A listening server always has something pending, so Node keeps the process alive to handle future requests."},
-        {"q": "In the request handler, what does `req.url` give you for the address `http://localhost:3000/about`?", "shuffle": true, "choices": ["The whole address, `http://localhost:3000/about`", "The path, `/about`", "The port, `3000`", "The body of the request"], "answer": 1, "explain": "`req.url` is the path part of the address. That is why the handler can compare it with `'/'` and `'/about'`."},
-        {"q": "What happens if your handler never calls `res.end()`?", "shuffle": true, "choices": ["Node sends an empty page automatically", "The client waits, because the response was never finished", "The server restarts", "The status code becomes 404"], "answer": 1, "explain": "`res.end` sends the body and finishes the response. Without it, the conversation hangs open and the browser spins."},
+        {"q": "Why does `node-hello.js` exit when it finishes, but `http-server.js` keeps running?", "shuffle": true, "choices": ["The `http` module switches Node into a server mode that is unable to exit", "A listening server always has pending work, so the event loop stays alive", "The call to `server.listen` runs over and over in a loop that never finishes", "The server file has more lines, so Node takes far longer to reach its end"], "answer": 1, "explain": "A plain script ends when its last line runs. A listening server always has something pending, so Node keeps the process alive to handle future requests."},
+        {"q": "In the request handler, what does `req.url` give you for the address `http://localhost:3000/about`?", "shuffle": true, "choices": ["The whole address: `http://localhost:3000/about`", "Everything after the host and port: `/about`", "The host and port together: `localhost:3000`", "The request's method and path: `GET /about`"], "answer": 1, "explain": "`req.url` is everything after the host and port: the path plus any query string. This address has no query string, so it is just `/about` — which is why the handler can compare it with `'/'` and `'/about'`."},
+        {"q": "What happens if your handler never calls `res.end()`?", "shuffle": true, "choices": ["Node finishes the response itself and sends an empty page", "The client waits, because the response was never finished", "The server stops with an error and has to be started again", "The client receives a 404, because no body was provided"], "answer": 1, "explain": "`res.end` sends the body and finishes the response. Without it, the conversation hangs open and the browser spins."},
         {"q": "A visitor asks for a path your server does not know. Which pairing is correct?", "shuffle": true, "choices": ["Status `200` and body `Page not found`", "Status `404` and body `Page not found`", "No response at all — silence means not found", "Status `500` and body `Home page`"], "answer": 1, "explain": "The body explains it to the human; the status code `404` tells programs what happened. Both travel in the same response."}
       ]
       </script>
@@ -343,7 +349,7 @@ server.[[listen]](3000);
   <!-- ===================================================== 1.3 -->
   <section class="lesson" id="s1-3">
     <h2>npm: Packages and package.json</h2>
-    <p>Your server so far uses only tools that ship inside Node. But nobody writes everything from scratch. If you need your server to talk to a database, check a password, or — as in the very next section — handle routes without twenty lines of plumbing per page, you use code somebody else wrote, tested and published. A reusable bundle of code like that is called a <strong>package</strong>. (You will also hear <strong>module</strong>: in Node, a module is any file of code you can load with <code>require</code> or <code>import</code>. A package is a folder of one or more modules, bundled up for sharing, usually with a name and a version number.)</p>
+    <p>Your server so far uses only tools that ship inside Node. But nobody writes everything from scratch. If you need your server to talk to a database, check a password, or — as in the very next section — handle routes without hand-written plumbing for every page, you use code somebody else wrote, tested and published. A reusable bundle of code like that is called a <strong>package</strong>. (You will also hear <strong>module</strong>: in Node, a module is any file of code you can load with <code>require</code> or <code>import</code>. A package is a folder of one or more modules, bundled up for sharing, usually with a name and a version number.)</p>
     <p>The tool that downloads, installs and keeps track of packages is <strong>npm</strong>, the Node Package Manager. It installs automatically alongside Node. Behind it sits the <strong>npm registry</strong>, a giant public library of packages — over two million of them — that your computer downloads from when you ask.</p>
 
     <h3>Starting a project: npm init</h3>
@@ -415,7 +421,8 @@ server.[[listen]](3000);
         </tbody>
       </table>
     </div>
-    <p>That is why <code>package.json</code> records <code>"express": "^5.3.0"</code> with a caret (<code>^</code>). The caret means "5.3.0 or anything newer that keeps the same major number" — so <code>npm install</code> may bring you 5.4.2, but never 6.0.0. You get fixes and features automatically, and breaking changes never sneak in. An exact <code>"5.3.0"</code> with no symbol means that version and no other; a tilde (<code>~5.3.0</code>) allows only patch updates.</p>
+    <p>That is why <code>package.json</code> records <code>"express": "^5.3.0"</code> with a caret (<code>^</code>). The caret means "5.3.0 or anything newer that keeps the same major number" — so the range allows 5.4.2, but never 6.0.0. Fixes and features can come in; breaking changes never sneak in. An exact <code>"5.3.0"</code> with no symbol means that version and no other; a tilde (<code>~5.3.0</code>) allows only patch updates.</p>
+    <p>The range is not the whole story, though. Once a <code>package-lock.json</code> exists, plain <code>npm install</code> keeps installing the exact version recorded in it, on every machine. The caret only gets a say when there is no lock file yet, or when you ask for newer versions on purpose by running <code>npm update</code>.</p>
 
     <h3>The three artifacts, side by side</h3>
     <p>After your first install, your project folder holds three things students constantly confuse. Keep them straight:</p>
@@ -442,22 +449,22 @@ server.[[listen]](3000);
       {"prompt": "You are starting a server project from an empty folder. Drag the steps into the order you would actually do them.",
        "items": [
          "Create the project folder and move into it",
-         "Run `npm init` to create `package.json`",
+         "Run `npm init` so the folder has its own `package.json`",
          "Run `npm install express` to download Express into `node_modules`",
-         "Write your server code in `server.js`",
-         "Run `node server.js` and test it with curl"
+         "Write `server.js`, which loads Express, and start it with `node server.js`",
+         "Request `http://localhost:3000/` with curl and read the answer"
        ],
-       "explain": "`package.json` comes before installing anything, because `npm install` needs somewhere to record the dependency. The code can only run after both the file and its packages exist."}
+       "explain": "`npm init` comes before any install so that this folder has its own `package.json`. Without one, npm looks upward for the nearest folder that does have a `package.json` and attaches Express to that parent project instead — or, finding none, writes a bare `package.json` with no name, entry point or scripts. After that the order forces itself: the server cannot start until Express is installed, and curl has nothing to talk to until the server is running."}
       </script>
     </div>
 
     <div class="quiz" data-title="Check your understanding: npm">
       <script type="application/json">
       [
-        {"q": "What is the job of `package.json`?", "shuffle": true, "choices": ["It stores your server's code in JSON form", "It is the project's identity card: name, entry point, scripts, and the packages it depends on", "It is a database of your users", "It makes your server run faster"], "answer": 1, "explain": "`package.json` describes the project and lists its dependencies precisely enough that anyone can recreate the whole setup with one `npm install`."},
-        {"q": "Where does `npm install express` put the downloaded code?", "shuffle": true, "choices": ["Inside Node itself", "In a `node_modules` folder in your project", "On the npm website, linked live", "In your browser's cache"], "answer": 1, "explain": "Packages are downloaded into the project's `node_modules` folder — which is also why that folder never needs to be shared or committed."},
-        {"q": "A tool that restarts your server while you develop, but is never loaded by the running program, belongs in…", "shuffle": true, "choices": ["`\"dependencies\"`", "`\"devDependencies\"`", "`\"scripts\"`", "The Windows registry"], "answer": 1, "explain": "Development-only tools go in `devDependencies`, installed with `npm install --save-dev`. Visitors never need them."},
-        {"q": "In the version `5.3.0`, a change to `6.0.0` signals…", "shuffle": true, "choices": ["A bug fix", "A new feature", "A breaking change — the major number went up", "A smaller download"], "answer": 2, "explain": "Semantic versioning: MAJOR means breaking, MINOR means new features, PATCH means bug fixes. The `^` in `^5.3.0` accepts minor and patch updates but never a new major."},
+        {"q": "What is the job of `package.json`?", "shuffle": true, "choices": ["It holds your server's code, converted into JSON so that Node can load it", "It describes the project: its name, entry point, scripts and dependencies", "It records the exact version of every package that was downloaded, with checksums", "It holds the downloaded code of every package that the project has installed"], "answer": 1, "explain": "`package.json` describes the project and lists its dependencies precisely enough that anyone can recreate the whole setup with one `npm install`. The exact-version receipt is `package-lock.json`, and the downloaded code lives in `node_modules`."},
+        {"q": "Where does `npm install express` put the downloaded code?", "shuffle": true, "choices": ["In the folder where Node itself is installed", "In a `node_modules` folder in your project", "In `package.json`, under `\"dependencies\"`", "On the npm registry, fetched again on every run"], "answer": 1, "explain": "Packages are downloaded into the project's `node_modules` folder — which is also why that folder never needs to be shared or committed."},
+        {"q": "A tool that restarts your server while you develop, but is never loaded by the running program, belongs in…", "shuffle": true, "choices": ["The `\"dependencies\"` list", "The `\"devDependencies\"` list", "The `\"scripts\"` section", "The `\"main\"` entry-point field"], "answer": 1, "explain": "Development-only tools go in `devDependencies`, installed with `npm install --save-dev`. Visitors never need them."},
+        {"q": "In the version `5.3.0`, a change to `6.0.0` signals…", "shuffle": true, "choices": ["Bug fixes only — the patch number went up", "New features only — the minor number went up", "A breaking change — the major number went up", "A routine yearly release — the first number counts years"], "answer": 2, "explain": "Semantic versioning: MAJOR means breaking, MINOR means new features, PATCH means bug fixes. The `^` in `^5.3.0` accepts minor and patch updates but never a new major."},
         {"q": "True or false: if you delete `node_modules`, your project is destroyed.", "answer": false, "explain": "Not at all. Run `npm install` and npm rebuilds the folder from `package.json` and `package-lock.json`. The folder is a download cache, not your work."}
       ]
       </script>
@@ -495,7 +502,7 @@ About this site
 --- server console ---
 Server listening on http://localhost:3000</div>
 
-    <p>Same behavior, roughly half the code, and the savings grow with every route you add: no <code>writeHead</code>, no <code>Content-Type</code> bookkeeping, no <code>if</code> chain. And one invisible improvement: ask this server for <code>/missing</code> and Express answers with a proper 404 on its own — the fallback branch you had to write by hand is built in.</p>
+    <p>Same behavior, in eleven lines of code where the raw server needed sixteen (blank lines aside). What is gone is exactly the plumbing: no <code>writeHead</code>, no <code>Content-Type</code> bookkeeping, no <code>if</code> chain. And one invisible improvement: ask this server for <code>/missing</code> and Express answers with a proper 404 on its own — the fallback branch you had to write by hand is built in.</p>
 
     <h3>Line by line</h3>
     <div class="table-wrap">
@@ -505,7 +512,7 @@ Server listening on http://localhost:3000</div>
           <tr><th scope="row"><code>const express = require('express');</code></th><td>Load the Express package from <code>node_modules</code>. What you get back is a function — a factory for apps.</td></tr>
           <tr><th scope="row"><code>const app = express();</code></th><td>Call the factory to create your application, universally nicknamed <code>app</code>. The app <em>is</em> your server-to-be: you register routes on it, then tell it to listen.</td></tr>
           <tr><th scope="row"><code>app.get('/', (req, res) =&gt; { … })</code></th><td>Register a <strong>route</strong>: a pairing of an HTTP method and a path with the function that handles it. This one says "when a <code>GET</code> request arrives for the path <code>/</code>, run this function." The function is the route handler — the same job as the raw handler's <code>if</code> branch, but declared instead of tested.</td></tr>
-          <tr><th scope="row"><code>res.send('Hello from Express!')</code></th><td>Send the response body and finish, in one call. Express works out a sensible status code (200) and <code>Content-Type</code> for you — <code>res.send</code> replaces both <code>writeHead</code> and <code>end</code>. Send an object instead of a string and Express sends it as JSON; you will use that in the next section.</td></tr>
+          <tr><th scope="row"><code>res.send('Hello from Express!')</code></th><td>Send the response body and finish, in one call. Express works out a sensible status code (200) and <code>Content-Type</code> for you — <code>res.send</code> replaces both <code>writeHead</code> and <code>end</code>. Send an object instead of a string and Express sends it as JSON; the next section does that with <code>res.json</code>, a sibling method made for exactly that job.</td></tr>
           <tr><th scope="row"><code>app.listen(3000, …)</code></th><td>Exactly the <code>listen</code> from the raw server — underneath, Express created an <code>http</code> server for you and is listening on it. Port 3000, same as before.</td></tr>
         </tbody>
       </table>
@@ -549,9 +556,9 @@ Server listening on http://localhost:3000</div>
     <div class="quiz" data-title="Check your understanding: Express basics">
       <script type="application/json">
       [
-        {"q": "What is a **route** in Express?", "shuffle": true, "choices": ["A folder on the server's disk", "A method + path pairing with the handler function that answers it", "The cable between the browser and the server", "A type of status code"], "answer": 1, "explain": "`app.get('/about', handler)` is a route: GET is the method, `/about` is the path, and the function is what runs when both match."},
+        {"q": "What is a **route** in Express?", "shuffle": true, "choices": ["A folder on the server's disk that holds the files for one page", "A method + path pairing with the handler function that answers it", "The network path a request travels between the browser and the server", "A numbered door on the server that one program listens behind"], "answer": 1, "explain": "`app.get('/about', handler)` is a route: GET is the method, `/about` is the path, and the function is what runs when both match."},
         {"q": "Which single Express call replaces both `res.writeHead(...)` and `res.end(...)` from the raw server?", "shuffle": true, "choices": ["`app.listen()`", "`res.send()`", "`require()`", "`app.get()`"], "answer": 1, "explain": "`res.send` sets a sensible status and content type, sends the body, and ends the response — all in one call."},
-        {"q": "What happens when a request matches **no** route in `express-hello.js`?", "shuffle": true, "choices": ["The server crashes", "The request hangs forever", "Express sends a built-in 404 response", "The home page is sent instead"], "answer": 2, "explain": "Express has a default final handler: no matching route means a 404 response, with no code from you. In the raw server you had to write that branch yourself."},
+        {"q": "What happens when a request matches **no** route in `express-hello.js`?", "shuffle": true, "choices": ["The whole server stops with an error", "The request hangs until the browser gives up", "Express sends a built-in 404 response", "Express sends the home page as a fallback"], "answer": 2, "explain": "Express has a default final handler: no matching route means a 404 response, with no code from you. In the raw server you had to write that branch yourself."},
         {"q": "True or false: Express replaces Node — once you install Express, Node is no longer involved.", "answer": false, "explain": "Express runs *on* Node and uses Node's own `http` module underneath. `app.listen` is listening on a Node server; Node is still executing every line."}
       ]
       </script>
@@ -586,7 +593,7 @@ Server listening on http://localhost:3000</div>
       <li><code>express.urlencoded({ extended: true })</code> — reads bodies sent by HTML forms and turns the pairs into an object.</li>
       <li><code>express.json()</code> — reads bodies sent as JSON and turns them into an object.</li>
     </ul>
-    <p>Either way, the finished object lands in the same place: <code>req.body</code>. Your handler never has to care which format arrived. Here is the whole thing working:</p>
+    <p>How does each translator know which bodies are its job? It reads the request's <code>Content-Type</code> header — the label a client attaches to say what format its body is in — and leaves every other body alone. Either way, the finished object lands in the same place: <code>req.body</code>. Your handler never has to care which format arrived. Here is the whole thing working:</p>
 
     <script type="text/plain" class="code" data-lang="js" data-title="express-post.js">
       const express = require('express');
@@ -614,7 +621,9 @@ $ curl -X POST http://localhost:3000/signup -H "Content-Type: application/json" 
 --- server console ---
 Listening on port 3000</div>
 
-    <p>Two different body formats went in; the same shape of answer came out, because <code>req.body</code> held <code>{ name: 'Ada', plan: 'free' }</code> the first time and <code>{ name: 'Ada', plan: 'pro' }</code> the second. Forget both translators and <code>req.body</code> is empty — the single most common beginner bug with POST, and now you know its cause before you ever meet it.</p>
+    <p>Three curl flags do the work in those commands. <code>-X POST</code> sets the method. <code>-d</code> supplies the body — and, used alone, it also labels that body as form data (<code>Content-Type: application/x-www-form-urlencoded</code>), just as a browser form does. <code>-H</code> adds a header of your choosing, and the second command uses it to relabel its body as JSON. That label is the only reason the JSON example works: leave out the <code>-H</code> and the form translator claims the body, misreads the whole JSON text as one oddly named field, and the JSON translator never looks at it.</p>
+
+    <p>Two different body formats went in; the same shape of answer came out, because <code>req.body</code> held <code>{ name: 'Ada', plan: 'free' }</code> the first time and <code>{ name: 'Ada', plan: 'pro' }</code> the second. Forget both translators and <code>req.body</code> is <code>undefined</code>: nothing translated the body, so there is no object at all, and the first line that reads a field from it — <code>req.body.name</code>, say — fails with <span class="wk1-err">TypeError: Cannot read properties of undefined</span>. That is the single most common beginner bug with POST, and now you know its cause before you ever meet it.</p>
 
     <aside class="callout warn">
       <strong>req.body is untrusted mail</strong>
@@ -622,7 +631,8 @@ Listening on port 3000</div>
     </aside>
 
     <h3>See exactly what a form sends</h3>
-    <p>This playground runs in your browser, and its preview does something special with forms: when you press the submit button, it intercepts the submission and shows you precisely what the browser <em>would</em> send — the method, the address, and the body as a table of names and values. Try it. Then look for the coupon field's warning, and fix it by giving that control a <code>name</code>.</p>
+    <p>This playground runs in your browser, and its preview does something special with forms: when you press the submit button, it intercepts the submission and shows you precisely what the browser <em>would</em> send — the method, the address, and the body as a table of names and values. Press <strong>Sign up</strong> and read the report. The body is <code>name=Ada&amp;plan=free</code>, and a warning says one field was not sent: the coupon code, because its control has no <code>name</code>.</p>
+    <p><strong>Your task:</strong> get the coupon code to the server. Give the coupon input the attribute <code>name="coupon"</code>, then press <strong>Sign up</strong> again. The warning disappears, and the body grows to <code>name=Ada&amp;plan=free&amp;coupon=SAVE10</code>.</p>
 
     <div class="playground" data-title="Try it: what the browser sends" data-height="320">
       <textarea data-lang="html"><h1>Sign up</h1>
@@ -651,16 +661,15 @@ Listening on port 3000</div>
 request this form would send to the server in express-post.js.</p></textarea>
       <script type="application/json" class="checks">
       [
-        {"label": "There is a form on the page", "test": "return !!$('form')"},
-        {"label": "The form sends with POST, not GET", "test": "var f = $('form'); return !!f && (f.getAttribute('method') || '').toLowerCase() === 'post'"},
-        {"label": "One control is named `name`", "test": "return $$('input, select').some(function (el) { return el.getAttribute('name') === 'name'; })"},
-        {"label": "One control is named `plan`", "test": "return $$('input, select').some(function (el) { return el.getAttribute('name') === 'plan'; })"},
-        {"label": "One input still has no `name` (the coupon field — the report warns about it)", "test": "return $$('input').some(function (el) { return !el.getAttribute('name'); })"}
+        {"label": "The form still sends with POST to `/signup`", "test": "var f = $('form'); return !!f && (f.getAttribute('method') || '').toLowerCase() === 'post' && f.getAttribute('action') === '/signup'"},
+        {"label": "`name` and `plan` are still in the body", "test": "var f = $('form'); if (!f) return false; var d = new win.FormData(f); return d.has('name') && d.has('plan')"},
+        {"label": "The coupon code is now in the body, labeled `coupon`", "test": "var f = $('form'); if (!f) return false; var d = new win.FormData(f); return d.has('coupon')"},
+        {"label": "No field is left behind: every control in the form has a `name`", "test": "var f = $('form'); if (!f) return false; var c = $$('form input, form select, form textarea').filter(function (el) { return !/^(submit|button|reset|image)$/i.test(el.type); }); return c.length > 0 && c.every(function (el) { return !!el.name; })"}
       ]
       </script>
     </div>
 
-    <p>Connect the dots: the body that report shows you — <code>name=Ada&amp;plan=free</code> — is character-for-character the body in the first curl command above, and it produces the first verified output. A browser form and curl are just two different clients packing the same envelope.</p>
+    <p>Connect the dots: before your fix, the body in that report — <code>name=Ada&amp;plan=free</code> — was character-for-character the body in the first curl command above, the one that produced the first verified output. After your fix it carries a third pair, <code>coupon=SAVE10</code>, and the server in <code>express-post.js</code> would find a third property, <code>coupon</code>, in <code>req.body</code>. A browser form and curl are just two different clients packing the same envelope.</p>
 
     <div class="buckets" data-title="GET or POST? Sort the job">
       <script type="application/json">
@@ -681,10 +690,10 @@ request this form would send to the server in express-post.js.</p></textarea>
     <div class="quiz" data-title="Check your understanding: GET and POST">
       <script type="application/json">
       [
-        {"q": "Which request is the right tool for submitting a new password?", "shuffle": true, "choices": ["GET, with the password in the query string", "POST, with the password in the request body", "GET, because forms always use GET", "Either — they are identical"], "answer": 1, "explain": "Query strings are visible in the address bar, history and logs. Secrets travel in a POST body, never in a URL."},
-        {"q": "In `http://localhost:3000/search?q=express+tips&amp;page=2`, the query string is…", "shuffle": true, "choices": ["`/search`", "`q=express tips&amp;page=2` (written in the address as `q=express+tips&amp;page=2`)", "`localhost:3000`", "There is no query string"], "answer": 1, "explain": "The query string is everything after the `?`: `name=value` pairs joined by `&`. A space inside a value is written as `+`."},
-        {"q": "Your POST handler prints `req.body` and it is empty, even though the form was filled in. The most likely cause is…", "shuffle": true, "choices": ["The server needs restarting every hour", "The body translators — `express.urlencoded()` / `express.json()` — were never switched on with `app.use`", "POST bodies are always empty", "The port number is too low"], "answer": 1, "explain": "Without a translator, Express does not parse the raw body text into an object, so `req.body` stays empty. This is the classic first-POST bug."},
-        {"q": "A form control has an `id` but no `name`. What reaches the server when the form is submitted?", "shuffle": true, "choices": ["The value, labeled by its `id`", "Nothing — controls without a `name` are never sent", "The value, with an empty label", "The whole HTML of the control"], "answer": 1, "explain": "The browser packs controls by `name` only. An unnamed control is silently left out — the playground's report warns you about exactly this."},
+        {"q": "Which request is the right tool for submitting a new password?", "shuffle": true, "choices": ["GET, with the password in the query string", "POST, with the password in the request body", "POST, with the password in the query string", "GET, with the password in the request body"], "answer": 1, "explain": "Query strings are visible in the address bar, history and logs, whichever method carries them, and a GET request has no body to put anything in. Secrets travel in a POST body, never in a URL."},
+        {"q": "In `http://localhost:3000/search?q=express+tips&page=2`, the query string is…", "shuffle": true, "choices": ["`http://localhost:3000`", "`q=express+tips&page=2`", "`localhost:3000/search`", "`/search?q=express+tips`"], "answer": 1, "explain": "The query string is everything after the `?`: `name=value` pairs joined by `&`. A space inside a value is written as `+`."},
+        {"q": "Your POST handler prints `req.body` and it is `undefined`, even though the form was filled in. The most likely cause is…", "shuffle": true, "choices": ["The server must be restarted after every form submission to read a new body", "No body translator such as `express.urlencoded()` was switched on with `app.use`", "POST requests carry their data in the address, so the body is always empty", "The server listens on port 3000, and browsers only send form bodies to ports 80 and 443"], "answer": 1, "explain": "Without a translator, nothing parses the raw body text into an object, so in Express 5 `req.body` stays `undefined`. This is the classic first-POST bug."},
+        {"q": "A form control has an `id` but no `name`. What reaches the server when the form is submitted?", "shuffle": true, "choices": ["Its value, labeled with the `id` in place of a `name`", "Nothing — controls without a `name` are never sent", "Its value, sent with an empty label before the `=`", "Its value, but only if the form uses `method=\"post\"`"], "answer": 1, "explain": "The browser packs controls by `name` only. An unnamed control is silently left out — the playground's report warns you about exactly this."},
         {"q": "True or false: `app.post('/signup', ...)` will also answer a GET request for `/signup`.", "answer": false, "explain": "A route matches on method *and* path. `app.post` only answers POST. A GET to the same path falls through to the 404 handler unless you register a GET route too."}
       ]
       </script>
@@ -713,7 +722,18 @@ request this form would send to the server in express-post.js.</p></textarea>
         res.json({ received: req.body });
       });
     </script>
-    <p>That one line settles the Section 1.5 mystery in seconds: if the terminal shows <code>Body received: {}</code>, your translators are missing; if it shows your data, the bug is somewhere after this line.</p>
+    <p>That one line settles the Section 1.5 mystery in seconds. If the terminal shows <code>Body received: undefined</code>, no translator handled the body: check your <code>app.use</code> lines and the <code>Content-Type</code> the client sent. If it shows <code>Body received: {}</code>, a translator ran but no named fields arrived: check the <code>name</code> attributes in the form. If it shows your data, the bug is somewhere after this line.</p>
+
+    <h3>Rule three: one change at a time</h3>
+    <p>Reading and logging tell you where to look. What turns them into a fix is a routine: the same few steps, in the same order, every time — instead of editing whatever looks suspicious.</p>
+    <ol>
+      <li><strong>Read the error.</strong> The headline first, then the first stack frame that names your own file. That is rule one.</li>
+      <li><strong>Make it fail again, on purpose.</strong> Before you touch any code, repeat exactly what you did — the same curl command, the same click — and check that the same error comes back. Now you have a test you can run as often as you like. If you cannot make a bug appear on demand, you can never be sure you made it go away.</li>
+      <li><strong>Shine the flashlight.</strong> Add <code>console.log</code> near the line the trace named, run your test, and compare what the values <em>are</em> with what you assumed they were. That is rule two.</li>
+      <li><strong>Change exactly one thing.</strong> Use what the logs showed you to make one guess, and make one edit.</li>
+      <li><strong>Run the same test again.</strong> If the error is gone, you know which edit fixed it. If it is still there, undo the edit and try your next guess.</li>
+    </ol>
+    <p>Two cautions. Every edit, a log line as much as a fix, only takes effect once you restart the server. And the fourth step is the one beginners skip: change three things at once and, when the error vanishes, you cannot tell which change mattered — or whether one of the other two planted a new bug.</p>
 
     <h3>Three classic beginner errors</h3>
     <p>You will meet all three of these. Recognizing them on sight turns a half-hour panic into a ten-second fix. Open each one:</p>
@@ -748,8 +768,10 @@ request this form would send to the server in express-post.js.</p></textarea>
     </details>
 
     <h3>Catching errors on purpose: try / catch</h3>
-    <p>Some failures you can predict. A function that divides by zero, parses text a visitor typed, or reads a file that might not exist <em>will</em> fail sometimes — and an uncaught failure in Node crashes the whole program, taking every other visitor down with it. JavaScript's answer is <code>try / catch</code>: put risky code in a <code>try</code> block; if anything inside it <strong>throws</strong> an error (raises it, deliberately or by accident), execution jumps straight to the <code>catch</code> block, which receives the error as a value — its <code>message</code> property is the headline text — and the program carries on.</p>
-    <p>Run this playground. The second <code>greet('')</code> call would kill the program if it were not wrapped — watch the console prove that it survives. Then change the code: remove the <code>try / catch</code> around the second call and run it again to see the crash for yourself. (Undo with the Reset button.)</p>
+    <p>Some failures you can predict. Code that calls a method on a value that turned out to be <code>undefined</code>, uses <code>JSON.parse</code> to turn text a visitor typed into an object, or reads a file that might not exist <em>will</em> fail sometimes. JavaScript's answer is <code>try / catch</code>: put risky code in a <code>try</code> block; if anything inside it <strong>throws</strong> an error (raises it, deliberately or by accident), execution jumps straight to the <code>catch</code> block, which receives the error as a value — its <code>message</code> property is the headline text — and the program carries on.</p>
+    <p>What happens when <em>nothing</em> catches the error depends on where it was thrown, and the three cases are worth telling apart. In the raw <code>http</code> server from Section 1.2, a throw inside the request handler crashes the whole Node process, taking every other visitor down with it. In an Express route handler, Express catches the throw for you: the stack trace prints in your terminal, that one client gets a <code>500 Internal Server Error</code> response, and the server keeps running. But an error thrown <em>later</em> — inside a timer or another callback that runs after your handler has returned — is beyond Express's reach, and it crashes the process just as it would in the raw server. Week 2 shows how to decide for yourself what a 500 response says.</p>
+    <p>Read the console in this playground before you change anything. <code>greet('')</code> throws, and <code>safeGreet</code> does nothing to stop it, so the error escapes all the way out to the <code>try / catch</code> near the bottom. The line that starts with <code>Escaped:</code> is that outer <code>catch</code> speaking. It saves the script, but every caller of <code>safeGreet</code> would need the same safety net.</p>
+    <p><strong>Your task:</strong> move the protection inside. Rewrite <code>safeGreet</code> so that it wraps its call to <code>greet</code> in its own <code>try / catch</code> and, when an error is thrown, returns <code>'Caught: '</code> followed by the error's <code>message</code>. You will know it worked when the console's second line changes to <code>Caught: A name is required</code> and every check is green.</p>
 
     <div class="playground" data-title="Try it: throwing and catching errors" data-preview="false" data-height="340">
       <textarea data-lang="js">// greet() refuses to run without a name: it throws an error.
@@ -760,58 +782,64 @@ function greet(name) {
   return 'Hello, ' + name + '!';
 }
 
-// This call works, so no error is thrown.
-try {
-  console.log(greet('Ada'));
-} catch (err) {
-  console.log('Caught: ' + err.message);
+// Your task: make safeGreet() catch the error itself and
+// return 'Caught: ' + the error's message.
+// Right now it only passes the call along, so the error escapes.
+function safeGreet(name) {
+  return greet(name);
 }
 
-// This call throws. try/catch catches it, so the program survives.
+console.log(safeGreet('Ada'));
+
+// The error escapes from safeGreet, so this outer try/catch
+// is the only thing keeping the script alive.
 try {
-  console.log(greet(''));
+  console.log(safeGreet(''));
 } catch (err) {
-  console.log('Caught: ' + err.message);
+  console.log('Escaped: ' + err.message);
 }
 
 console.log('The program kept running.');</textarea>
       <script type="application/json" class="checks">
       [
-        {"label": "The risky calls are wrapped in `try`", "test": "return code.js.indexOf('try') > -1"},
-        {"label": "There is a `catch` block to handle the error", "test": "return code.js.indexOf('catch') > -1"},
-        {"label": "`greet` throws on bad input", "test": "return code.js.indexOf('throw') > -1"},
-        {"label": "The catch block reads the error's `message`", "test": "return code.js.indexOf('err.message') > -1"}
+        {"label": "`safeGreet('Ada')` still returns `Hello, Ada!`", "test": "return win.safeGreet('Ada') === 'Hello, Ada!'"},
+        {"label": "`greet('')` itself still throws: the fix belongs in `safeGreet`", "test": "try { win.greet(''); return false; } catch (e) { return true; }"},
+        {"label": "`safeGreet('')` no longer throws", "test": "var c = win.console, log = c.log; c.log = function () {}; try { win.safeGreet(''); return true; } catch (e) { return false; } finally { c.log = log; }"},
+        {"label": "`safeGreet('')` returns `Caught: A name is required`", "test": "var c = win.console, log = c.log; c.log = function () {}; try { return win.safeGreet('') === 'Caught: A name is required'; } catch (e) { return false; } finally { c.log = log; }"},
+        {"label": "A different error gets its own message back, so the `catch` block really reads `err.message`", "test": "var c = win.console, log = c.log, real = win.greet; c.log = function () {}; win.greet = function () { throw new Error('Out of coffee'); }; try { return win.safeGreet('Ada') === 'Caught: Out of coffee'; } catch (e) { return false; } finally { win.greet = real; c.log = log; }"}
       ]
       </script>
     </div>
 
+    <p>One more experiment, once every check is green. Add the line <code>console.log(greet(''));</code> just above the last line and watch the console. Nothing catches that throw, so the script stops on the spot: an error appears, and <code>The program kept running.</code> never prints. That is an uncaught error in miniature. Delete the line again and the script recovers.</p>
+
     <aside class="callout tip">
-      <strong>Stop restarting your server by hand: nodemon</strong>
-      <p>Every edit to a running server requires a stop and a restart, because Node loaded your file once, at startup. The tool from Section 1.3's devDependencies table exists precisely for this: <code>nodemon</code> watches your files and restarts the server for you on every save. Install it once per project with <code>npm install --save-dev nodemon</code>, run your server with <code>npx nodemon server.js</code>, and the edit–restart–retest loop shrinks to just edit–retest. It is a development tool only — production servers do not change under their own feet.</p>
+      <strong>Stop restarting your server by hand</strong>
+      <p>Every edit to a running server requires a stop and a restart, because Node loaded your file once, at startup. Node can take over that chore. Start the server with <code>node --watch server.js</code> instead of <code>node server.js</code>, and Node restarts it for you every time you save the file — watch mode is built in, so there is nothing to install. The edit–restart–retest loop shrinks to just edit–retest. The <code>nodemon</code> package from Section 1.3's devDependencies table does the same job, and you will see it in many tutorials written before Node could do this itself. Either way, it is a development convenience only — production servers do not change under their own feet.</p>
     </aside>
 
     <div class="order" data-title="Put the debugging routine in order">
       <script type="application/json">
-      {"prompt": "An error appears in your terminal. Drag the steps of a calm debugging routine into the order a developer actually follows them.",
+      {"prompt": "An error appears in your terminal. Drag the five steps of this section's debugging routine into order.",
        "items": [
-         "Read the first line of the error — the headline",
-         "Find the first stack frame that names your own file, and note its line number",
-         "Make the failure happen again on purpose, so you know your test is reliable",
-         "Add `console.log` at the points you are unsure about and run the test again",
-         "Change exactly one thing, then retest"
+         "Read the error: the headline first, then the first stack frame that names your own file",
+         "Before changing any code, trigger the same error again, so you have a test you can repeat",
+         "Add `console.log` near the line the trace named, and run your test to see the real values",
+         "Use what the logs showed you to change exactly one thing",
+         "Run the same test once more, to learn whether that one change fixed it"
        ],
-       "explain": "One change at a time is the discipline that makes the routine work: if you change three things and the error vanishes, you have learned nothing — and the bug's twin is still in there somewhere."}
+       "explain": "Each step leans on the one before it: you cannot repeat an error you have not read, logs need a test to run them against, a sensible change needs what the logs showed, and the change means nothing until the same test runs again. One change at a time is the discipline that makes it work: change three things and, when the error vanishes, you have learned nothing — and the bug's twin may still be in there somewhere."}
       </script>
     </div>
 
     <div class="quiz" data-title="Check your understanding: debugging">
       <script type="application/json">
       [
-        {"q": "A stack trace lands in your terminal. What do you read first?", "shuffle": true, "choices": ["The last line, where the prompt is", "The first line — the headline naming the error — then the first frame that names your own file", "Every frame, top to bottom, including Node's internals", "Nothing; just restart and hope"], "answer": 1, "explain": "Headline first: it usually names the problem. Then find your file and line number in the trace. The frames below yours are the machinery that called you."},
-        {"q": "`Error: listen EADDRINUSE` — the error you see when you start the raw `http` server, or from a checked Express startup — almost always means…", "shuffle": true, "choices": ["Port 3000 is banned", "Another copy of your server (or another program) is already listening on that port", "Your code has a spelling mistake", "Express needs reinstalling"], "answer": 1, "explain": "The address is in use. Stop the old server with Ctrl+C in its terminal instead of hopping to a new port and multiplying your servers."},
-        {"q": "The browser shows `Cannot GET /`. What is true?", "shuffle": true, "choices": ["The server is down", "The server is up, but no GET route matches the path `/`", "The browser is broken", "You forgot `express.json()`"], "answer": 1, "explain": "That message is Express's own 404. The conversation worked perfectly; the route table simply has no matching entry. Compare it with your registrations, character by character."},
-        {"q": "What does `catch` receive when code inside `try` throws?", "shuffle": true, "choices": ["Nothing — the program just skips ahead", "The error itself, whose `message` property holds the headline text", "A copy of the request object", "The value `true`"], "answer": 1, "explain": "`catch (err)` hands you the thrown error as a value. `err.message` is the readable headline, like `A name is required`."},
-        {"q": "True or false: an error thrown inside a request handler and never caught can crash the whole Node process, disconnecting every visitor.", "answer": true, "explain": "Yes. One program serves everyone, so one uncaught failure can take it down for all of them — which is why predictable failures get wrapped in `try / catch`."}
+        {"q": "A stack trace lands in your terminal. What do you read first?", "shuffle": true, "choices": ["The last line of the trace, because the newest call is printed at the bottom", "The first line, the headline, then the first frame that names your own file", "Every frame from top to bottom, including the ones inside Node and Express", "The frames inside Express, because the fault is usually in the framework"], "answer": 1, "explain": "Headline first: it usually names the problem. Then find your file and line number in the trace. The frames below yours are the machinery that called you."},
+        {"q": "`Error: listen EADDRINUSE` — the error you see when you start the raw `http` server, or from a checked Express startup — almost always means…", "shuffle": true, "choices": ["Port 3000 is reserved by the operating system and is never open to your programs", "Another program, usually your own earlier server, is already listening on that port", "Your code misspelled the port number or the address in the call to `listen`", "The Express package is damaged and must be installed again with `npm install`"], "answer": 1, "explain": "The address is in use. Stop the old server with Ctrl+C in its terminal instead of hopping to a new port and multiplying your servers."},
+        {"q": "The browser shows `Cannot GET /`. What is true?", "shuffle": true, "choices": ["The server is down, so the browser wrote this message itself", "The server is up, but no GET route matches the path `/`", "The server crashed while running the `/` handler", "The server is up, but it needs `express.json()` to answer `/`"], "answer": 1, "explain": "That message is Express's own 404. The conversation worked perfectly; the route table simply has no matching entry. Compare it with your registrations, character by character."},
+        {"q": "What does `catch` receive when code inside `try` throws?", "shuffle": true, "choices": ["Nothing at all — the program just skips ahead to the next statement", "The error itself, whose `message` property holds the headline text", "A copy of the request object that was being handled at the time", "The value `true`, as a signal that something inside `try` went wrong"], "answer": 1, "explain": "`catch (err)` hands you the thrown error as a value. `err.message` is the readable headline, like `A name is required`."},
+        {"q": "True or false: in the raw `http` server from Section 1.2, an error thrown inside the request handler and never caught crashes the whole Node process, disconnecting every visitor.", "answer": true, "explain": "True for the raw server: nothing stands between your handler and Node, so one uncaught throw stops the program for everyone. Express is more forgiving — a throw in a route handler becomes a 500 for that one client — but an error thrown later, inside a timer or callback, still brings down either kind of server."}
       ]
       </script>
     </div>
@@ -847,16 +875,16 @@ console.log('The program kept running.');</textarea>
     <div class="quiz" data-title="Week 1 review quiz">
       <script type="application/json">
       [
-        {"q": "A visitor's account page must show *their* current balance. Static or dynamic — and why?", "shuffle": true, "choices": ["Static, because balances are just numbers", "Dynamic, because the answer differs per visitor and changes over time, so a program must build it at request time", "Static, because the page was designed in advance", "Dynamic, because it uses HTML forms"], "answer": 1, "explain": "If the answer depends on who is asking or what the data looks like right now, it cannot be a ready-made file. A program has to build the response."},
-        {"q": "Which statement about Node is correct?", "shuffle": true, "choices": ["Node is a programming language that replaces JavaScript", "Node is a runtime: the V8 engine plus server-side tools like `fs` and `http`", "Node only runs inside Chrome", "Node is a database"], "answer": 1, "explain": "Node runs the *same* JavaScript language, in a different runtime — one that allows files, networking and listening for connections."},
-        {"q": "Your handler receives a request for `/about`. In the **raw** `http` server, how did your code decide what to send?", "shuffle": true, "choices": ["Express matched the route automatically", "An `if / else` chain compared `req.url` with each known path", "Node read the answer from `package.json`", "The browser told it which branch to run"], "answer": 1, "explain": "Raw routing is manual: test `req.url`, and in each branch call `writeHead` and `end` yourself. Express exists to remove exactly this repetition."},
-        {"q": "A classmate deletes their `node_modules` folder by accident the night before a demo. What should they do?", "shuffle": true, "choices": ["Rewrite the project from scratch", "Run `npm install` — npm rebuilds the folder from `package.json` and `package-lock.json`", "Reinstall Node", "Copy `node_modules` from any other project"], "answer": 1, "explain": "That rebuildability is the entire point of recording dependencies. The folder is a download cache; `package.json` is the recipe."},
-        {"q": "The version range `\"express\": \"^5.3.0\"` allows npm to install which of these on a fresh install?", "shuffle": true, "choices": ["Only exactly 5.3.0, forever", "5.4.2, but never 6.0.0", "6.0.0, because newer is always allowed", "Any version at all, including 1.0.0"], "answer": 1, "explain": "The caret allows minor and patch updates within the same major version. A new major means breaking changes, and semver says those never arrive uninvited."},
-        {"q": "Which line registers a route that answers POST requests for form submissions at `/signup`?", "shuffle": true, "choices": ["`app.get('/signup', (req, res) => { ... })`", "`app.post('/signup', (req, res) => { ... })`", "`app.listen('/signup', 3000)`", "`require('/signup')`"], "answer": 1, "explain": "Routes match method *and* path. Form submissions arrive as POST, so the route is `app.post`. A GET route for the same path is a different route."},
+        {"q": "A visitor's account page must show *their* current balance. Static or dynamic — and why?", "shuffle": true, "choices": ["Static, because a balance is only a number and numbers fit in any file", "Dynamic, because the answer differs per visitor and changes over time", "Static, because the page's layout and styles were designed in advance", "Dynamic, because any page that contains a form or a button is dynamic"], "answer": 1, "explain": "If the answer depends on who is asking or what the data looks like right now, it cannot be a ready-made file. A program has to build the response."},
+        {"q": "Which statement about Node is correct?", "shuffle": true, "choices": ["Node is a programming language that replaces JavaScript on the server", "Node is a runtime: the V8 engine plus server-side tools like `fs` and `http`", "Node is a part of Chrome, so it only runs while that browser is open", "Node is a framework built on top of Express that adds routes and body translators"], "answer": 1, "explain": "Node runs the *same* JavaScript language, in a different runtime — one that allows files, networking and listening for connections."},
+        {"q": "Your handler receives a request for `/about`. In the **raw** `http` server, how did your code decide what to send?", "shuffle": true, "choices": ["Express matched the method and path against its list of routes", "An `if / else` chain compared `req.url` with each known path", "Node looked up the path under `\"scripts\"` in `package.json`", "The `http` module found a file named `about` and sent its contents"], "answer": 1, "explain": "Raw routing is manual: test `req.url`, and in each branch call `writeHead` and `end` yourself. Express exists to remove exactly this repetition."},
+        {"q": "A classmate deletes their `node_modules` folder by accident the night before a demo. What should they do?", "shuffle": true, "choices": ["Rewrite the project, because the folder held their own code too", "Run `npm install`, which rebuilds the folder from `package.json`", "Reinstall Node, because `node_modules` is part of Node itself", "Copy `node_modules` over from any other project that uses Express"], "answer": 1, "explain": "That rebuildability is the entire point of recording dependencies. The folder is a download cache; `package.json` is the recipe, and `package-lock.json` makes sure the rebuilt copy uses the same exact versions."},
+        {"q": "The version range `\"express\": \"^5.3.0\"` allows npm to install which of these in a project that has no lock file yet?", "shuffle": true, "choices": ["5.3.0 only, never anything newer", "5.4.2 or 5.3.1, but never 6.0.0", "6.0.0 or 5.4.2 — anything newer", "5.3.9 or 5.3.1, but never 5.4.0"], "answer": 1, "explain": "The caret allows minor and patch updates within the same major version. A new major means breaking changes, and semver says those never arrive uninvited. Stopping short of 5.4.0 is what a tilde (`~5.3.0`) would do, and a bare `5.3.0` allows nothing newer at all."},
+        {"q": "Which line registers a route that answers POST requests for form submissions at `/signup`?", "shuffle": true, "choices": ["`app.get('/signup', (req, res) => { ... })`", "`app.post('/signup', (req, res) => { ... })`", "`app.listen('/signup', (req, res) => { ... })`", "`app.send('/signup', (req, res) => { ... })`"], "answer": 1, "explain": "Routes match method *and* path. Form submissions arrive as POST, so the route is `app.post`. A GET route for the same path is a different route."},
         {"q": "A search form uses GET and the visitor searches for `node servers`. Which address does the browser request?", "shuffle": true, "choices": ["`http://localhost:3000/search` with the words hidden in a body", "`http://localhost:3000/search?q=node+servers`", "`http://localhost:3000/node servers`", "`http://localhost:3000/search#q=node servers`"], "answer": 1, "explain": "GET forms pack their fields into the query string: after the `?`, as `name=value`, with spaces written as `+`."},
-        {"q": "In `express-post.js`, the same handler answered a form body and a JSON body correctly. What made that possible?", "shuffle": true, "choices": ["curl converted both bodies to the same format", "Two translators — `express.urlencoded()` and `express.json()` — both parse their format into the same `req.body` object", "`res.json` can read request bodies", "POST bodies are always objects"], "answer": 1, "explain": "Each `app.use` line switches on one translator. Whichever format arrives, the parsed result lands in `req.body`, and the handler stays the same."},
-        {"q": "Your server prints `Error: listen EADDRINUSE: address already in use :::3000`. What is the correct first move?", "shuffle": true, "choices": ["Change your code to port 3001 and move on", "Find the terminal where your earlier server is still running and stop it with Ctrl+C", "Delete `node_modules` and reinstall", "Restart your computer"], "answer": 1, "explain": "One server, one port. The old copy is still listening; stop it deliberately instead of accumulating servers on different ports."},
-        {"q": "Why wrap a risky call — like parsing text a visitor typed — in `try / catch` inside a server?", "shuffle": true, "choices": ["It makes the code run faster", "An uncaught throw can crash the whole Node process and disconnect every visitor; `catch` lets this one request fail while the server lives", "Express requires it on every route", "It converts the error into a 404"], "answer": 1, "explain": "One process serves everyone. Catching a predictable failure confines the damage to the request that caused it."}
+        {"q": "In `express-post.js`, the same handler answered a form body and a JSON body correctly. What made that possible?", "shuffle": true, "choices": ["curl converted both bodies into the same format before it sent the requests", "`express.urlencoded()` and `express.json()` each parse one format into `req.body`", "`res.json` reads the request body in either format before it sends the response", "`app.post` turns every request body into an object, whatever format it arrives in"], "answer": 1, "explain": "Each `app.use` line switches on one translator. Whichever format arrives, the parsed result lands in `req.body`, and the handler stays the same."},
+        {"q": "Your server prints `Error: listen EADDRINUSE: address already in use :::3000`. What is the correct first move?", "shuffle": true, "choices": ["Change the port in your code to 3001 and start the server again", "Find the terminal of your earlier server and stop it with Ctrl+C", "Delete `node_modules` and run `npm install` to rebuild the folder", "Restart your computer so that every port is released at once"], "answer": 1, "explain": "One server, one port. The old copy is still listening; stop it deliberately instead of accumulating servers on different ports."},
+        {"q": "Why wrap a risky call — like running `JSON.parse` on text a visitor typed — in `try / catch` inside a server?", "shuffle": true, "choices": ["Code inside a `try` block runs faster, because Node skips its usual error checks there", "Your code gets to answer that one failed request, instead of a crash or a generic 500", "Express refuses to start a server unless every route handler contains a `try / catch`", "A `catch` block turns any error into a 404, which is the correct status for bad input"], "answer": 1, "explain": "Left uncaught, a throw in a raw `http` handler stops the whole process, and a throw in an Express route handler becomes a generic 500. Catching a predictable failure yourself lets your code give that one visitor a clear answer while everyone else carries on."}
       ]
       </script>
     </div>
@@ -881,6 +909,7 @@ console.log('The program kept running.');</textarea>
         <thead><tr><th scope="col">Command</th><th scope="col">What it does</th></tr></thead>
         <tbody>
           <tr><th scope="row"><code>node server.js</code></th><td>Run a JavaScript file with Node. For a server, it starts listening and keeps running.</td></tr>
+          <tr><th scope="row"><code>node --watch server.js</code></th><td>Run the server in watch mode: Node restarts it every time you save the file. For development only.</td></tr>
           <tr><th scope="row">Ctrl+C</th><td>Stop the program running in this terminal — how you stop your server before editing it.</td></tr>
           <tr><th scope="row"><code>npm init</code></th><td>Create <code>package.json</code> by answering questions (<code>npm init -y</code> accepts every default).</td></tr>
           <tr><th scope="row"><code>npm install express</code></th><td>Download Express into <code>node_modules</code> and record it under <code>"dependencies"</code>.</td></tr>
