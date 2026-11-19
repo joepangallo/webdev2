@@ -1,8 +1,23 @@
 /* ==========================================================================
-   Web Development I: shared course styles
-   Tokens first (light, then dark), then base, shell, content, components.
+   Web Development II: shared course styles
+   Fonts, then tokens (light, then dark), then base, shell, content, components.
    Every color comes from a token so both themes stay in sync.
    ========================================================================== */
+
+/* ---------- Fonts (self-hosted; SIL Open Font License, see assets/fonts/OFL-*.txt) ---------- */
+
+@font-face { font-family: "Atkinson Hyperlegible"; font-style: italic; font-weight: 400; font-display: swap; src: url("../fonts/atkinson-hyperlegible-400-italic-latin-ext.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Atkinson Hyperlegible"; font-style: italic; font-weight: 400; font-display: swap; src: url("../fonts/atkinson-hyperlegible-400-italic-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Atkinson Hyperlegible"; font-style: italic; font-weight: 700; font-display: swap; src: url("../fonts/atkinson-hyperlegible-700-italic-latin-ext.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Atkinson Hyperlegible"; font-style: italic; font-weight: 700; font-display: swap; src: url("../fonts/atkinson-hyperlegible-700-italic-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Atkinson Hyperlegible"; font-style: normal; font-weight: 400; font-display: swap; src: url("../fonts/atkinson-hyperlegible-400-latin-ext.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Atkinson Hyperlegible"; font-style: normal; font-weight: 400; font-display: swap; src: url("../fonts/atkinson-hyperlegible-400-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Atkinson Hyperlegible"; font-style: normal; font-weight: 700; font-display: swap; src: url("../fonts/atkinson-hyperlegible-700-latin-ext.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Atkinson Hyperlegible"; font-style: normal; font-weight: 700; font-display: swap; src: url("../fonts/atkinson-hyperlegible-700-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Bricolage Grotesque"; font-style: normal; font-weight: 500 800; font-display: swap; font-stretch: 100%; src: url("../fonts/bricolage-grotesque-variable-latin-ext.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "Bricolage Grotesque"; font-style: normal; font-weight: 500 800; font-display: swap; font-stretch: 100%; src: url("../fonts/bricolage-grotesque-variable-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400 700; font-display: swap; src: url("../fonts/jetbrains-mono-variable-latin-ext.woff2") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400 700; font-display: swap; src: url("../fonts/jetbrains-mono-variable-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 
 :root {
   /* Ground and ink: cool paper, slightly blue-biased greys */
@@ -12,7 +27,7 @@
   --surface-3: #E3E8F0;
   --ink: #161A23;
   --ink-2: #454D5E;
-  --ink-3: #697184;
+  --ink-3: #5F677A;
   --line: #D9DEE7;
   --line-2: #C3CAD7;
 
@@ -39,12 +54,7 @@
   --bm-content: #8CB6C0;
   --bm-ink: #1F2330;
 
-  /* Chapter accents, one box-model layer each */
-  --ch2: #B85A12;
-  --ch3: #8F6A00;
-  --ch4: #52731A;
-  --ch5: #237089;
-  --chl: #A92F68;
+  /* Module accents */
   --wk1: #1F7A38;
   --wk2: #B85A12;
   --wk3: #1D6F8E;
@@ -55,7 +65,7 @@
   --code-bg: #F6F8FB;
   --code-ink: #1E2433;
   --code-line: #E1E6EE;
-  --tk-com: #6E7689;
+  --tk-com: #636B7E;
   --tk-tag: #1D55B5;
   --tk-attr: #8A4A00;
   --tk-str: #127046;
@@ -113,11 +123,6 @@
     --bm-padding: #5E6B3A;
     --bm-content: #3F6370;
     --bm-ink: #F1F3F7;
-    --ch2: #F2A060;
-    --ch3: #E3C04F;
-    --ch4: #A7C76A;
-    --ch5: #6EC5DE;
-    --chl: #F27DB3;
     --wk1: #7BD88F;
     --wk2: #F2A060;
     --wk3: #6EC5DE;
@@ -171,11 +176,6 @@
   --bm-padding: #5E6B3A;
   --bm-content: #3F6370;
   --bm-ink: #F1F3F7;
-  --ch2: #F2A060;
-  --ch3: #E3C04F;
-  --ch4: #A7C76A;
-  --ch5: #6EC5DE;
-  --chl: #F27DB3;
   --wk1: #7BD88F;
   --wk2: #F2A060;
   --wk3: #6EC5DE;
@@ -201,11 +201,6 @@
   color-scheme: dark;
 }
 
-body[data-module="ch2"] { --mod: var(--ch2); }
-body[data-module="ch3"] { --mod: var(--ch3); }
-body[data-module="ch4"] { --mod: var(--ch4); }
-body[data-module="ch5"] { --mod: var(--ch5); }
-body[data-module="levelup"] { --mod: var(--chl); }
 body[data-module="wk1"] { --mod: var(--wk1); }
 body[data-module="wk2"] { --mod: var(--wk2); }
 body[data-module="wk3"] { --mod: var(--wk3); }
@@ -850,7 +845,8 @@ pre.bare { background: var(--code-bg); border: 1px solid var(--code-line); borde
 .order-item::before { counter-increment: ord; content: counter(ord); font-family: var(--font-mono); font-size: .75rem; color: var(--ink-3); width: 18px; flex: none; }
 .order-item .o-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .order-item .o-text.mono { font-family: var(--font-mono); font-size: .86rem; }
-.order-item .o-btns { display: flex; gap: 4px; flex: none; }
+.order-item .o-btns { display: flex; gap: 4px; flex: none; order: 2; }
+.order-item > .mark { order: 1; }
 .order-item .o-btns button { width: 30px; height: 30px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-2); cursor: pointer; font-size: .8rem; }
 .order-item .o-btns button:hover { color: var(--ink); border-color: var(--line-2); }
 .order-item.right { border-color: var(--good); background: var(--good-soft); }
@@ -903,9 +899,10 @@ pre.bare { background: var(--code-bg); border: 1px solid var(--code-line); borde
 .stepper.show-all .steps > li { display: flex; opacity: .5; margin-bottom: 10px; }
 .stepper.show-all .steps > li.current { opacity: 1; }
 .stepper-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); background: var(--surface-2); }
-.stepper-dots { display: flex; gap: 5px; margin-left: auto; flex-wrap: wrap; }
-.stepper-dots button { width: 10px; height: 10px; border-radius: 50%; border: 0; padding: 0; background: var(--line-2); cursor: pointer; }
-.stepper-dots button[aria-current="step"] { background: var(--mod); transform: scale(1.25); }
+.stepper-dots { display: flex; margin-left: auto; flex-wrap: wrap; }
+.stepper-dots button { width: 24px; height: 24px; border: 0; padding: 0; background: none; cursor: pointer; display: grid; place-items: center; }
+.stepper-dots button::before { content: ""; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--ink-3); transition: transform .15s; }
+.stepper-dots button[aria-current="step"]::before { background: var(--mod); border-color: var(--mod); transform: scale(1.25); }
 
 /* ---------- Fill in the blanks ---------- */
 
@@ -913,14 +910,16 @@ pre.bare { background: var(--code-bg); border: 1px solid var(--code-line); borde
 .fill-code input {
   font: inherit; font-size: .86rem; color: var(--ink); line-height: 1.3;
   background: var(--surface); border: 1px solid var(--line-2); border-bottom: 2px solid var(--accent); border-radius: 4px;
-  padding: 1px 5px; min-width: 3ch; min-height: 0; margin: 0 1px;
+  padding: 1px 5px; min-width: 3ch; min-height: 24px; margin: 0 1px;
 }
 .fill-code input.right { border-color: var(--good); background: var(--good-soft); }
 .fill-code input.wrong { border-color: var(--bad); background: var(--bad-soft); }
 .fill-text { padding: 16px; line-height: 2.2; }
-.fill-text input { font: inherit; font-size: .95rem; min-height: 0; padding: 1px 6px; border: 1px solid var(--line-2); border-bottom: 2px solid var(--accent); border-radius: 4px; background: var(--surface); color: var(--ink); }
+.fill-text input { font: inherit; font-size: .95rem; min-height: 24px; padding: 1px 6px; border: 1px solid var(--line-2); border-bottom: 2px solid var(--accent); border-radius: 4px; background: var(--surface); color: var(--ink); }
 .fill-text input.right { border-color: var(--good); background: var(--good-soft); }
 .fill-text input.wrong { border-color: var(--bad); background: var(--bad-soft); }
+.blank { position: relative; display: inline-block; }
+.blank > .mark { position: absolute; top: -.7em; right: -.5em; font-size: .62em; pointer-events: none; }
 .fill-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 16px; border-top: 1px solid var(--line); background: var(--surface-2); }
 
 /* ---------- Tabs ---------- */
@@ -947,6 +946,16 @@ pre.bare { background: var(--code-bg); border: 1px solid var(--code-line); borde
 }
 .toast.visited { background: var(--visited); color: #fff; }
 @keyframes wd1-toast { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ---------- Right / wrong marks: a ✓ or ✗ badge, so a verdict never depends on colour alone ---------- */
+
+.mark {
+  flex: none; display: inline-grid; place-items: center; width: 1.5em; height: 1.5em; border-radius: 50%;
+  font-family: var(--font-body); font-size: .8em; font-weight: 700; line-height: 1; color: var(--surface);
+}
+.mark-good { background: var(--good); }
+.mark-bad { background: var(--bad); }
+.choice > .mark { margin-left: auto; align-self: center; }
 
 /* ---------- Box-model swatches (reused in lessons) ---------- */
 

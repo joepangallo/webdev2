@@ -4,9 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Code Playground · Web Dev II</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=JetBrains+Mono:wght@400;700&display=swap">
+  <meta name="description" content="A full-page HTML, CSS and JavaScript playground with live preview, console, templates, download and share links.">
   <link rel="stylesheet" href="../assets/css/course.css">
   <script src="../assets/js/course.js"></script>
   <style>
@@ -79,7 +77,7 @@
     </div>
     <div class="tp-right">
       <div class="pg-label"><span>Preview</span><span id="tp-size" class="num"></span></div>
-      <div class="tp-stage" id="tp-stage"><iframe id="tp-frame" title="Preview"></iframe></div>
+      <div class="tp-stage" id="tp-stage"><iframe id="tp-frame" title="Preview" sandbox="allow-scripts allow-forms allow-modals"></iframe></div>
       <div class="pg-label" id="tp-console-label"><span>Console</span><button type="button" class="btn small ghost" id="tp-clear">Clear</button></div>
       <div class="tp-console" id="tp-console" aria-live="polite" aria-label="Console output"></div>
     </div>
@@ -110,26 +108,35 @@ WD1.ready(() => {
   const sel = $('#tp-template');
   Object.entries(TEMPLATES).forEach(([k, t]) => sel.appendChild(h('option', { value: k, text: t.label })));
 
-  /* Load: share link > handoff from a lesson > saved > default */
+  /* Load: share link > handoff from a lesson > saved > default.
+     Shared code is somebody else's code. It only ever runs inside the sandboxed preview frame,
+     which cannot reach this site's storage or the page around it. */
+  const isCode = (d) => !!d && typeof d === 'object' && !Array.isArray(d);
   let code = null, source = '';
   if (location.hash.startsWith('#code=')) {
     try {
       const b64 = location.hash.slice(6);
-      code = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(b64)))));
-      source = 'Loaded from a share link';
+      const d = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(b64)))));
+      if (isCode(d)) { code = d; source = 'Loaded from a share link'; }
     } catch (e) { code = null; }
   }
   if (!code && location.hash === '#handoff') {
     try {
-      const raw = localStorage.getItem('wd1:handoff');
-      if (raw) { const d = JSON.parse(raw); code = { html: d.html, css: d.css, js: d.js }; source = 'Opened from “' + (d.title || 'a lesson') + '”'; }
+      // Written by the "Open in playground" button on a lesson (course.js); used once.
+      const raw = localStorage.getItem('wd2:handoff');
+      localStorage.removeItem('wd2:handoff');
+      const d = raw ? JSON.parse(raw) : null;
+      if (isCode(d)) { code = d; source = 'Opened from “' + (typeof d.title === 'string' && d.title ? d.title : 'a lesson') + '”'; }
     } catch (e) { code = null; }
   }
-  if (!code) code = WD1.store.get('custom', 'playground');
+  if (!code) { const saved = WD1.store.get('custom', 'playground'); if (isCode(saved)) code = saved; }
   if (!code) { const t = TEMPLATES.events; code = { html: t.html, css: t.css, js: t.js }; source = 'Example: JavaScript events'; }
-  code = { html: code.html || '', css: code.css || '', js: code.js || '' };
+  const text = (v) => (typeof v === 'string' ? v : '');
+  code = { html: text(code.html), css: text(code.css), js: text(code.js) };
   if (source) $('#tp-status').textContent = source;
   if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  // A share or handoff link opened while this page is already showing only changes the hash.
+  window.addEventListener('hashchange', () => { if (location.hash.startsWith('#code=') || location.hash === '#handoff') location.reload(); });
 
   /* Editors */
   const tabs = $('#tp-tabs'), edWrap = $('#tp-editors');
@@ -157,11 +164,13 @@ WD1.ready(() => {
   }
   window.addEventListener('message', (e) => {
     const d = e.data;
-    if (!d || d.wd1pg !== ID) return;
+    if (!d || d.wd1pg !== ID || e.source !== frame.contentWindow) return;
+    if (!['log', 'info', 'warn', 'error'].includes(d.type)) return;
     const empty = $('.empty', consoleEl);
     if (empty) empty.remove();
     const pre = { error: '✖ ', warn: '⚠ ', info: '› ' }[d.type] || '';
-    consoleEl.appendChild(h('div', { class: 'log-line ' + (d.type === 'log' ? '' : d.type), text: pre + (d.args || []).join(' ') }));
+    consoleEl.appendChild(h('div', { class: 'log-line ' + (d.type === 'log' ? '' : d.type), text: pre + (Array.isArray(d.args) ? d.args.map(String) : []).join(' ') }));
+    while (consoleEl.childElementCount > WD1.MAX_CONSOLE_LINES) consoleEl.firstElementChild.remove();
     consoleEl.scrollTop = consoleEl.scrollHeight;
   });
   let timer = null, saveTimer = null;

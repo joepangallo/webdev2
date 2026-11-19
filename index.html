@@ -5,9 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Web Development II · Course Hub</title>
   <meta name="description" content="An interactive companion for Web Development II: server-side JavaScript with Node and Express, routing and middleware, REST APIs, state and databases, and authentication and authorization.">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=JetBrains+Mono:wght@400;700&display=swap">
   <link rel="stylesheet" href="assets/css/course.css">
   <script src="assets/js/course.js"></script>
   <style>
@@ -166,7 +163,7 @@
         <h1 id="hub-title">Web Development&nbsp;II <span class="lt">{ }</span></h1>
         <p class="lede">JavaScript leaves the browser. Build the server side of the web: Node and Express, routing and middleware, REST APIs, cookies, sessions and real databases, and login systems with roles — then put it all together in a full-stack final project. Every section has something to click, drag, type or break on purpose.</p>
         <div class="hub-cta">
-          <a class="btn primary" id="hub-continue" href="wk1/index.html">Start with Week 1</a>
+          <a class="btn primary wrap" id="hub-continue" href="wk1/index.html">Start with Week 1</a>
           <a class="btn" href="project/index.html">Open the final project</a>
         </div>
         <span class="hub-continue-meta" id="hub-continue-meta">Your progress saves in this browser automatically.</span>
@@ -238,8 +235,8 @@
       <p>Progress, quiz scores and your playground code are stored only in this browser. Export a file to move them to another computer, or to show your work.</p>
       <div class="btn-row">
         <button type="button" class="btn small" id="hub-export">Export progress</button>
-        <label class="btn small" for="hub-import-file" style="cursor:pointer">Import progress</label>
-        <input type="file" id="hub-import-file" accept="application/json,.json" hidden>
+        <button type="button" class="btn small" id="hub-import">Import progress</button>
+        <input type="file" id="hub-import-file" accept="application/json,.json" hidden tabindex="-1" aria-hidden="true">
         <span class="hub-confirm" id="hub-reset-wrap"><button type="button" class="btn small ghost" id="hub-reset">Reset all progress</button></span>
       </div>
     </section>
@@ -254,7 +251,7 @@ WD1.ready(() => {
 
   /* Hero editor */
   const tryBox = $('#hub-try');
-  const frame = h('iframe', { title: 'Live preview' });
+  const frame = WD1.previewFrame('Live preview');
   const start = '<h1>Course books</h1>\n<p>Rendered by JavaScript from data shaped like our API:</p>\n<ul id="list"></ul>\n<p><em>Edit this HTML — the list below is rebuilt by script.</em></p>';
   let saved = WD1.store.get('custom', 'hub-try');
   const draw = (html) => {
@@ -376,6 +373,8 @@ WD1.ready(() => {
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     WD1.toast('Progress exported');
   });
+  // A real button opens the file picker, so the control works from the keyboard.
+  $('#hub-import').addEventListener('click', () => $('#hub-import-file').click());
   $('#hub-import-file').addEventListener('change', (e) => {
     const f = e.target.files[0];
     if (!f) return;
