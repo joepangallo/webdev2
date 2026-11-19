@@ -24,7 +24,7 @@
 
   <aside class="callout listen">
     <strong>Listen: the Week 3 audio companion</strong>
-    <p>This episode covers how websites remember things: cookies, sessions, files, and real databases — with the full create, read, update, delete cycle in both MongoDB and MySQL.</p>
+    <p>This episode covers how websites remember things: cookies, sessions, files, and real databases — with the full create, read, update, delete cycle in both MongoDB and MySQL. (The hands-on exercises on this page have been updated since the recording, so follow the page instructions when you reach the activities.)</p>
     <audio controls preload="metadata" src="../audio/wk3.mp3" style="width:100%"></audio>
   <p class="small"><a href="../audio/wk3-transcript.txt">Read the episode transcript</a> (text file).</p>
   </aside>
@@ -649,7 +649,7 @@ Lines: 2</div>
     <h3>SQL: the four statements are CRUD</h3>
     <p>Start with the schema. This statement creates the <code>books</code> table from Section 3.3, declaring every column and its type. <code>INT</code> is a whole number, <code>VARCHAR(200)</code> is text up to 200 characters, <code>NOT NULL</code> means "a value is required," and <code>AUTO_INCREMENT PRIMARY KEY</code> makes <code>id</code> the unique row identifier, filled in by the database with the next number each time:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="SQL — create the table">
+    <script type="text/plain" class="code" data-lang="sql" data-title="SQL — create the table">
       CREATE TABLE books (
         id INT AUTO_INCREMENT PRIMARY KEY,
         title VARCHAR(200) NOT NULL,
@@ -659,21 +659,21 @@ Lines: 2</div>
 
     <p>With the table in place, the four CRUD operations are four SQL verbs. <strong>Create</strong> is <code>INSERT</code> — name the columns, then the values that fill them:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="SQL — INSERT (Create)">
+    <script type="text/plain" class="code" data-lang="sql" data-title="SQL — INSERT (Create)">
       INSERT INTO books (title, author) VALUES ('Dune', 'Frank Herbert');
       INSERT INTO books (title, author) VALUES ('Emma', 'Jane Austen');
       INSERT INTO books (title, author) VALUES ('The Hobbit', 'J.R.R. Tolkien');
     </script>
     <p>Notice there is no <code>id</code> in those statements: <code>AUTO_INCREMENT</code> assigns 1, 2 and 3 itself. <strong>Read</strong> is <code>SELECT</code> — name the columns you want, the table to take them from, and optionally a <code>WHERE</code> clause, a condition that filters which rows come back:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="SQL — SELECT (Read)">
+    <script type="text/plain" class="code" data-lang="sql" data-title="SQL — SELECT (Read)">
       SELECT * FROM books;
       SELECT * FROM books WHERE id = 2;
       SELECT title, author FROM books WHERE author = 'Jane Austen';
     </script>
     <p>The <code>*</code> means "every column." <strong>Update</strong> is <code>UPDATE</code> with a <code>SET</code> clause — and a <code>WHERE</code>, always a <code>WHERE</code>:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="SQL — UPDATE (Update)">
+    <script type="text/plain" class="code" data-lang="sql" data-title="SQL — UPDATE (Update)">
       UPDATE books SET title = 'Dune (revised)' WHERE id = 1;
     </script>
 
@@ -684,7 +684,7 @@ Lines: 2</div>
 
     <p><strong>Delete</strong> is <code>DELETE</code> — the same shape, the same warning:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="SQL — DELETE (Delete)">
+    <script type="text/plain" class="code" data-lang="sql" data-title="SQL — DELETE (Delete)">
       DELETE FROM books WHERE id = 2;
     </script>
 
@@ -938,7 +938,7 @@ console.log('Year too big:', validateBook({ title: 'The Hobbit', author: 'J.R.R.
 
     <p>While developing, you collect these in a <strong><code>.env</code> file</strong> — a plain text file in your project folder, one <code>NAME=value</code> per line. Node loads it for you when you start the app with <code>node --env-file=.env server.js</code>: every line becomes an entry in <code>process.env</code> before your code runs. (Calling <code>process.loadEnvFile()</code> at the top of your entry file does the same from inside the program.) In existing projects you will also meet the older way, the <code>dotenv</code> package — <code>npm install dotenv</code>, then <code>require('dotenv').config();</code> at the top of the entry file — which did the same job before Node could read the file itself. A typical <code>.env</code> file looks like this:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title=".env — local development settings">
+    <script type="text/plain" class="code" data-lang="text" data-title=".env — local development settings">
       PORT=3000
       DB_PASSWORD=the-real-password-goes-here
       SESSION_SECRET=a-long-random-string

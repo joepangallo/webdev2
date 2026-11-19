@@ -56,7 +56,7 @@
 
   /* Module accents */
   --wk1: #1F7A38;
-  --wk2: #B85A12;
+  --wk2: #A34E0E;
   --wk3: #1D6F8E;
   --wk4: #7434B8;
   --mod: var(--accent);
@@ -404,9 +404,14 @@ mark { background: color-mix(in srgb, var(--warn) 28%, transparent); color: inhe
 .toc .t-check { width: 16px; height: 16px; margin-top: 2px; border-radius: 50%; border: 1.5px solid var(--line-2); }
 .toc a.done { color: var(--visited); }
 .toc a.done .t-check {
+  position: relative;
   border-color: var(--visited); background: var(--visited);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.5 2.5L12 5.5' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  background-size: 100%;
+}
+.toc a.done .t-check::after {
+  content: ""; position: absolute; inset: 0;
+  background: var(--accent-ink);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.5 2.5L12 5.5' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.5 2.5L12 5.5' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% no-repeat;
 }
 .sidebar-foot { margin: 18px 10px 0; display: grid; gap: 8px; font-size: .85rem; }
 .sidebar-foot .mod-progress { height: 6px; border-radius: 99px; background: var(--surface-3); overflow: hidden; }
@@ -870,11 +875,20 @@ pre.bare { background: var(--code-bg); border: 1px solid var(--code-line); borde
 .bk-bucket {
   display: flex; flex-direction: column; gap: 8px; min-height: 120px;
   border: 1.5px dashed var(--line-2); border-radius: 10px; padding: 10px; background: var(--surface-2);
-  cursor: pointer; text-align: left; font: inherit; color: inherit;
+  text-align: left; font: inherit; color: inherit;
 }
-.bk-bucket.armed { border-color: var(--accent); background: var(--accent-soft); }
+.bk-bucket.armed { border-color: var(--accent); background: var(--accent-soft); cursor: pointer; }
 .bk-bucket.over { border-color: var(--accent); border-style: solid; }
+.bk-bucket-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; min-height: 28px; padding: 2px 4px; margin: -2px -4px 0;
+  border: 0; border-radius: 6px; background: transparent; color: inherit;
+  font: inherit; text-align: left; cursor: pointer;
+}
+.bk-bucket-head:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .bk-bucket-title { font-weight: 700; font-size: .9rem; }
+.bk-place-hint { font-family: var(--font-mono); font-size: .72rem; color: var(--accent); opacity: 0; transition: opacity .15s; white-space: nowrap; }
+.bk-bucket.armed .bk-place-hint { opacity: 1; }
 .bk-bucket-items { display: flex; flex-wrap: wrap; gap: 6px; }
 
 /* ---------- Stepper ---------- */
@@ -944,7 +958,7 @@ pre.bare { background: var(--code-bg); border: 1px solid var(--code-line); borde
   background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; box-shadow: var(--shadow-2);
   font-size: .92rem; font-weight: 700; animation: wd1-toast .25s ease;
 }
-.toast.visited { background: var(--visited); color: #fff; }
+.toast.visited { background: var(--visited); color: var(--accent-ink); }
 @keyframes wd1-toast { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
 /* ---------- Right / wrong marks: a ✓ or ✗ badge, so a verdict never depends on colour alone ---------- */

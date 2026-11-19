@@ -203,12 +203,22 @@ WD1.ready(() => {
     letters.innerHTML = '';
     const groups = new Map();
     list.forEach((t) => { const L = /[A-Z]/.test(t.key[0]) ? t.key[0] : '#'; if (!groups.has(L)) groups.set(L, []); groups.get(L).push(t); });
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach((L) => {
-      letters.appendChild(groups.has(L) ? h('a', { href: '#gl-' + L, text: L }) : h('span', { text: L, 'aria-hidden': 'true' }));
+    const groupId = (L) => 'gl-' + (L === '#' ? 'num' : L);
+    '#ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach((L) => {
+      letters.appendChild(groups.has(L) ? h('a', { href: '#' + groupId(L), text: L, 'aria-label': L === '#' ? 'Numbers and symbols' : L }) : h('span', { text: L, 'aria-hidden': 'true' }));
     });
-    if (!list.length) { out.appendChild(h('p', { class: 'gl-empty', text: 'No terms match. Try a shorter search or another week.' })); return; }
+    const studyBtn = $('#gl-study');
+    studyBtn.disabled = !list.length;
+    if (!list.length) {
+      const box = $('#gl-cards');
+      box.hidden = true;
+      box.innerHTML = '';
+      studyBtn.textContent = 'Study as flashcards';
+      out.appendChild(h('p', { class: 'gl-empty', text: 'No terms match. Try a shorter search or another week.' }));
+      return;
+    }
     groups.forEach((items, L) => {
-      out.appendChild(h('section', { class: 'gl-group', id: 'gl-' + L, 'aria-label': 'Terms starting with ' + L },
+      out.appendChild(h('section', { class: 'gl-group', id: groupId(L), 'aria-label': L === '#' ? 'Terms starting with a number' : 'Terms starting with ' + L },
         h('h2', { text: L }),
         h('dl', { class: 'gl-list' }, items.map((t) => {
           const m = modOf(t.mod), s = WD1.section(t.sec);
@@ -225,6 +235,12 @@ WD1.ready(() => {
   function study() {
     const { list } = current();
     const box = $('#gl-cards');
+    if (!list.length) {
+      box.hidden = true;
+      box.innerHTML = '';
+      $('#gl-study').textContent = 'Study as flashcards';
+      return;
+    }
     box.hidden = false;
     box.innerHTML = '';
     const el = h('div', { dataset: { title: 'Study ' + list.length + ' term' + (list.length === 1 ? '' : 's') } });

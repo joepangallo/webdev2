@@ -101,7 +101,7 @@ Write raw code inside a text script. It is dedented, highlighted and gets a copy
 </script>
 ```
 
-`data-lang` is `html`, `css`, `js` or `json` (anything else, such as `text`, is shown without highlighting). `data-title` overrides the label. A literal `</script>` inside the sample must be written `<\/script>`; it is displayed correctly.
+`data-lang` is `html`, `css`, `js`, `json` or `sql` (anything else, such as `text`, is shown without highlighting). `data-title` overrides the label. A literal `</script>` inside the sample must be written `<\/script>`; it is displayed correctly.
 
 ---
 
@@ -270,7 +270,7 @@ Then wire it up in the page script inside `WD1.ready(() => { … })`.
 | `WD1.$(sel, root)`, `WD1.$$(sel, root)` | Query helpers (`$$` returns an array) |
 | `WD1.h(tag, attrs, ...children)` | Create elements. `attrs` supports `class`, `text`, `html`, `onclick`, `dataset`, `style` (object) |
 | `WD1.esc(str)` / `WD1.fmt(str)` | Escape HTML / render mini-markdown |
-| `WD1.highlight(code, lang)` | Highlighted HTML string for `html`, `css`, `js` |
+| `WD1.highlight(code, lang)` | Highlighted HTML string for `html`, `css`, `js`, `json` and `sql` |
 | `WD1.codeBlock(code, lang)` | A ready-made code block element |
 | `WD1.editor(container, {value, lang, height, onInput})` | A highlighted code editor (`get`, `set`, `focus`) |
 | `WD1.previewFrame(title, lazy?)` | A sandboxed `<iframe>` for running student code. Always create preview frames with this |

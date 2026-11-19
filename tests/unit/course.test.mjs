@@ -71,6 +71,7 @@ test('highlight: adds markup but never changes the code text', () => {
     css: '@media (min-width: 40em) {\n  .a > b::before { content: "x"; color: #fff !important; margin: -1.5px calc(1em + 2%); }\n}\n/* done */\n@import "x.css";\na[href^="http"], .b/**/c { background: url(\'i.png\') no-repeat; --gap: 4px; width: var(--gap) }\n@font-face { font-family: "F"; }',
     js: "const re = /a\\/b[/]c/gi; // regex\nlet s = `t ${1 + 2}` + 'q' + \"d\";\nfunction f(x) { return x / 2 > 0x1F ? null : await g(); }\n/* block */",
     json: '{"a": [1, 2.5, true, null], "b": "c"}',
+    sql: "-- fetch one book\nSELECT title, author FROM books WHERE id = ? AND title <> 'O''Brien' /* ok */ LIMIT 1;",
     text: 'plain <text> & more'
   };
   const strip = (h) => h.replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');

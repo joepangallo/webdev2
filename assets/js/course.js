@@ -142,10 +142,17 @@
       if (!isObj(data) || !isObj(data.done)) throw new Error('That file is not a course progress export.');
       state = sanitize(data);
       applyTheme(state.prefs.theme);
+      updateThemeButton();
       persist();
       refreshProgressUI();
     },
-    reset() { state = blank(); persist(); refreshProgressUI(); }
+    reset() {
+      state = blank();
+      applyTheme(state.prefs.theme);
+      updateThemeButton();
+      persist();
+      refreshProgressUI();
+    }
   };
 
   /* ---------- Theme (applied immediately to avoid a flash) ---------- */
@@ -317,9 +324,10 @@
   WD1.copy = function (text, btn) {
     const done = () => {
       if (!btn) return;
-      const old = btn.innerHTML;
+      if (btn._copyHtml == null) btn._copyHtml = btn.innerHTML;
+      clearTimeout(btn._copyTimer);
       btn.innerHTML = ICON.check + '<span>Copied</span>';
-      setTimeout(() => { btn.innerHTML = old; }, 1400);
+      btn._copyTimer = setTimeout(() => { btn.innerHTML = btn._copyHtml; btn._copyTimer = null; }, 1400);
     };
     try {
       navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
@@ -732,10 +740,35 @@
     return out;
   }
 
+  const SQL_KW = new Set(('SELECT FROM WHERE INSERT INTO VALUES UPDATE SET DELETE CREATE TABLE DROP ALTER ADD COLUMN ' +
+    'PRIMARY KEY FOREIGN REFERENCES UNIQUE NOT NULL DEFAULT AUTO_INCREMENT INT INTEGER BIGINT VARCHAR TEXT BOOLEAN DATE DATETIME TIMESTAMP ' +
+    'AND OR IN IS AS ON JOIN LEFT RIGHT INNER OUTER ORDER BY GROUP HAVING LIMIT OFFSET ASC DESC DISTINCT COUNT SUM AVG MIN MAX IF EXISTS INDEX BEGIN COMMIT ROLLBACK').split(' '));
+  function hlSQL(src) {
+    let out = '', i = 0;
+    const n = src.length;
+    const at = (re) => { re.lastIndex = i; const m = re.exec(src); return m ? m[0] : null; };
+    const reWs = /\s+/y, reCom = /--[^\n]*|\/\*[\s\S]*?(?:\*\/|$)/y;
+    const reStr = /'(?:[^']|'')*'?|"(?:[^"]|"")*"?/y, reNum = /\d+(?:\.\d+)?\b/y, reId = /[A-Za-z_][\w$]*/y;
+    while (i < n) {
+      let t;
+      if ((t = at(reWs))) { out += esc(t); i += t.length; continue; }
+      if ((t = at(reCom))) { out += span('com', t); i += t.length; continue; }
+      if ((t = at(reStr))) { out += span('str', t); i += t.length; continue; }
+      if ((t = at(reNum))) { out += span('num', t); i += t.length; continue; }
+      if ((t = at(reId))) {
+        out += SQL_KW.has(t.toUpperCase()) ? span('kw', t) : esc(t);
+        i += t.length; continue;
+      }
+      out += span('punct', src[i]); i++;
+    }
+    return out;
+  }
+
   WD1.highlight = function (code, lang) {
     lang = (lang || 'html').toLowerCase();
     if (lang === 'css') return hlCSS(code);
     if (lang === 'js' || lang === 'javascript' || lang === 'json') return hlJS(code);
+    if (lang === 'sql') return hlSQL(code);
     if (lang === 'html' || lang === 'xml' || lang === 'svg') return hlHTML(code);
     return esc(code);
   };
@@ -1013,7 +1046,11 @@
       const need = Math.max(200, front.scrollHeight, back.scrollHeight);
       card.style.height = need + 'px';
     }
-    window.addEventListener('resize', fit);
+    function onResize() {
+      if (!el.isConnected) { window.removeEventListener('resize', onResize); return; }
+      fit();
+    }
+    window.addEventListener('resize', onResize);
     show();
   }
   WD1.flashcards = mountFlashcards;
@@ -1082,7 +1119,7 @@
     return {
       el: box, textarea: ta,
       get: () => ta.value,
-      set: (v) => { ta.value = v; paint(); if (opts.onInput) opts.onInput(v); },
+      set: (v, silent) => { ta.value = v; paint(); if (!silent && opts.onInput) opts.onInput(v); },
       focus: () => ta.focus()
     };
   };
@@ -1294,6 +1331,11 @@
       else if (line && !jsLine) where = ' (line ' + line + ')';
       send('error', [e.message + where]);
     });
+    window.addEventListener('unhandledrejection', function (e) {
+      var r = e.reason;
+      var msg = r instanceof Error ? r.name + ': ' + r.message : fmt(r);
+      send('error', ['Unhandled promise rejection: ' + msg]);
+    });
 
     var panel = null;
     function note(html) {
@@ -1412,8 +1454,9 @@
     if (el.dataset.preview === 'false') el.classList.add('console-only');
 
     const resetB = iconBtn('reset', 'Reset', 'ghost', () => {
+      clearTimeout(timer); clearTimeout(saveTimer);
       Object.assign(code, orig);
-      editors.forEach((ed, l) => ed.set(orig[l]));
+      editors.forEach((ed, l) => ed.set(orig[l], true));
       WD1.store.set('pg', id, undefined);
       run();
     });
@@ -1423,23 +1466,38 @@
     });
     frame(el, 'Playground', title, [resetB, openB]);
 
-    const tabs = h('div', { class: 'pg-tabs', role: 'tablist' });
+    const tabs = h('div', { class: 'pg-tabs', role: 'tablist', 'aria-label': 'Code editors' });
     const edCol = h('div', { class: 'pg-editor-col' }, tabs);
     const editors = new Map();
+    const uid = 'pg' + Math.random().toString(36).slice(2, 8);
     let active = langs[0];
-    langs.forEach((l) => {
-      const tab = h('button', { type: 'button', class: 'pg-tab', role: 'tab', 'aria-selected': String(l === active), text: LANG_LABEL[l],
-        onclick: () => select(l) });
+    langs.forEach((l, idx) => {
+      const tabId = uid + '-t-' + l, panelId = uid + '-p-' + l;
+      const tab = h('button', {
+        type: 'button', class: 'pg-tab', role: 'tab', id: tabId, 'aria-controls': panelId,
+        'aria-selected': String(l === active), tabindex: l === active ? '0' : '-1', text: LANG_LABEL[l],
+        onclick: () => select(l)
+      });
+      tab.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight') { e.preventDefault(); select(langs[(idx + 1) % langs.length], true); }
+        if (e.key === 'ArrowLeft') { e.preventDefault(); select(langs[(idx - 1 + langs.length) % langs.length], true); }
+      });
       tabs.appendChild(tab);
-      const holder = h('div', { style: { display: 'flex', flexDirection: 'column', flex: '1' }, hidden: l !== active });
+      const holder = h('div', { id: panelId, role: 'tabpanel', 'aria-labelledby': tabId, style: { display: 'flex', flexDirection: 'column', flex: '1' }, hidden: l !== active });
       edCol.appendChild(holder);
       const ed = WD1.editor(holder, { value: code[l], lang: l, height, onInput: (v) => { code[l] = v; schedule(); saveSoon(); } });
       ed.holder = holder; ed.tab = tab;
       editors.set(l, ed);
     });
-    function select(l) {
+    function select(l, focusTab) {
       active = l;
-      editors.forEach((ed, k) => { ed.holder.hidden = k !== l; ed.tab.setAttribute('aria-selected', String(k === l)); });
+      editors.forEach((ed, k) => {
+        const on = k === l;
+        ed.holder.hidden = !on;
+        ed.tab.setAttribute('aria-selected', String(on));
+        ed.tab.tabIndex = on ? 0 : -1;
+      });
+      if (focusTab) editors.get(l).tab.focus();
     }
 
     const iframe = WD1.previewFrame(title + ' preview', true);
@@ -1523,12 +1581,12 @@
     function build() {
       el.innerHTML = '';
       el.classList.add('widget', 'match');
-      const status = h('span', { class: 'muted small' });
+      const status = h('span', { class: 'muted small', role: 'status' });
       frame(el, 'Match', title, [iconBtn('reset', 'Reset', 'ghost', build)]);
       const left = h('div', { class: 'match-col' }, h('span', { class: 'match-col-title', text: data.leftTitle || 'Term' }));
       const right = h('div', { class: 'match-col' }, h('span', { class: 'match-col-title', text: data.rightTitle || 'Matches' }));
       let sel = null, matched = 0, misses = 0;
-      const mk = (text, k, side) => h('button', { type: 'button', class: 'match-item ' + (side === 'L' ? 'term' : ''), dataset: { k, side } },
+      const mk = (text, k, side) => h('button', { type: 'button', class: 'match-item ' + (side === 'L' ? 'term' : ''), 'aria-pressed': 'false', dataset: { k, side } },
         h('span', { class: 'm-badge', text: side === 'L' ? String(k + 1) : '·' }), h('span', { html: WD1.fmt(text) }));
       const L = pairs.map((p, k) => mk(p[0], k, 'L'));
       const R = WD1.shuffle(pairs.map((p, k) => mk(p[1], k, 'R')));
@@ -1538,12 +1596,12 @@
       const onClick = (b) => {
         if (b.classList.contains('matched')) return;
         if (!sel || sel.dataset.side === b.dataset.side) {
-          if (sel) sel.classList.remove('selected');
+          if (sel) { sel.classList.remove('selected'); sel.setAttribute('aria-pressed', 'false'); }
           sel = sel === b ? null : b;
-          if (sel) sel.classList.add('selected');
+          if (sel) { sel.classList.add('selected'); sel.setAttribute('aria-pressed', 'true'); }
           return;
         }
-        const a = sel; sel = null; a.classList.remove('selected');
+        const a = sel; sel = null; a.classList.remove('selected'); a.setAttribute('aria-pressed', 'false');
         if (a.dataset.k === b.dataset.k) {
           matched++;
           [a, b].forEach((x) => { x.classList.add('matched', 'pop'); x.disabled = true; $('.m-badge', x).textContent = String(+x.dataset.k + 1); });
@@ -1657,19 +1715,20 @@
       let armed = null, dragChip = null;
       const zones = [];
       const arm = (chip) => {
-        if (armed) armed.classList.remove('selected');
+        if (armed) { armed.classList.remove('selected'); armed.setAttribute('aria-pressed', 'false'); }
         armed = armed === chip ? null : chip;
-        if (armed) armed.classList.add('selected');
+        if (armed) { armed.classList.add('selected'); armed.setAttribute('aria-pressed', 'true'); }
         zones.forEach((z) => z.classList.toggle('armed', !!armed));
       };
       const place = (chip, zone) => {
         chip.classList.remove('selected', 'right', 'wrong');
+        chip.setAttribute('aria-pressed', 'false');
         unmark(chip);
         (zone ? $('.bk-bucket-items', zone) : pool).appendChild(chip);
         armed = null; zones.forEach((z) => z.classList.remove('armed'));
       };
       WD1.shuffle(items.map((it, k) => k)).forEach((k) => {
-        const chip = h('button', { type: 'button', class: 'bk-chip' + (mono ? ' mono' : ''), draggable: 'true', dataset: { k },
+        const chip = h('button', { type: 'button', class: 'bk-chip' + (mono ? ' mono' : ''), draggable: 'true', 'aria-pressed': 'false', dataset: { k },
           html: mono ? esc(items[k][0]) : WD1.fmt(items[k][0]) });
         chip.addEventListener('click', (e) => { e.stopPropagation(); arm(chip); });
         chip.addEventListener('dragstart', (e) => { dragChip = chip; try { e.dataTransfer.setData('text/plain', ''); } catch (err) { /* ignore */ } });
@@ -1680,11 +1739,16 @@
       pool.addEventListener('dragover', (e) => { if (dragChip) e.preventDefault(); });
       pool.addEventListener('drop', (e) => { e.preventDefault(); if (dragChip) place(dragChip, null); });
       const grid = h('div', { class: 'bk-grid' });
-      buckets.forEach((name) => {
-        const zone = h('div', { class: 'bk-bucket', role: 'button', tabindex: '0', dataset: { bucket: name }, 'aria-label': 'Place selected item in ' + name },
-          h('span', { class: 'bk-bucket-title', html: WD1.fmt(name) }), h('div', { class: 'bk-bucket-items' }));
+      const uid = 'bk' + Math.random().toString(36).slice(2, 8);
+      buckets.forEach((name, idx) => {
+        const titleId = uid + '-b' + idx;
+        const headBtn = h('button', { type: 'button', class: 'bk-bucket-head', 'aria-label': 'Place selected item in ' + name },
+          h('span', { class: 'bk-bucket-title', id: titleId, html: WD1.fmt(name) }),
+          h('span', { class: 'bk-place-hint', 'aria-hidden': 'true', text: 'Place here' }));
+        const zone = h('div', { class: 'bk-bucket', role: 'region', 'aria-labelledby': titleId, dataset: { bucket: name } },
+          headBtn, h('div', { class: 'bk-bucket-items' }));
+        headBtn.addEventListener('click', (e) => { e.stopPropagation(); if (armed) place(armed, zone); });
         zone.addEventListener('click', () => { if (armed) place(armed, zone); });
-        zone.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && armed) { e.preventDefault(); place(armed, zone); } });
         zone.addEventListener('dragover', (e) => { if (dragChip) { e.preventDefault(); zone.classList.add('over'); } });
         zone.addEventListener('dragleave', () => zone.classList.remove('over'));
         zone.addEventListener('drop', (e) => { e.preventDefault(); zone.classList.remove('over'); if (dragChip) place(dragChip, zone); });
@@ -1708,9 +1772,10 @@
           if (right === items.length) WD1.toast('All sorted!');
         } }),
         h('button', { type: 'button', class: 'btn small ghost', text: 'Show answers', onclick: () => {
+          armed = null; zones.forEach((z) => z.classList.remove('armed'));
           $$('.bk-chip', el).forEach((c) => {
             const z = zones.find((x) => x.dataset.bucket === items[c.dataset.k][1]);
-            if (z) { $('.bk-bucket-items', z).appendChild(c); c.classList.remove('wrong', 'selected'); c.classList.add('right'); mark(c, true, '(correct category)'); }
+            if (z) { $('.bk-bucket-items', z).appendChild(c); c.classList.remove('wrong', 'selected'); c.setAttribute('aria-pressed', 'false'); c.classList.add('right'); mark(c, true, '(correct category)'); }
           });
           status.textContent = 'Answers shown.'; status.className = 'small muted';
         } }),

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Final Project · Web Dev II</title>
 <meta name="description" content="The Web Development II final project: one full-stack web app, built a milestone at a time — Express server, REST API, database persistence, and logins with roles.">
 <link rel="stylesheet" href="../assets/css/course.css">
@@ -49,8 +49,8 @@
     <h2 id="m1-h">Milestone 1 · A Running Server</h2>
     <p><strong>Goal:</strong> a Node project with an Express server that starts cleanly and answers real routes. This is the skeleton everything else hangs on.</p>
     <p><strong>Builds on:</strong> Week 1 — Node, the http module, npm, Express, GET and POST.</p>
-    <div class="table-wrap"><table class="data">
-      <thead><tr><th>Requirement</th><th>What "done" looks like</th></tr></thead>
+    <div class="table-wrap"><table class="data-table">
+      <thead><tr><th scope="col">Requirement</th><th scope="col">What "done" looks like</th></tr></thead>
       <tbody>
         <tr><td>Project setup</td><td><code>npm init</code> done; <code>express</code> in <code>dependencies</code>; a <code>start</code> script in package.json</td></tr>
         <tr><td>Server</td><td><code>node</code> starts it with no errors; it listens on a port taken from <code>process.env.PORT</code> with a sensible default</td></tr>
@@ -108,8 +108,8 @@
     <h2 id="m2-h">Milestone 2 · API and Front End</h2>
     <p><strong>Goal:</strong> your main collection becomes a small REST API, and a web page uses it. For now the data can live in memory — Week 3 makes it permanent.</p>
     <p><strong>Builds on:</strong> Week 2 — routing in depth, middleware, REST design, single-page front ends.</p>
-    <div class="table-wrap"><table class="data">
-      <thead><tr><th>Requirement</th><th>What "done" looks like</th></tr></thead>
+    <div class="table-wrap"><table class="data-table">
+      <thead><tr><th scope="col">Requirement</th><th scope="col">What "done" looks like</th></tr></thead>
       <tbody>
         <tr><td>REST endpoints</td><td>GET all, GET one by id, POST, PUT, DELETE for your main collection, with nouns-not-verbs paths like <code>/api/books</code></td></tr>
         <tr><td>Status codes</td><td>201 on create, 204 on delete, 404 with a JSON error when an id does not exist</td></tr>
@@ -168,8 +168,8 @@
     <h2 id="m3-h">Milestone 3 · Real Persistence</h2>
     <p><strong>Goal:</strong> restart your server and your data is still there. Your API now reads and writes a real database — MongoDB or MySQL, your choice — and refuses bad data.</p>
     <p><strong>Builds on:</strong> Week 3 — cookies and sessions, relational vs non-relational databases, CRUD, validation and configuration.</p>
-    <div class="table-wrap"><table class="data">
-      <thead><tr><th>Requirement</th><th>What "done" looks like</th></tr></thead>
+    <div class="table-wrap"><table class="data-table">
+      <thead><tr><th scope="col">Requirement</th><th scope="col">What "done" looks like</th></tr></thead>
       <tbody>
         <tr><td>Database</td><td>Main collection stored in MongoDB or MySQL; all five API operations use the database, not an in-memory array</td></tr>
         <tr><td>Safe queries</td><td>MySQL: every query uses placeholders — no user input glued into SQL strings. MongoDB: filters built from validated fields only</td></tr>
@@ -228,8 +228,8 @@
     <h2 id="m4-h">Milestone 4 · Accounts and Roles</h2>
     <p><strong>Goal:</strong> your app knows who is using it and what they may do. This is the finished full-stack application — the course in one project.</p>
     <p><strong>Builds on:</strong> Week 4 — authentication, sessions, hashing, roles and protected routes, security hygiene.</p>
-    <div class="table-wrap"><table class="data">
-      <thead><tr><th>Requirement</th><th>What "done" looks like</th></tr></thead>
+    <div class="table-wrap"><table class="data-table">
+      <thead><tr><th scope="col">Requirement</th><th scope="col">What "done" looks like</th></tr></thead>
       <tbody>
         <tr><td>Accounts</td><td>Register and log in; passwords stored only as salted hashes (never plain text, never reversible); a new account's role is set by the server, never read from the sign-up form</td></tr>
         <tr><td>Sessions</td><td>Login creates a session; the browser carries only the session ID cookie; logout truly ends it</td></tr>
@@ -286,8 +286,8 @@
   <section class="lesson" id="rubric" aria-labelledby="rubric-h">
     <h2 id="rubric-h">How the project is graded</h2>
     <p>One hundred points across the four milestones (20 + 25 + 25 + 30). Within each milestone, the same four questions are asked:</p>
-    <div class="table-wrap"><table class="data">
-      <thead><tr><th>Criterion</th><th>What earns the points</th></tr></thead>
+    <div class="table-wrap"><table class="data-table">
+      <thead><tr><th scope="col">Criterion</th><th scope="col">What earns the points</th></tr></thead>
       <tbody>
         <tr><td>It runs (40%)</td><td>Starts cleanly from the README steps and behaves as specified — routes answer, data persists, logins work</td></tr>
         <tr><td>It is correct (30%)</td><td>The week's concepts are used the way the course teaches them: REST shapes, middleware order, safe queries, hashed passwords, server-side checks</td></tr>

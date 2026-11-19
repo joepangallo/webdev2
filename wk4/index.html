@@ -10,10 +10,12 @@
   <style>
     /* ===== Week 4 page styles. Every selector is prefixed c4- ===== */
     .c4-flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; margin: 14px 0; }
-    .c4-flow .c4-node { flex: 1 1 130px; border: 1.5px solid var(--line-2); border-radius: 10px; padding: 10px 12px; background: var(--surface); font-size: .88rem; }
+    .c4-flow .c4-node { flex: 1 1 130px; border: 1.5px solid var(--line-2); border-radius: 10px; padding: 10px 12px; background: var(--surface); font-size: .88rem; transition: opacity .25s, border-color .25s, background .25s; }
     .c4-flow .c4-node b { display: block; font-size: .92rem; margin-bottom: 2px; }
     .c4-flow .c4-node span { color: var(--ink-3); font-size: .8rem; line-height: 1.35; display: block; }
-    .c4-flow .c4-node.on { border-color: var(--mod); background: color-mix(in srgb, var(--mod) 12%, var(--surface)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--mod) 35%, transparent); }
+    .stepper-stage .c4-node { opacity: .28; }
+    .stepper-stage .c4-node.on { opacity: 1; }
+    .stepper-stage .c4-node.active { border-color: var(--mod); background: color-mix(in srgb, var(--mod) 12%, var(--surface)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--mod) 35%, transparent); }
     .c4-token { font-family: var(--font-mono); font-size: .86rem; line-height: 1.7; overflow-wrap: anywhere; padding: 12px 14px; background: var(--code-bg); border: 1px solid var(--code-line); border-radius: 8px; color: var(--code-ink); }
     .c4-token .h { color: var(--bad); font-weight: 700; }
     .c4-token .p { color: var(--accent); font-weight: 700; }
@@ -33,7 +35,7 @@
 
 <aside class="callout listen">
   <strong>Listen: the Week 4 audio companion</strong>
-  <p>This episode explains how apps know who you are and what you are allowed to do: hashed passwords, sessions, tokens, and roles — plus the security habits that keep it all safe.</p>
+  <p>This episode explains how apps know who you are and what you are allowed to do: hashed passwords, sessions, tokens, and roles — plus the security habits that keep it all safe. (The hands-on exercises on this page have been updated since the recording, so follow the page instructions when you reach the playgrounds.)</p>
   <audio controls preload="metadata" src="../audio/wk4.mp3" style="width:100%"></audio>
   <p class="small"><a href="../audio/wk4-transcript.txt">Read the episode transcript</a> (text file).</p>
 </aside>
@@ -574,15 +576,15 @@ console.log('Two parts only:', JSON.stringify(decodeToken(twoParts)));</textarea
       // POST /register — create an account. Every new account starts as a student.
       app.post('/register', async (req, res) => {
         const { username, password } = req.body || {};
-        if (typeof username !== 'string' || typeof password !== 'string'
-            || !username || password.length < 15) {
+        const name = typeof username === 'string' ? username.trim() : '';
+        if (!name || typeof password !== 'string' || password.length < 15) {
           return res.status(400).send('Choose a username, and a password of at least 15 characters');
         }
-        if (await findUser(username)) {
+        if (await findUser(name)) {
           return res.status(409).send('That username is taken');
         }
         await createUser({
-          username,
+          username: name,
           password_hash: await hashPassword(password),
           role: 'student'                             // never from req.body
         });
@@ -902,16 +904,16 @@ function requireRole(...roles) {
 
       const router = express.Router();
 
-      // Create one book for the signed-in user.
-      router.post('/api/books', requireLogin, async (req, res) => {
+      // Mounted at /api/books in server.js, so '/' here means POST /api/books.
+      router.post('/', requireLogin, async (req, res) => {
         const { title, author } = req.body || {};   // no JSON body at all: same 400
-        if (!title || !author) {
+        if (typeof title !== 'string' || !title.trim() || typeof author !== 'string' || !author.trim()) {
           return res.status(400).json({ error: 'title and author are required' });
         }
         // The owner comes from the session — never from the request body.
         const book = await db.insertBook({
-          title,
-          author,
+          title: title.trim(),
+          author: author.trim(),
           ownerId: req.session.userId
         });
         res.status(201).json(book);

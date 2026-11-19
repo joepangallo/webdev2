@@ -190,10 +190,44 @@ test('solving a challenge is recorded once, and only after the code was changed'
   assert.equal(solved.toast, 'Challenge complete!');
   assert.deepEqual(solved.last, { passed: 2, total: 2, complete: true });
 
-  // Reset puts the starter back: checks go red again, the earned record stays.
-  await page.eval(`Array.from(${sel}.querySelectorAll('.widget-actions button')).find((b) => /Reset/.test(b.textContent)).click()`);
-  await page.waitFor(`${sel}.querySelectorAll('.pg-checks li.fail').length === 1`);
-  assert.deepEqual(await page.eval(`({ complete: !!${sel}.querySelector('.all-pass'), done: typeof WD1.store.get('challenge', 'demo-pg'), saved: WD1.store.get('pg', 'demo-pg') === undefined })`), { complete: false, done: 'number', saved: true });
+  // Reset puts the starter back: checks go red again, the earned record stays, and Reset does not re-save or double-load.
+  const reset = await page.eval(`(async () => {
+    let loads = 0;
+    ${sel}.querySelector('iframe').addEventListener('load', () => loads++);
+    Array.from(${sel}.querySelectorAll('.widget-actions button')).find((b) => /Reset/.test(b.textContent)).click();
+    await new Promise((r) => setTimeout(r, 900));
+    return {
+      fail: ${sel}.querySelectorAll('.pg-checks li.fail').length,
+      complete: !!${sel}.querySelector('.all-pass'),
+      done: typeof WD1.store.get('challenge', 'demo-pg'),
+      saved: WD1.store.get('pg', 'demo-pg') === undefined,
+      loads
+    };
+  })()`);
+  assert.deepEqual(reset, { fail: 1, complete: false, done: 'number', saved: true, loads: 1 });
+});
+
+test('all nine lesson challenges can be solved as described', async () => {
+  const solutions = [
+    ['wk1/index.html', 0, 'js', `function respond(path) {\n  if (path === '/') return 'Home page';\n  if (path === '/about') return 'About page';\n  if (path === '/contact') return 'Contact page';\n  return 'Page not found';\n}`],
+    ['wk1/index.html', 1, 'html', `<h1>Sign up</h1><form method="post" action="/signup"><input name="name" value="Ada"><select name="plan"><option value="free" selected>Free</option></select><input name="coupon" value="SAVE10"><button>Sign up</button></form>`],
+    ['wk1/index.html', 2, 'js', `function greet(name) { if (!name) throw new Error('A name is required'); return 'Hello, ' + name + '!'; }\nfunction safeGreet(name) { try { return greet(name); } catch (err) { return 'Caught: ' + err.message; } }`],
+    ['wk2/index.html', 0, 'js', `function parseUrl(url) { const q = url.indexOf('?'), path = q === -1 ? url : url.slice(0, q), query = {}; if (q !== -1) url.slice(q + 1).split('&').forEach((p) => { const eq = p.indexOf('='); if (eq === -1) return; const k = p.slice(0, eq), v = p.slice(eq + 1); query[k] = k in query ? (Array.isArray(query[k]) ? [...query[k], v] : [query[k], v]) : v; }); return { path, segments: path.split('/').filter(Boolean), query }; }`],
+    ['wk2/index.html', 1, 'js', `let books = [], nextId = 1; const list = document.getElementById('book-list'); function loadBooks() { books = [{ id: 1, title: 'Dune', author: 'Frank Herbert' }, { id: 2, title: 'Emma', author: 'Jane Austen' }]; nextId = 3; render(); } function render() { list.replaceChildren(); books.forEach((b) => { const li = document.createElement('li'); li.dataset.id = b.id; const s = document.createElement('strong'); s.textContent = b.title; li.append(s, ' by ' + b.author); list.appendChild(li); }); } function addBook(t, a) { if (!t || !a) return; books.push({ id: nextId++, title: t, author: a }); render(); } loadBooks();`],
+    ['wk3/index.html', 0, 'js', `function parseCookies(h) { const c = {}; for (const p of String(h).split(';')) { const eq = p.indexOf('='); if (eq === -1) continue; c[p.slice(0, eq).trim()] = p.slice(eq + 1).trim(); } return c; }`],
+    ['wk3/index.html', 1, 'js', `function validateBook(b) { const e = []; if (!b || typeof b !== 'object') return ['Send a book object.']; if (typeof b.title !== 'string' || !b.title.trim()) e.push('Title'); else if (b.title.trim().length > 100) e.push('Title'); if (typeof b.author !== 'string' || !b.author.trim()) e.push('Author'); else if (b.author.trim().length > 60) e.push('Author'); if (!Number.isInteger(b.year)) e.push('Year'); else if (b.year < 1000 || b.year > 2100) e.push('Year'); return e; }`],
+    ['wk4/index.html', 0, 'js', `function decodePart(p) { const b = p.replace(/-/g, '+').replace(/_/g, '/'); return JSON.parse(atob(b + '='.repeat((4 - (b.length % 4)) % 4))); }\nfunction decodeToken(t) { const ps = t.split('.'); if (ps.length !== 3) return null; return { header: decodePart(ps[0]), payload: decodePart(ps[1]) }; }`],
+    ['wk4/index.html', 1, 'js', `const PERMISSIONS = { student: ['view courses', 'view grades', 'submit homework'], instructor: ['view courses', 'view grades', 'submit homework', 'edit grades'], admin: ['view courses', 'view grades', 'submit homework', 'edit grades', 'delete course', 'manage users'] };\nfunction can(r, a) { return Array.isArray(PERMISSIONS[r]) && PERMISSIONS[r].includes(a); }`]
+  ];
+  let loaded = null;
+  for (const [rel, idx, lang, code] of solutions) {
+    if (loaded !== rel) { await fresh(rel); loaded = rel; }
+    await page.eval(`(() => { const pg = document.querySelectorAll('.playground')[${idx}]; pg.scrollIntoView(); pg.wd1.set(${JSON.stringify(lang)}, ${JSON.stringify(code)}); })()`);
+    await page.waitFor(`!!document.querySelectorAll('.playground')[${idx}].querySelector('.all-pass')`);
+    const r = await page.eval(`(() => { const pg = document.querySelectorAll('.playground')[${idx}]; return { fail: pg.querySelectorAll('.pg-checks li.fail').length, pass: pg.querySelectorAll('.pg-checks li.pass').length }; })()`);
+    assert.equal(r.fail, 0, `${rel} challenge ${idx + 1} has failing checks`);
+    assert.ok(r.pass >= 4, `${rel} challenge ${idx + 1} passed checks`);
+  }
 });
 
 /* ---------- playground: handoff, sharing, sandbox ---------- */
@@ -357,7 +391,7 @@ test('console output, error lines and form reports cross the sandbox as plain te
     "console.warn(document.querySelector('h1'));",
     "console.info('<img src=x onerror=alert(1)>');",
     "document.querySelector('form').requestSubmit();",
-    "",
+    "Promise.reject(new Error('async boom'));",
     "undefinedFunction();"
   ].join('\n');
   const r = await page.eval(`(async () => {
@@ -373,6 +407,7 @@ test('console output, error lines and form reports cross the sandbox as plain te
   assert.equal(text[2], '› <img src=x onerror=alert(1)>');
   assert.equal(r.imgs, 0, 'console text is never parsed as HTML');
   assert.ok(text.some((t) => /^› Form submitted: GET \/subscribe · email=ana%40example\.com/.test(t)), JSON.stringify(text));
+  assert.ok(text.some((t) => /Unhandled promise rejection: Error: async boom/.test(t)), JSON.stringify(text));
   assert.ok(text.some((t) => /^✖ .*undefinedFunction is not defined \(JS line 6\)$/.test(t)), JSON.stringify(text));
   assert.ok(r.lines.find((l) => /undefinedFunction/.test(l.text)).cls.includes('error'));
 
@@ -514,7 +549,7 @@ test('right and wrong are shown with marks and words, not color alone', async ()
     press(bk, 'Check'); const early = bk.querySelector('[role=status]').textContent;
     chips.forEach((c) => { c.click(); zones[0].click(); }); press(bk, 'Check');
     const b = { early, status: bk.querySelector('[role=status]').textContent, wrong: bk.querySelectorAll('.bk-chip.wrong').length, marked: bk.querySelectorAll('.bk-chip.wrong > .mark-bad').length,
-      zoneRole: zones[0].getAttribute('role'), zoneTab: zones[0].tabIndex };
+      zoneRole: zones[0].getAttribute('role'), headTag: zones[0].querySelector('.bk-bucket-head').tagName, nestedBtns: bk.querySelectorAll('button button, [role=button] button').length };
     return { o, f, b };
   })()`);
   assert.ok(acts.o.wrong >= 1 && acts.o.marked === acts.o.wrong, 'every misplaced item carries a ✗');
@@ -529,7 +564,7 @@ test('right and wrong are shown with marks and words, not color alone', async ()
   assert.match(acts.b.early, /^Place every item first/);
   assert.ok(acts.b.wrong >= 1 && acts.b.marked === acts.b.wrong, 'every mis-sorted item carries a ✗');
   assert.match(acts.b.status, /Move the ones marked ✗\.$/, 'the hint does not rely on color');
-  assert.deepEqual([acts.b.zoneRole, acts.b.zoneTab], ['button', 0]);
+  assert.deepEqual([acts.b.zoneRole, acts.b.headTag, acts.b.nestedBtns], ['region', 'BUTTON', 0]);
 });
 
 test('controls are large enough to tap and the shell is navigable', async () => {
@@ -554,19 +589,31 @@ test('controls are large enough to tap and the shell is navigable', async () => 
   assert.ok(r.current);
 });
 
-test('theme choice is applied and remembered', async () => {
+test('theme choice is applied, remembered, and kept in sync on import and reset', async () => {
   await fresh('glossary.html');
   const r = await page.eval(`(() => {
     const b = document.querySelector('.theme-toggle'); const before = document.documentElement.getAttribute('data-theme');
     b.click(); const first = document.documentElement.getAttribute('data-theme'); const label = b.getAttribute('aria-label');
-    return { before, first, label, saved: JSON.parse(localStorage.getItem('wd2:v1')).prefs.theme };
+    WD1.toast('Done', 'visited');
+    const toastColor = getComputedStyle(document.querySelector('.toast.visited')).color;
+    return { before, first, label, toastColor, saved: JSON.parse(localStorage.getItem('wd2:v1')).prefs.theme };
   })()`);
   assert.equal(r.before, null);
   assert.ok(['dark', 'light'].includes(r.first));
   assert.equal(r.saved, r.first);
   assert.match(r.label, /^Switch to (light|dark) theme$/);
+  if (r.first === 'dark') assert.notEqual(r.toastColor, 'rgb(255, 255, 255)', 'dark-mode visited toast uses dark ink for contrast');
   await page.goto(server.url + 'index.html');
   assert.equal(await page.eval(`document.documentElement.getAttribute('data-theme')`), r.first, 'the choice follows the visitor to other pages');
+  const sync = await page.eval(`(() => {
+    WD1.store.reset();
+    const afterReset = { theme: document.documentElement.getAttribute('data-theme'), label: document.querySelector('.theme-toggle').getAttribute('aria-label') };
+    WD1.store.importJSON(JSON.stringify({ done: {}, prefs: { theme: 'dark' }, challengeRev: 2 }));
+    const afterImport = { theme: document.documentElement.getAttribute('data-theme'), label: document.querySelector('.theme-toggle').getAttribute('aria-label') };
+    return { afterReset, afterImport };
+  })()`);
+  assert.equal(sync.afterReset.theme, null);
+  assert.deepEqual(sync.afterImport, { theme: 'dark', label: 'Switch to light theme' });
 });
 
 /* ---------- every widget, by pointer, keyboard and drag ---------- */
@@ -687,7 +734,9 @@ test('code samples: highlighted, and copied with a fallback when the clipboard i
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: (t) => { copied = t; return Promise.resolve(); } } });
     btn.click(); await new Promise((r) => setTimeout(r, 50));
     const ok = { label: btn.textContent, firstLine: copied.split(String.fromCharCode(10))[0], hasScriptEnd: copied.includes('</scr' + 'ipt>') };
-    await new Promise((r) => setTimeout(r, 1500));
+    // Double-clicking Copy while "Copied" is showing must still restore "Copy".
+    btn.click();
+    await new Promise((r) => setTimeout(r, 1550));
     ok.restored = btn.textContent;
 
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: () => Promise.reject(new Error('denied')) } });
@@ -717,13 +766,17 @@ test('code editor: Tab, Shift+Tab, Enter indentation, and Escape to leave', asyn
     const pg = document.querySelector('.playground[data-id="demo-pg"]');
     const NL = String.fromCharCode(10);
     const tabs = Array.from(pg.querySelectorAll('.pg-tab'));
+    const panels = Array.from(pg.querySelectorAll('[role=tabpanel]'));
+    const tabsWired = tabs.every((t, i) => t.getAttribute('aria-controls') === panels[i].id && panels[i].getAttribute('aria-labelledby') === t.id);
+    tabs[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+    const arrowSelected = tabs.map((t) => t.getAttribute('aria-selected'));
     tabs.find((t) => t.textContent === 'CSS').click();
     const shown = Array.from(pg.querySelectorAll('.pg-editor-col textarea')).map((t) => !t.closest('[hidden]'));
     const selected = tabs.map((t) => t.getAttribute('aria-selected'));
     const ta = pg.querySelectorAll('.pg-editor-col textarea')[1];
     const key = (k, extra) => { const e = new KeyboardEvent('keydown', Object.assign({ key: k, bubbles: true, cancelable: true }, extra || {})); ta.dispatchEvent(e); return e.defaultPrevented; };
     const set = (v, at) => { ta.focus(); ta.value = v; ta.setSelectionRange(at == null ? v.length : at, at == null ? v.length : at); };
-    const out = { shown, selected };
+    const out = { tabsWired, arrowSelected, shown, selected };
     set('h1 {'); key('Enter'); out.afterBrace = ta.value;
     set('h1 {}', 4); key('Enter'); out.between = ta.value; out.caret = ta.selectionStart;
     set('a'); out.tabPrevented = key('Tab'); out.afterTab = ta.value;
@@ -743,6 +796,8 @@ test('code editor: Tab, Shift+Tab, Enter indentation, and Escape to leave', asyn
     out.painted = pg.querySelector('.code-editor pre').innerHTML.includes('tk-');
     return JSON.parse(JSON.stringify(out).split(NL).join('|'));
   })()`);
+  assert.ok(r.tabsWired, 'playground tabs and tabpanels reference each other');
+  assert.deepEqual(r.arrowSelected.slice(0, 2), ['false', 'true']);
   assert.deepEqual(r.shown, [false, true, false].slice(0, r.shown.length));
   assert.deepEqual(r.selected.slice(0, 2), ['false', 'true']);
   assert.equal(r.afterBrace, 'h1 {\n  ');
@@ -851,10 +906,10 @@ test('match: a miss is counted and shown, and Reset starts over', async () => {
     const m = document.querySelector('.match');
     const L = (k) => m.querySelector('.match-item[data-side=L][data-k="' + k + '"]'), R = (k) => m.querySelector('.match-item[data-side=R][data-k="' + k + '"]');
     const status = () => m.querySelector('.widget-foot').textContent;
-    const out = { start: status() };
-    L(0).click(); out.selected = L(0).classList.contains('selected');
-    L(1).click(); out.switched = [L(0).classList.contains('selected'), L(1).classList.contains('selected')];
-    L(1).click(); out.deselected = L(1).classList.contains('selected');
+    const out = { start: status(), role: m.querySelector('.widget-foot [role=status]').getAttribute('role') };
+    L(0).click(); out.selected = L(0).classList.contains('selected') && L(0).getAttribute('aria-pressed') === 'true';
+    L(1).click(); out.switched = [L(0).classList.contains('selected'), L(1).classList.contains('selected'), L(0).getAttribute('aria-pressed'), L(1).getAttribute('aria-pressed')];
+    L(1).click(); out.deselected = L(1).classList.contains('selected') || L(1).getAttribute('aria-pressed') === 'true';
     L(0).click(); R(2).click(); out.miss = { status: status(), shake: R(2).classList.contains('shake') };
     L(0).click(); R(0).click(); out.hit = { status: status(), disabled: L(0).disabled && R(0).disabled, badge: R(0).querySelector('.m-badge').textContent };
     L(0).click(); out.matchedIgnored = L(0).classList.contains('selected');
@@ -865,8 +920,9 @@ test('match: a miss is counted and shown, and Reset starts over', async () => {
     return out;
   })()`);
   assert.equal(r.start, '0 of 4 matched');
+  assert.equal(r.role, 'status');
   assert.ok(r.selected);
-  assert.deepEqual(r.switched, [false, true]);
+  assert.deepEqual(r.switched, [false, true, 'false', 'true']);
   assert.equal(r.deselected, false);
   assert.deepEqual(r.miss, { status: '0 of 4 matched · 1 miss', shake: true });
   assert.deepEqual(r.hit, { status: '1 of 4 matched', disabled: true, badge: '1' });
@@ -912,18 +968,21 @@ test('order and sort: arrow buttons, drag and drop, keyboard placement', async (
     drag(zones[0], 'dragover'); drag(zones[0], 'drop'); drag(chip('HTTP'), 'dragend'); out.dropped = where('HTTP');
     drag(chip('HTTP'), 'dragstart'); out.poolOver = drag(pool, 'dragover'); drag(pool, 'drop'); drag(chip('HTTP'), 'dragend'); out.backToPool = where('HTTP');
     out.idleOver = drag(zones[1], 'dragover');
-    chip('TCP').click(); out.armed = zones.every((z) => z.classList.contains('armed'));
-    zones[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); out.keyboard = where('TCP');
-    chip('UDP').click(); zones[1].dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true })); out.space = where('UDP');
+    chip('TCP').click(); out.armed = zones.every((z) => z.classList.contains('armed')) && chip('TCP').getAttribute('aria-pressed') === 'true';
+    zones[1].querySelector('.bk-bucket-head').click(); out.keyboard = where('TCP');
+    chip('UDP').click(); zones[1].querySelector('.bk-bucket-head').click(); out.space = where('UDP');
     chip('UDP').click(); pool.click(); out.returned = where('UDP');
-    chip('IP').click(); chip('IP').click(); out.disarmed = !chip('IP').classList.contains('selected') && !zones[0].classList.contains('armed');
+    chip('IP').click(); chip('IP').click(); out.disarmed = !chip('IP').classList.contains('selected') && chip('IP').getAttribute('aria-pressed') === 'false' && !zones[0].classList.contains('armed');
+    chip('IP').click();
+    Array.from(bk.querySelectorAll('button')).find((b) => b.textContent === 'Show answers').click();
+    out.showClearsArmed = !zones.some((z) => z.classList.contains('armed')) && chip('IP').getAttribute('aria-pressed') === 'false';
     Array.from(bk.querySelectorAll('.widget-actions button')).find((b) => /Reset/.test(b.textContent)).click();
     out.reset = document.querySelectorAll('.buckets .bk-pool .bk-chip').length;
     return out;
   })()`);
   assert.deepEqual(r, { up: true, down: true, upAtTop: true, dragging: true, overPrevented: true, dropAfter: true, leftClean: true, dropBefore: true, moved: true, cleaned: 0,
     selfOver: false, reshuffled: 8, explain: true, zoneOver: true, overCls: true, overCleared: true, dropped: 'Application', poolOver: true, backToPool: 'pool', idleOver: false,
-    armed: true, keyboard: 'Transport', space: 'Transport', returned: 'pool', disarmed: true, reset: 7 });
+    armed: true, keyboard: 'Transport', space: 'Transport', returned: 'pool', disarmed: true, showClearsArmed: true, reset: 7 });
 });
 
 test('fill in the blanks: Enter checks, alternatives count, Clear resets', async () => {
@@ -1002,23 +1061,41 @@ test('hub: objectives matrix, live demo and reset', async () => {
     const frame = document.querySelector('#hub-try iframe'); out.sandbox = frame.getAttribute('sandbox');
     const ta = document.querySelector('#hub-try textarea'); ta.value = '<h1>Mine</h1><ul id="list"></ul>'; ta.dispatchEvent(new Event('input')); await wait(500);
     out.saved = WD1.store.get('custom', 'hub-try');
-    WD1.progress.setDone('s1-1', true, true);
+    WD1.store.importJSON(JSON.stringify({ done: { 's1-1': 1 }, last: { module: 'wk1', section: 's1-2', t: 1 }, quiz: { bad: { best: 1, total: 0 } }, prefs: { theme: 'dark' }, challengeRev: 2 }));
+    out.badQuizAvg = document.querySelector('#hub-avg').textContent;
     let downloaded = null; const realClick = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { downloaded = this.download; };
     document.querySelector('#hub-export').click(); HTMLAnchorElement.prototype.click = realClick; out.exportName = /^webdev2-progress-\\d{4}-\\d{2}-\\d{2}\\.json$/.test(downloaded);
     document.querySelector('#hub-reset').click(); out.confirm = document.querySelector('#hub-reset-wrap').textContent.slice(0, 30);
     Array.from(document.querySelectorAll('#hub-reset-wrap button')).find((b) => b.textContent === 'Cancel').click(); out.cancelled = WD1.progress.isDone('s1-1');
     Array.from(document.querySelectorAll('#hub-reset-wrap button')).find((b) => /Reset all/.test(b.textContent)).click();
     Array.from(document.querySelectorAll('#hub-reset-wrap button')).find((b) => b.textContent === 'Yes, erase').click();
-    out.erased = { done: WD1.progress.isDone('s1-1'), shown: document.querySelector('#hub-sections').textContent, button: document.querySelector('#hub-reset-wrap').textContent };
+    out.erased = {
+      done: WD1.progress.isDone('s1-1'),
+      shown: document.querySelector('#hub-sections').textContent,
+      button: document.querySelector('#hub-reset-wrap').textContent,
+      cta: document.querySelector('#hub-continue').textContent,
+      meta: document.querySelector('#hub-continue-meta').textContent,
+      theme: document.documentElement.getAttribute('data-theme'),
+      editorReset: document.querySelector('#hub-try textarea').value.includes('Course books')
+    };
     return out;
   })()`);
   assert.deepEqual(r.objective, { selected: true, pressed: 'true', title: 'Apply authentication', sections: 6, first: false });
   assert.equal(r.sandbox, 'allow-scripts allow-forms allow-modals');
   assert.equal(r.saved, '<h1>Mine</h1><ul id="list"></ul>');
+  assert.equal(r.badQuizAvg, '–', 'malformed quiz entries are ignored instead of showing NaN% or Infinity%');
   assert.ok(r.exportName, 'export offers a dated file');
   assert.equal(r.confirm, 'Erase all progress, scores and');
   assert.equal(r.cancelled, true, 'Cancel keeps progress');
-  assert.deepEqual(r.erased, { done: false, shown: '0 of 28 sections complete', button: 'Reset all progress' });
+  assert.deepEqual(r.erased, {
+    done: false,
+    shown: '0 of 28 sections complete',
+    button: 'Reset all progress',
+    cta: 'Start with Week 1',
+    meta: 'Your progress saves in this browser automatically.',
+    theme: null,
+    editorReset: true
+  });
 });
 
 test('full-page playground: templates, layout switches, download and share link', async () => {
@@ -1027,8 +1104,24 @@ test('full-page playground: templates, layout switches, download and share link'
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const $ = (s) => document.querySelector(s); const out = {};
     const editors = () => Array.from(document.querySelectorAll('.tp-pane textarea')).map((t) => t.value);
-    const sel = $('#tp-template'); sel.value = 'grid'; sel.dispatchEvent(new Event('change'));
-    out.template = { status: $('#tp-status').textContent, html: editors()[0].slice(0, 20), reset: sel.value };
+    const sel = $('#tp-template');
+    let templateLoads = 0;
+    $('#tp-frame').addEventListener('load', () => templateLoads++);
+    sel.value = 'grid'; sel.dispatchEvent(new Event('change'));
+    await wait(850);
+    out.template = { status: $('#tp-status').textContent, html: editors()[0].slice(0, 20), reset: sel.value, loads: templateLoads };
+    const tpTabs = Array.from(document.querySelectorAll('#tp-tabs .pg-tab'));
+    const tpPanels = Array.from(document.querySelectorAll('.tp-pane[role=tabpanel]'));
+    out.tpTabsWired = tpTabs.every((t, i) => t.getAttribute('aria-controls') === tpPanels[i].id && tpPanels[i].getAttribute('aria-labelledby') === t.id);
+    tpTabs[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+    out.tpArrow = tpTabs.map((t) => t.getAttribute('aria-selected')).join(',');
+    const wd2Errors = [];
+    for (const key of ['spaApi', 'restValidator', 'jwtCookie']) {
+      sel.value = key; sel.dispatchEvent(new Event('change'));
+      await wait(450);
+      wd2Errors.push(...Array.from(document.querySelectorAll('#tp-console .log-line.error')).map((l) => key + ': ' + l.textContent));
+    }
+    out.wd2Template = { status: $('#tp-status').textContent, errors: wd2Errors };
     sel.value = ''; sel.dispatchEvent(new Event('change'));
     Array.from(document.querySelectorAll('.seg button')).find((b) => b.dataset.w === '390').click();
     out.width = { frame: $('#tp-frame').style.width, label: $('#tp-size').textContent, fixed: $('#tp-stage').classList.contains('fixed') };
@@ -1051,7 +1144,10 @@ test('full-page playground: templates, layout switches, download and share link'
     out.fullDoc = { one: copied.split('<html').length === 2, title: copied.includes('<title>My Page</title>') };
     return out;
   })()`);
-  assert.deepEqual(r.template, { status: 'Loaded template: Grid page layout', html: '<div class="layout">', reset: '' });
+  assert.deepEqual(r.template, { status: 'Loaded template: Grid page layout', html: '<div class="layout">', reset: '', loads: 1 });
+  assert.ok(r.tpTabsWired, 'standalone playground tabs and tabpanels reference each other');
+  assert.equal(r.tpArrow, 'false,true,false');
+  assert.deepEqual(r.wd2Template, { status: 'Loaded template: JWT & Cookie inspector', errors: [] });
   assert.deepEqual(r.width, { frame: '390px', label: '390px wide', fixed: true });
   assert.equal(r.fill, '100%');
   assert.ok(r.stacked);
@@ -1071,12 +1167,19 @@ test('full-page playground: templates, layout switches, download and share link'
 test('glossary: search, letter filter and flashcard mode', async () => {
   await fresh('glossary.html');
   const r = await page.eval(`(async () => {
-    const out = { total: document.querySelector('#gl-total').textContent, all: document.querySelectorAll('dt').length };
+    const out = {
+      total: document.querySelector('#gl-total').textContent,
+      all: document.querySelectorAll('dt').length,
+      hashLink: !!document.querySelector('#gl-letters a[href="#gl-num"]'),
+      hashTarget: !!document.getElementById('gl-num')
+    };
     const q = document.querySelector('input[type=search], #gl-q, .gl-controls input'); q.value = 'injection'; q.dispatchEvent(new Event('input'));
     await new Promise((r) => setTimeout(r, 200));
     out.search = { count: document.querySelector('#gl-count').textContent, terms: Array.from(document.querySelectorAll('dt')).map((d) => d.textContent) };
-    q.value = 'zzzz-no-such-term'; q.dispatchEvent(new Event('input')); await new Promise((r) => setTimeout(r, 200));
+    document.querySelector('#gl-study').click();
+    q.value = 'zzzz-no-match'; q.dispatchEvent(new Event('input')); await new Promise((r) => setTimeout(r, 200));
     out.none = document.querySelectorAll('dt').length;
+    out.cardsHiddenOnEmpty = document.querySelector('#gl-cards').hidden && document.querySelector('#gl-study').disabled;
     q.value = ''; q.dispatchEvent(new Event('input')); await new Promise((r) => setTimeout(r, 200));
     document.querySelector('#gl-study').click();
     out.study = { cards: !!document.querySelector('.fc-card'), label: document.querySelector('#gl-study').textContent };
@@ -1085,9 +1188,11 @@ test('glossary: search, letter filter and flashcard mode', async () => {
   })()`);
   assert.match(r.total, /^\d+ terms$/);
   assert.ok(r.all >= 90, 'the whole glossary is listed');
+  assert.ok(r.hashLink && r.hashTarget, 'the # group for status codes is reachable from the jump bar');
   assert.deepEqual(r.search.terms.sort(), ['NoSQL injection', 'SQL injection']);
   assert.match(r.search.count, /^2 of \d+ terms$/);
   assert.equal(r.none, 0);
+  assert.ok(r.cardsHiddenOnEmpty, 'flashcards hide and the Study button disables when no terms match');
   assert.deepEqual(r.study, { cards: true, label: 'Hide flashcards' });
   assert.ok(r.closed);
 });

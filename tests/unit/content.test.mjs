@@ -140,10 +140,11 @@ test('pages carry the basics: one h1, a title, a description, a language', () =>
     assert.match(doc, /<html lang="en">/, rel + ' declares its language');
     assert.match(doc, /<title>[^<]{5,}<\/title>/, rel + ' has a title');
     assert.match(doc, /<meta name="description" content="[^"]{40,}"/, rel + ' has a description');
-    assert.match(doc, /<meta name="viewport"/, rel + ' has a viewport');
+    assert.match(doc, /<meta name="viewport"[^>]*viewport-fit=cover/, rel + ' has a viewport with viewport-fit=cover');
     assert.equal((doc.match(/<h1[\s>]/g) || []).length, 1, rel + ' has exactly one h1');
     assert.equal((doc.match(/<main[\s>]/g) || []).length, 1, rel + ' has exactly one main');
     assert.equal((doc.match(/<img\b(?![^>]*\balt=)[^>]*>/g) || []).length, 0, rel + ' every image has alt text');
+    assert.equal((doc.match(/<table\b[^>]*\bclass="data"/g) || []).length, 0, rel + ' uses .data-table, not .data');
   }
 });
 

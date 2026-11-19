@@ -31,7 +31,7 @@
 
   <aside class="callout listen">
     <strong>Listen: the Week 2 audio companion</strong>
-    <p>This episode explains the middleware assembly line, how REST APIs are designed, and how a single-page front end talks to your own server.</p>
+    <p>This episode explains the middleware assembly line, how REST APIs are designed, and how a single-page front end talks to your own server. (The hands-on exercises on this page have been updated since the recording, so follow the page instructions when you reach the activities.)</p>
     <audio controls preload="metadata" src="../audio/wk2.mp3" style="width:100%"></audio>
   <p class="small"><a href="../audio/wk2-transcript.txt">Read the episode transcript</a> (text file).</p>
   </aside>
@@ -293,7 +293,7 @@ app.use((req, res, [[next]]) => {
     </script>
     <p>The whole server is five lines because the middleware does the work. It serves these two files from the <code>public</code> folder:</p>
     <div class="grid-2">
-      <script type="text/plain" class="code" data-lang="html" data-title="public/hello.txt">
+      <script type="text/plain" class="code" data-lang="text" data-title="public/hello.txt">
         Hello from the public folder!
       </script>
       <script type="text/plain" class="code" data-lang="html" data-title="public/index.html">
@@ -918,7 +918,7 @@ loadBooks();</textarea>
     </aside>
     <p>Put the week's architecture together and the line reads: global middleware (logger, body translators, static files) at the top, routers in the middle, then the 404 handler, then the error handler, last of all. Every request has a defined path through the app — including the requests that fail.</p>
     <p>On disk, the organized app looks like this — small files, each named for the one thing it holds:</p>
-    <script type="text/plain" class="code" data-lang="js" data-title="Project layout">
+    <script type="text/plain" class="code" data-lang="text" data-title="Project layout">
       app.js            the wiring: middleware, mounts, listen
       routes/
         books.js      the books router (Section 2.4's handlers, moved)
