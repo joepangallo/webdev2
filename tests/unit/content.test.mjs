@@ -230,3 +230,18 @@ test('README objectives match the manifest', () => {
   const readme = read('README.md');
   WD1.OBJECTIVES.forEach((text, i) => assert.ok(readme.includes(`${i + 1}. ${text}`), `objective ${i + 1} wording`));
 });
+
+test('code blocks declare data-lang, prose has no raw section ids, and window.open uses noopener', () => {
+  for (const rel of PAGES) {
+    const src = read(rel);
+    for (const m of src.matchAll(/<script\s+type="text\/plain"\s+class="code"([^>]*)>/gi)) {
+      assert.match(m[1], /\bdata-lang="[^"]+"/, `${rel}:${lineAt(src, m.index)} code block is missing data-lang`);
+    }
+    const prose = markupOnly(src).replace(/<[^>]+>/g, ' ');
+    assert.doesNotMatch(prose, /\bs[1-4]-[1-7]\b/, `${rel} leaks a raw section id in visible prose`);
+  }
+  const engine = read('assets/js/course.js');
+  for (const m of engine.matchAll(/window\.open\([^\n;]+/g)) {
+    assert.match(m[0], /noopener/, `course.js window.open must pass noopener: ${m[0]}`);
+  }
+});

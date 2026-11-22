@@ -20,6 +20,8 @@
     .wk2-mini { font-family: var(--font-mono); font-size: .82rem; }
     .wk2-booklist { list-style: none; padding: 0; margin: 0 0 1em; display: grid; gap: 6px; }
     .wk2-booklist li { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; background: var(--surface-2); }
+    .wk2-tabs .tab-panel > .code-block:first-child { margin-top: 8px; }
+    .wk2-tabs .tab-panel > p + .code-block { margin-top: 14px; }
   </style>
 </head>
 <body data-module="wk2">
@@ -94,6 +96,101 @@ Listening on port 3000</div>
       <strong>Route patterns can do more</strong>
       <p>A route path is a pattern, not just a fixed string. You can use several parameters in one path (<code>/users/:userId/books/:bookId</code>), and a parameter matches exactly one path segment — <code>/users/:id</code> matches <code>/users/42</code> but not <code>/users/42/books</code>. Express tries routes in the order you define them and uses the first match, so define specific routes before catch-all patterns.</p>
     </aside>
+
+    <p><strong>Example — route parameters and query strings working together across HTML, CSS, and Express JS:</strong> click through all three tabs to see how links build parameter URLs, how a GET form builds a query string, and how Express reads both:</p>
+    <div class="tabs wk2-tabs">
+      <div data-tab="1 · HTML (links &amp; filter form)">
+        <p>The links choose <em>which</em> user via path segments (<code>/users/42</code>), while the GET form appends filter options as a query string (<code>/users/42/books?sort=title&amp;limit=5</code>).</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="catalog-nav.html">
+          <nav class="user-pills" aria-label="Pick a reader">
+            <a href="/users/42/books">Ada's shelf</a>
+            <a href="/users/7/books">Grace's shelf</a>
+          </nav>
+
+          <form class="filter-bar" method="get" action="/users/42/books">
+            <label for="sort-by">Sort by</label>
+            <select id="sort-by" name="sort">
+              <option value="title">Title (A–Z)</option>
+              <option value="year">Newest first</option>
+            </select>
+
+            <label for="max-items">Show</label>
+            <input id="max-items" type="number" name="limit" value="5" min="1" max="50">
+
+            <button type="submit">Apply</button>
+          </form>
+        </script>
+      </div>
+      <div data-tab="2 · CSS (pill nav &amp; filter bar)">
+        <p>Flexbox lays out the reader links as rounded pills and keeps the filter controls aligned on one wrapping toolbar.</p>
+        <script type="text/plain" class="code" data-lang="css" data-title="catalog-nav.css">
+          .user-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 14px;
+          }
+          .user-pills a {
+            padding: 6px 14px;
+            border-radius: 99px;
+            background: #eef4ff;
+            color: #1f4fd1;
+            font-weight: 700;
+            text-decoration: none;
+          }
+          .filter-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+          }
+          .filter-bar input,
+          .filter-bar select {
+            padding: 6px 8px;
+            border: 1px solid #94a3b8;
+            border-radius: 6px;
+            font: inherit;
+          }
+        </script>
+      </div>
+      <div data-tab="3 · Express JS (multi-param + query route)">
+        <p>Notice the order: the specific route <code>/users/featured</code> sits <em>above</em> <code>/users/:userId/books</code>, and the handler reads both <code>req.params</code> and <code>req.query</code> while converting numeric strings safely.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="multi-param-route.js (Express)">
+          // Specific route FIRST so ':userId' never swallows the word 'featured'
+          app.get('/users/featured', (req, res) => {
+            res.json({ featured: ['Ada', 'Grace'] });
+          });
+
+          // Route with a parameter (:userId) AND optional query options (?sort=&limit=)
+          app.get('/users/:userId/books', (req, res) => {
+            const userId = Number(req.params.userId);
+            const sort = req.query.sort || 'title';
+            const limit = Number(req.query.limit) || 10;
+
+            res.json({ userId, sort, limit });
+          });
+
+          // Route with TWO parameters in one path
+          app.get('/users/:userId/books/:bookId', (req, res) => {
+            res.json({
+              userId: Number(req.params.userId),
+              bookId: Number(req.params.bookId)
+            });
+          });
+        </script>
+      </div>
+    </div>
+    <p>Walk through every connection across the three tabs:</p>
+    <ul>
+      <li><strong>HTML:</strong> clicking <code>Ada's shelf</code> requests <code>GET /users/42/books</code>; submitting the form requests <code>GET /users/42/books?sort=title&amp;limit=5</code>. Both hit the exact same Express route — the parameter identifies <em>whose</em> shelf, and the query string tunes <em>how</em> the list comes back.</li>
+      <li><strong>CSS:</strong> <code>border-radius: 99px</code> turns ordinary <code>&lt;a&gt;</code> links into pills, and <code>align-items: center</code> vertically aligns labels, inputs, and the button inside the flex toolbar.</li>
+      <li><strong>Express JS:</strong> <code>Number(req.params.userId)</code> and <code>Number(req.query.limit) || 10</code> turn incoming URL text into numbers with a safe fallback when <code>limit</code> is omitted or invalid (<code>NaN || 10</code> evaluates to <code>10</code>). Putting <code>/users/featured</code> above <code>/users/:userId/books</code> illustrates top-to-bottom route matching.</li>
+    </ul>
+
     <p>One more routing fact worth knowing now: a route can have <strong>more than one handler</strong>. You can pass several functions to <code>app.get()</code> and they run in order, each handing off to the next — which is exactly the mechanism the next section is about.</p>
 
     <h3>See the split for yourself</h3>
@@ -254,6 +351,31 @@ Route handler: sending the response</div>
     <p>You can also mount middleware on one branch of the line instead of the whole line. Give <code>app.use()</code> a path as its first argument — <code>app.use('/api', fn)</code> — and that station only sees requests whose path starts with <code>/api</code>. Everything else walks straight past it. That is how you will later protect just the API, or log just the admin area, without touching the rest of the app.</p>
     <p>One more thing middleware can do: <strong>carry data down the line</strong>. Because every station receives the same <code>req</code> object, an early middleware can attach something to it — <code>req.visitTime = Date.now()</code>, say — and every later station and the route handler can read it. Middleware is not only a filter; it is also how a request accumulates context as it travels.</p>
 
+    <p><strong>Example — broken middleware (missing <code>next()</code>) vs. working request-stamping middleware:</strong></p>
+    <div class="grid-2">
+      <script type="text/plain" class="code" data-lang="js" data-title="Broken: hangs forever (no next, no response)">
+        app.use((req, res, next) => {
+          // Stamps the request, logs it... and forgets next()!
+          req.requestTime = new Date().toISOString();
+          console.log(req.method, req.url);
+          // Request stops dead here — the browser spins forever.
+        });
+      </script>
+      <script type="text/plain" class="code" data-lang="js" data-title="Fixed: carries data down the line and calls next()">
+        app.use((req, res, next) => {
+          req.requestTime = new Date().toISOString();
+          console.log(req.method, req.url, 'at', req.requestTime);
+          next(); // Hand the stamped req to the next station
+        });
+
+        app.get('/whoami', (req, res) => {
+          // Reads the property attached by the earlier station:
+          res.json({ arrivedAt: req.requestTime });
+        });
+      </script>
+    </div>
+    <p>Trace the right-hand block closely. The middleware attaches <code>req.requestTime</code> to the shared <code>req</code> object and calls <code>next()</code>. When Express reaches <code>app.get('/whoami', ...)</code>, it hands that handler the <em>exact same</em> <code>req</code> object — so <code>req.requestTime</code> is already waiting there. That same "attach data to <code>req</code>, then call <code>next()</code>" pattern is exactly how <code>express.json()</code> populates <code>req.body</code> and how Week 4's session and JWT middleware attach the signed-in user.</p>
+
     <div class="fill" data-title="Complete the middleware" data-explain="A middleware function takes `req`, `res` and `next`. Logging is its job here; `next()` is what keeps the belt moving.">
       <script type="text/plain">
 app.use((req, res, [[next]]) => {
@@ -308,6 +430,46 @@ $ curl http://localhost:3000/
 --- server console ---
 Listening on port 3000</div>
     <p>Notice what is <em>not</em> in the console: no route handler ran. The static middleware answered both requests itself. That is the assembly line working as designed — a station that can finish the job does, and the request never travels further.</p>
+
+    <p><strong>Example — how <code>express.static('public')</code> maps HTML, CSS, and browser JS to URLs:</strong> put all three front-end files inside <code>public/</code>, and Express automatically sends each one with the right <code>Content-Type</code> header (<code>text/html</code>, <code>text/css</code>, <code>text/javascript</code>):</p>
+    <div class="tabs wk2-tabs">
+      <div data-tab="public/index.html (URL: /)">
+        <p>Notice the paths are <code>/style.css</code> and <code>/app.js</code> — <strong>never</strong> <code>/public/style.css</code>, because the folder name <code>public</code> is stripped from the URL.</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="public/index.html">
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <title>Static Assets Demo</title>
+            <link rel="stylesheet" href="/style.css">
+          </head>
+          <body>
+            <main class="box">
+              <h1>Served by express.static</h1>
+              <p id="status">Waiting for browser JavaScript...</p>
+            </main>
+            <script src="/app.js" defer><\/script>
+          </body>
+          </html>
+        </script>
+      </div>
+      <div data-tab="public/style.css (URL: /style.css)">
+        <p>Express spots the <code>.css</code> extension and automatically attaches <code>Content-Type: text/css; charset=utf-8</code>.</p>
+        <script type="text/plain" class="code" data-lang="css" data-title="public/style.css">
+          body { font-family: system-ui, sans-serif; margin: 32px auto; max-width: 560px; padding: 0 16px; }
+          .box { padding: 20px; border: 1px solid #cbd5e1; border-radius: 10px; background: #f8fafc; }
+          .box h1 { margin-top: 0; color: #1f4fd1; }
+        </script>
+      </div>
+      <div data-tab="public/app.js (URL: /app.js)">
+        <p>Express spots the <code>.js</code> extension and sends it as browser JavaScript; the <code>defer</code> attribute waits until the HTML is parsed before running it.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="public/app.js (runs in browser)">
+          document.getElementById('status').textContent =
+            'Loaded /app.js cleanly from the public folder!';
+        </script>
+      </div>
+    </div>
+    <p>One common pitfall to avoid right away: when you write <code>app.use(express.static('public'))</code>, the folder name <code>public</code> is the <em>root</em> of your static URLs, not part of the URL itself. A browser request for <code>/style.css</code> reads <code>public/style.css</code>; a request for <code>/public/style.css</code> looks for <code>public/public/style.css</code> and returns <code>404</code>.</p>
 
     <aside class="callout warn">
       <strong>Order pitfall: static can shadow a route</strong>
@@ -481,14 +643,14 @@ GET /missing-test 404 1.073 ms - 26</div>
     <p><strong>JSON</strong> (JavaScript Object Notation) is a text format for structured data: objects with <code>"key": value</code> pairs, arrays in square brackets, strings in double quotes, numbers and <code>true</code>/<code>false</code> bare. It looks like a JavaScript object because it grew out of one, but it is plain text, so every language can read and write it. When your handler calls <code>res.json(books)</code>, Express converts the JavaScript value to JSON text and labels it with the <code>application/json</code> content type. When a client sends JSON to you, <code>express.json()</code> — the translator from Section 2.3 — converts it back. JSON out, JSON in: that round trip is the heartbeat of every API you will build or consume.</p>
     <p><strong>Example — one valid book, one broken book, and the error the broken one causes:</strong></p>
     <div class="grid-2">
-      <script type="text/plain" class="code" data-title="Valid JSON: one book">
+      <script type="text/plain" class="code" data-lang="json" data-title="Valid JSON: one book">
         {
           "id": 3,
           "title": "The Hobbit",
           "author": "J.R.R. Tolkien"
         }
       </script>
-      <script type="text/plain" class="code" data-title="Broken JSON: spot the mistake">
+      <script type="text/plain" class="code" data-lang="json" data-title="Broken JSON: spot the mistake">
         {
           "title": "The Hobbit",
           "author": "J.R.R. Tolkien",
@@ -584,6 +746,47 @@ $ curl http://localhost:3000/api/books
 Listening on port 3000</div>
     <p>Trace the final list and check it against the session: book 1 was renamed by the <code>PUT</code>, book 2 (<em>Emma</em>) was deleted, book 3 (<em>The Hobbit</em>) was created by the first <code>POST</code>. The two requests that failed on purpose changed nothing: the second <code>POST</code>, sent without an author, was refused with <code>400</code>, and the request for book 99 reported <code>404</code> — each in JSON. That is a complete CRUD story told in eight requests.</p>
     <p>Two practical notes on typing those commands. The <code>-H "Content-Type: application/json"</code> part is not decoration: leave it out and <code>express.json()</code> ignores the body, <code>req.body</code> is <code>undefined</code>, and the guard answers the same 400 you saw above. And the single quotes around the JSON after <code>-d</code> only work in macOS and Linux terminals and in Git Bash, so on Windows run these commands in Git Bash. (In Command Prompt, use double quotes and put a backslash before each inner one: <code>-d "{\"title\":\"The Hobbit\",\"author\":\"J.R.R. Tolkien\"}"</code>. In PowerShell, type <code>curl.exe</code> rather than <code>curl</code>, and expect its quoting rules to differ again.)</p>
+
+    <p><strong>Example — calling all four CRUD verbs on <code>rest-api.js</code> from browser JavaScript (<code>fetch</code>):</strong> here is the exact browser equivalent of that curl session, ready for the front end in Section 2.5:</p>
+    <script type="text/plain" class="code" data-lang="js" data-title="crud-fetch-examples.js (browser JS)">
+      // 1. READ (GET /api/books) — status 200 + JSON array
+      async function getBooks() {
+        const res = await fetch('/api/books');
+        if (!res.ok) throw new Error('Could not load books: ' + res.status);
+        return res.json();
+      }
+
+      // 2. CREATE (POST /api/books) — status 201 + newly created book with id
+      async function createBook(title, author) {
+        const res = await fetch('/api/books', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, author })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Create failed');
+        return data;
+      }
+
+      // 3. UPDATE (PUT /api/books/:id) — status 200 + replaced book
+      async function updateBook(id, title, author) {
+        const res = await fetch(`/api/books/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, author })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Update failed');
+        return data;
+      }
+
+      // 4. DELETE (DELETE /api/books/:id) — status 204 (empty body: do NOT call res.json()!)
+      async function deleteBook(id) {
+        const res = await fetch(`/api/books/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Delete failed: ' + res.status);
+      }
+    </script>
+    <p>Compare the four functions side by side. <code>GET</code> needs no options object at all. <code>POST</code> and <code>PUT</code> both send JSON, so both include <code>headers: { 'Content-Type': 'application/json' }</code> and <code>JSON.stringify(...)</code>, and both read <code>data.error</code> if the server replies <code>400</code> or <code>404</code>. Notice <code>deleteBook</code> stops right after checking <code>res.ok</code> — because <code>rest-api.js</code> replies <code>204 No Content</code> with an empty body, calling <code>res.json()</code> on a 204 response would throw a <code>SyntaxError</code>.</p>
 
     <div class="fill" data-title="Complete the create handler" data-explain="Bad data is refused with 400 before anything is stored. A successful creation answers 201 and returns the new resource — including the id the server assigned, which the client could not have known beforehand.">
       <script type="text/plain">
@@ -681,15 +884,65 @@ app.post('/api/books', (req, res) => {
 
     <h3>Try it: the same rendering, simulated in this page</h3>
     <p>This page has no server behind it, so the playground below <strong>simulates</strong> the API: its <code>loadBooks()</code> function fills a local array with exactly the verified API JSON from Section 2.4, where the real app would call <code>fetch('/api/books')</code>. The rendering is the real thing and follows the pattern above.</p>
-    <p><strong>Your task:</strong> the <strong>Add book</strong> button does nothing yet, because the <code>addBook(title, author)</code> function it calls is empty. Finish it. It has three jobs, in this order: if the title or the author is blank, return without changing anything; otherwise push a new book object onto the <code>books</code> array, using <code>nextId</code> as its <code>id</code> and then raising <code>nextId</code> by one; finally call <code>render()</code>, so the screen follows the state. (In the real app the middle job is a <code>POST</code> to the API, and the server hands back the new book with its id.) The checks call your function directly and turn green when it behaves.</p>
+    <p><strong>Your task:</strong> the <strong>Add book</strong> button does nothing yet, because the <code>addBook(title, author)</code> function it calls is empty. Finish it in the <strong>JS</strong> tab. It has three jobs, in this order: if the title or the author is blank, return without changing anything; otherwise push a new book object onto the <code>books</code> array, using <code>nextId</code> as its <code>id</code> and then raising <code>nextId</code> by one; finally call <code>render()</code>, so the screen follows the state. (In the real app the middle job is a <code>POST</code> to the API, and the server hands back the new book with its id.) Notice the <strong>CSS</strong> tab too — it turns the plain <code>&lt;ul&gt;</code> into styled cards and aligns the form controls, automatically styling every new <code>&lt;li&gt;</code> your <code>render()</code> function creates. The checks call your function directly and turn green when it behaves.</p>
     <div class="playground" data-title="Try it: render the book list, then add a book" data-height="300">
       <textarea data-lang="html">&lt;h1&gt;Book list&lt;/h1&gt;
 &lt;ul id="book-list"&gt;&lt;/ul&gt;
-&lt;div&gt;
+&lt;div class="add-row"&gt;
   &lt;label&gt;Title &lt;input id="new-title" type="text" placeholder="The Hobbit"&gt;&lt;/label&gt;
   &lt;label&gt;Author &lt;input id="new-author" type="text" placeholder="J.R.R. Tolkien"&gt;&lt;/label&gt;
   &lt;button id="add-btn" type="button"&gt;Add book&lt;/button&gt;
 &lt;/div&gt;</textarea>
+      <textarea data-lang="css">/* Every new <li> created by render() automatically inherits these styles. */
+body {
+  font-family: system-ui, sans-serif;
+  max-width: 520px;
+  padding: 16px;
+  color: #1f2937;
+}
+#book-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px;
+  display: grid;
+  gap: 8px;
+}
+#book-list li {
+  padding: 10px 14px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-left: 4px solid #1f4fd1;
+  border-radius: 8px;
+}
+.add-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+}
+.add-row label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  flex: 1 1 150px;
+}
+.add-row input {
+  padding: 7px 10px;
+  border: 1px solid #94a3b8;
+  border-radius: 6px;
+  font: inherit;
+}
+#add-btn {
+  padding: 8px 16px;
+  background: #1f4fd1;
+  color: #ffffff;
+  border: 0;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}</textarea>
       <textarea data-lang="js">// The state: the data this page is showing right now.
 let books = [];
 let nextId = 1;
@@ -871,6 +1124,76 @@ loadBooks();</textarea>
     </div>
     <p>Same page, same API, same state idea — the framework simply takes over the “keep the screen matched to the data” bookkeeping you did by hand. That trade is why frameworks exist, and why learning the vanilla version first was not wasted time: when a framework page misbehaves, the state underneath is still where you look.</p>
 
+    <p><strong>Taking the Vue page one step further — companion CSS, error state, and a Delete button:</strong> add <code>&lt;link rel=&quot;stylesheet&quot; href=&quot;/style.css&quot;&gt;</code> to <code>public/index.html</code> and pair these three pieces to give your SPA polished layout, visible API error messages, and one-click deletion:</p>
+    <div class="tabs wk2-tabs">
+      <div data-tab="1 · Vue HTML (error &amp; delete button)">
+        <p><code>v-if="errorMsg"</code> renders the alert box only when an error string is non-empty, and <code>@click="deleteBook(book.id)"</code> passes each row's id straight to the method.</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="Vue template excerpt (inside #app)">
+          <p v-if="errorMsg" class="error-banner" role="alert">Error: {{ errorMsg }}</p>
+
+          <ul class="book-cards">
+            <li v-for="book in books" :key="book.id" class="book-card">
+              <span><strong>{{ book.title }}</strong> by {{ book.author }}</span>
+              <button type="button" class="btn-danger" @click="deleteBook(book.id)">
+                Remove
+              </button>
+            </li>
+          </ul>
+        </script>
+      </div>
+      <div data-tab="2 · Companion CSS (public/style.css)">
+        <p>Flexbox pushes the Remove button to the right edge of each card (<code>justify-content: space-between</code>), and <code>.error-banner</code> highlights failures clearly.</p>
+        <script type="text/plain" class="code" data-lang="css" data-title="public/style.css">
+          .error-banner {
+            padding: 10px 14px;
+            background: #fef2f2;
+            border: 1px solid #ef4444;
+            color: #991b1b;
+            border-radius: 8px;
+            font-weight: 700;
+          }
+          .book-cards { list-style: none; padding: 0; display: grid; gap: 8px; }
+          .book-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            background: #ffffff;
+          }
+          .btn-danger {
+            padding: 5px 10px;
+            border: 1px solid #dc2626;
+            border-radius: 6px;
+            background: #ffffff;
+            color: #b91c1c;
+            font-weight: 700;
+            cursor: pointer;
+          }
+          .btn-danger:hover { background: #fef2f2; }
+        </script>
+      </div>
+      <div data-tab="3 · Vue JS (deleteBook method)">
+        <p>Sends <code>DELETE /api/books/:id</code>, remembers not to call <code>.json()</code> on the <code>204</code> response, and filters the removed book out of reactive state so Vue redraws automatically.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="Inside Vue methods: { ... }">
+          async deleteBook(id) {
+            this.errorMsg = '';
+            try {
+              const res = await fetch(`/api/books/${id}`, { method: 'DELETE' });
+              if (!res.ok) throw new Error('Could not delete book (' + res.status + ')');
+              // Replace state array without the deleted id — Vue re-renders automatically
+              this.books = this.books.filter((b) => b.id !== id);
+            } catch (err) {
+              this.errorMsg = err.message;
+            }
+          }
+        </script>
+      </div>
+    </div>
+    <p>Notice how reactive state shines here: setting <code>this.books = this.books.filter((b) =&gt; b.id !== id)</code> updates the array in one line, and Vue automatically removes the matching <code>&lt;li&gt;</code> from the DOM without any manual <code>removeChild()</code> code. If the server returns <code>404</code> or is unreachable, <code>this.errorMsg = err.message</code> makes <code>v-if="errorMsg"</code> show the styled <code>.error-banner</code>.</p>
+
     <div class="quiz" data-title="Check your understanding: single-page apps">
       <script type="application/json">
       [
@@ -961,6 +1284,30 @@ Listening on port 3000</div>
     </script>
     <p class="wk2-cap"><strong>Expected output</strong> — this pattern is shown as the standard shape rather than a fresh capture: with this handler in place, a handler that fails produces one error logged on the server console and a <code>500</code> response whose JSON body is <code>{"error":"Internal server error"}</code>, while a request whose JSON body is malformed gets a <code>400</code> whose <code>error</code> is the parser's own message, and nothing is logged. (The API-level error you have already seen verified is the 404 JSON from Section 2.4: <code>{"error":"Book not found"}</code>.) The client never receives the stack trace — that stays in your server log, where it helps you and leaks nothing.</p>
     <p>One modern convenience belongs here. In Express 5, if an <strong>async handler</strong> — a handler written as an <code>async</code> function, so it returns a promise (Section 2.5) — has that promise reject (the async version of throwing an error), Express forwards the error to the error-handling middleware automatically. <code>try</code>/<code>catch</code> is still needed for errors thrown later inside plain <strong>callbacks</strong> — functions you hand to other code, to be run whenever some work finishes, like a timer firing or a file read completing — which no framework can catch for you.</p>
+
+    <p><strong>Example — how routes reach the 4-argument error handler in Express 5:</strong></p>
+    <div class="grid-2">
+      <script type="text/plain" class="code" data-lang="js" data-title="Explicit next(err) — classic pattern">
+        router.get('/:id', (req, res, next) => {
+          if (Number.isNaN(Number(req.params.id))) {
+            const err = new Error('Book id must be a number');
+            err.status = 400; // Tells the error handler this is a client error
+            return next(err); // Jumps straight to (err, req, res, next)
+          }
+          res.json({ id: Number(req.params.id) });
+        });
+      </script>
+      <script type="text/plain" class="code" data-lang="js" data-title="Express 5 async handler — forwarded automatically">
+        router.get('/report', async (req, res) => {
+          // If loadReport() rejects (e.g. database down), Express 5 catches
+          // the rejected promise and forwards it straight to (err, req, res, next).
+          const report = await loadReport();
+          res.json(report);
+        });
+      </script>
+    </div>
+    <p>Look at how cleanly those two paths connect to the error handler above. On the left, attaching <code>err.status = 400</code> and calling <code>return next(err)</code> causes the 4-argument middleware to send <code>400</code> with <code>{"error":"Book id must be a number"}</code> without logging a server crash. On the right, an unhandled rejection inside an <code>async</code> route has no <code>err.status</code>, so the middleware defaults to <code>500</code>, logs the full stack trace on your server, and sends the calm generic message <code>{"error":"Internal server error"}</code> to the client.</p>
+
     <aside class="callout tip">
       <strong>Express 5 details that do real work</strong>
       <p>This course teaches Express 5, the current version. Three of its details matter in this section:</p>
@@ -1073,6 +1420,92 @@ Listening on port 3000</div>
           <tr><td>Front end renders nothing, console shows a JSON error</td><td>The fetch/render pair</td><td>Check the URL against the morgan diary: the API path the page asks for is not the path the server serves</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <h3>Week 2 code quick-reference: HTML, CSS &amp; JS patterns</h3>
+    <p>Keep these four Week 2 building blocks together when structuring your REST API and SPA front end:</p>
+    <div class="tabs wk2-tabs">
+      <div data-tab="Express App Wiring (app.js)">
+        <p>The exact middleware order: logger → body parser → static files → mounted routers → 404 → 4-argument error handler.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="app.js (complete Week 2 order)">
+          const express = require('express');
+          const morgan = require('morgan');
+          const booksRouter = require('./routes/books');
+
+          const app = express();
+          app.use(morgan('dev'));
+          app.use(express.json());
+          app.use(express.static('public'));
+
+          app.use('/api/books', booksRouter);
+
+          app.use((req, res) => res.status(404).json({ error: 'Not found' }));
+          app.use((err, req, res, next) => {
+            const status = err.status || 500;
+            if (status >= 500) console.error(err);
+            res.status(status).json({ error: status >= 500 ? 'Internal server error' : err.message });
+          });
+
+          app.listen(3000, () => console.log('Listening on port 3000'));
+        </script>
+      </div>
+      <div data-tab="Express Router (routes/books.js)">
+        <p>Relative paths (<code>/</code> and <code>/:id</code>) exported as a module and mounted at <code>/api/books</code>.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="routes/books.js (starter)">
+          const express = require('express');
+          const router = express.Router();
+
+          let books = [{ id: 1, title: 'Dune', author: 'Frank Herbert' }];
+          let nextId = 2;
+
+          router.get('/', (req, res) => res.json(books));
+          router.post('/', (req, res) => {
+            if (!req.body || !req.body.title) return res.status(400).json({ error: 'title required' });
+            const book = { id: nextId++, title: req.body.title, author: req.body.author || '' };
+            books.push(book);
+            res.status(201).json(book);
+          });
+          router.delete('/:id', (req, res) => {
+            const i = books.findIndex((b) => b.id === Number(req.params.id));
+            if (i === -1) return res.status(404).json({ error: 'Book not found' });
+            books.splice(i, 1);
+            res.status(204).send();
+          });
+
+          module.exports = router;
+        </script>
+      </div>
+      <div data-tab="SPA HTML (public/index.html)">
+        <p>Loads once from <code>express.static('public')</code> and lets JavaScript fetch JSON from <code>/api/books</code>.</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="public/index.html (starter)">
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <title>Books SPA</title>
+            <link rel="stylesheet" href="/style.css">
+          </head>
+          <body>
+            <main class="container">
+              <h1>Books</h1>
+              <p id="err" class="error-banner" role="alert" hidden></p>
+              <ul id="book-list" class="book-cards"></ul>
+            </main>
+            <script src="/app.js" defer><\/script>
+          </body>
+          </html>
+        </script>
+      </div>
+      <div data-tab="SPA CSS (public/style.css)">
+        <p>Responsive container, card rows, and accessible error banner styling for your static front end.</p>
+        <script type="text/plain" class="code" data-lang="css" data-title="public/style.css (starter)">
+          body { font-family: system-ui, sans-serif; margin: 0; padding: 24px 16px; background: #f8fafc; color: #1f2937; }
+          .container { max-width: 600px; margin: 0 auto; }
+          .book-cards { list-style: none; padding: 0; display: grid; gap: 8px; }
+          .book-cards li { padding: 12px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; }
+          .error-banner { padding: 10px 14px; background: #fef2f2; border: 1px solid #ef4444; color: #991b1b; border-radius: 8px; font-weight: 700; }
+        </script>
+      </div>
     </div>
 
     <div class="flashcards" data-title="Week 2 key terms" data-front="Term" data-back="Definition">

@@ -24,6 +24,8 @@
     .c4-checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
     .c4-checklist li { margin: 0; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--surface); font-size: .93rem; }
     .c4-checklist li b { display: block; margin-bottom: 2px; }
+    .c4-tabs .tab-panel > .code-block:first-child { margin-top: 8px; }
+    .c4-tabs .tab-panel > p + .code-block { margin-top: 14px; }
   </style>
 </head>
 <body data-module="wk4">
@@ -195,6 +197,28 @@ stored as : salt + ':' + hash, in a single column</div>
       <li>Run scrypt on the password that was just typed, using that stored salt and the same 64-byte key length.</li>
       <li>Compare the two hashes with <code>timingSafeEqual</code>. Equal means the typed password is right — and the real password was never stored, recovered, or compared directly.</li>
     </ol>
+
+    <p><strong>Example — how that <code>users</code> record is defined in SQL vs. stored in MongoDB:</strong></p>
+    <div class="grid-2">
+      <script type="text/plain" class="code" data-lang="sql" data-title="MySQL — CREATE TABLE users">
+        CREATE TABLE users (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          username VARCHAR(60) NOT NULL UNIQUE,
+          password_hash VARCHAR(255) NOT NULL,
+          role VARCHAR(20) NOT NULL DEFAULT 'student'
+        );
+      </script>
+      <script type="text/plain" class="code" data-lang="json" data-title="MongoDB — one user document">
+        {
+          "_id": "66f1c2a4b8e3d5f60718293a",
+          "username": "ada",
+          "password_hash": "f72847f6...:c4212967...",
+          "role": "student"
+        }
+      </script>
+    </div>
+    <p>Notice three deliberate schema choices in the SQL table: <code>UNIQUE</code> on <code>username</code> prevents duplicate accounts even if two registrations arrive at the same millisecond; <code>VARCHAR(255)</code> leaves comfortable room for the 161-character <code>salt:hash</code> (and for longer formats if you later upgrade to Argon2id); and <code>DEFAULT 'student'</code> guarantees every new account starts with least privilege unless an admin explicitly changes it.</p>
+
     <p>Students often ask why the app does not simply <em>encrypt</em> the passwords instead. The tabs below draw the line, because the difference decides whether a leak is embarrassing or catastrophic.</p>
     <div class="tabs">
       <div data-tab="Hashing (what you do)">
@@ -379,6 +403,105 @@ Listening on port 3000</div>
       <li><strong><code>maxAge</code></strong> is the cookie’s lifetime in milliseconds — here two hours — after which the visitor has to log in again; without it the cookie has no time limit and lasts until the browser closes.</li>
       <li><strong><code>secure: 'auto'</code></strong> marks the cookie HTTPS-only whenever the request arrived over HTTPS, and leaves the mark off on plain <code>http://localhost</code> so that logging in still works while you develop.</li>
     </ul>
+
+    <h3>The front end that talks to <code>/login</code> and <code>/logout</code></h3>
+    <p>Every backend login route starts with an HTML form in the browser. Click through all three tabs to see the HTML form, its CSS styling, and an optional browser-JS handler that shows a failed <code>401</code> cleanly without losing the visitor's username:</p>
+    <div class="tabs c4-tabs">
+      <div data-tab="1 · HTML (public/login.html)">
+        <p>Uses <code>method="post"</code> (passwords must never ride in a GET URL!), <code>type="password"</code> to mask input, proper <code>autocomplete</code> hints for password managers, and a <code>POST</code> form for logout.</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="public/login.html">
+          <main class="auth-card">
+            <h1>Sign in</h1>
+            <p id="login-error" class="auth-error" role="alert" hidden></p>
+
+            <form id="login-form" method="post" action="/login">
+              <label for="username">Username</label>
+              <input id="username" name="username" type="text" autocomplete="username" required>
+
+              <label for="password">Password</label>
+              <input id="password" name="password" type="password" autocomplete="current-password" required>
+
+              <button type="submit" class="btn-primary">Log in</button>
+            </form>
+          </main>
+
+          <!-- Logout MUST be POST, never an <a href="/logout"> GET link -->
+          <form method="post" action="/logout">
+            <button type="submit" class="btn-secondary">Log out</button>
+          </form>
+        </script>
+      </div>
+      <div data-tab="2 · CSS (public/auth.css)">
+        <p>Centers the card, spaces labels and inputs cleanly, keeps focus outlines unmistakable for keyboard users, and styles the error banner with high contrast.</p>
+        <script type="text/plain" class="code" data-lang="css" data-title="public/auth.css">
+          .auth-card {
+            max-width: 380px;
+            margin: 40px auto;
+            padding: 24px;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            font-family: system-ui, sans-serif;
+          }
+          .auth-card label { display: block; font-weight: 700; margin-top: 12px; }
+          .auth-card input {
+            display: block;
+            width: 100%;
+            margin-top: 4px;
+            padding: 9px 10px;
+            border: 1.5px solid #94a3b8;
+            border-radius: 6px;
+            font: inherit;
+            box-sizing: border-box;
+          }
+          .auth-card input:focus-visible { outline: 2px solid #1f4fd1; outline-offset: 2px; }
+          .btn-primary {
+            width: 100%;
+            margin-top: 16px;
+            padding: 10px;
+            border: 0;
+            border-radius: 6px;
+            background: #1f4fd1;
+            color: #ffffff;
+            font: inherit;
+            font-weight: 700;
+            cursor: pointer;
+          }
+          .auth-error {
+            padding: 10px 12px;
+            background: #fef2f2;
+            border: 1px solid #ef4444;
+            border-radius: 8px;
+            color: #991b1b;
+            font-weight: 700;
+          }
+        </script>
+      </div>
+      <div data-tab="3 · Browser JS (AJAX login check)">
+        <p>Optional enhancement: submits credentials with <code>fetch()</code> as form-encoded data (or JSON), redirects on success, and shows the server's generic <code>401</code> error inline while clearing only the password field.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="public/login.js (optional SPA handler)">
+          const form = document.getElementById('login-form');
+          const errEl = document.getElementById('login-error');
+
+          form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            errEl.hidden = true;
+
+            const body = new URLSearchParams(new FormData(form));
+            const res = await fetch('/login', { method: 'POST', body });
+
+            if (!res.ok) {
+              errEl.textContent = await res.text(); // "Wrong username or password"
+              errEl.hidden = false;
+              form.elements.password.value = '';    // clear password, keep username
+              return;
+            }
+            window.location = '/dashboard';
+          });
+        </script>
+      </div>
+    </div>
+    <p>Three security details hide inside those front-end snippets: <code>autocomplete="username"</code> and <code>autocomplete="current-password"</code> let browsers and password managers safely offer strong unique passwords (use <code>autocomplete="new-password"</code> on a registration form); logout uses a <code>&lt;form method="post" action="/logout"&gt;</code> instead of a plain link because a GET link can be triggered unintentionally by link prefetchers or an image tag on another site (CSRF, Section 4.5); and on a <code>401</code>, clearing <code>form.elements.password.value</code> while printing the server's generic error via <code>textContent</code> keeps the UI helpful and XSS-safe.</p>
 
     <aside class="callout warn">
       <strong>Three session rules that are not optional</strong>
@@ -589,6 +712,53 @@ Signature (part 3):        not decoded — it is the HMAC of parts 1 and 2,
     </script>
     <p>The word <code>Bearer</code> means “whoever bears (carries) this token” — the server does not ask for anything else. Middleware on the server reads the header, runs the same <code>verify</code> you saw in the demo, and — if it passes — copies the claims onto the request (often as <code>req.user</code>), so route handlers and role guards can use <code>sub</code> and <code>role</code> exactly the way the session version used <code>req.session</code>. Same authorization logic, different delivery van.</p>
     <p>“The client keeps the token” hides a real decision when the client is a browser. Put the token in <code>localStorage</code> and any script running on your page can read it, so one XSS bug (Section 4.5) lets an attacker copy the token and use it from their own machine. Put it in an <code>HttpOnly</code> cookie instead and page scripts cannot read it — but now the browser attaches it to requests automatically, which brings CSRF back and makes <code>SameSite</code> matter again. For this course’s app, where one server sends both the pages and the API, sessions are the simpler choice: the same cookie protections, and nothing for your own script to store.</p>
+
+    <p><strong>Example — both ends of a JWT-protected request in code:</strong> the server middleware verifies the <code>Bearer</code> token with a pinned algorithm, and the client attaches it in the <code>Authorization</code> header:</p>
+    <div class="grid-2">
+      <script type="text/plain" class="code" data-lang="js" data-title="Server: requireJwt middleware (Express)">
+        const jwt = require('jsonwebtoken');
+
+        function requireJwt(req, res, next) {
+          const auth = req.headers.authorization || '';
+          if (!auth.startsWith('Bearer ')) {
+            return res.status(401).json({ error: 'Missing or invalid token' });
+          }
+          const token = auth.slice(7); // Strip 'Bearer ' prefix
+          try {
+            // Pin the algorithm and verify signature + exp timestamp
+            req.user = jwt.verify(token, process.env.JWT_SECRET, {
+              algorithms: ['HS256']
+            });
+            next();
+          } catch {
+            return res.status(401).json({ error: 'Missing or invalid token' });
+          }
+        }
+
+        app.get('/api/my-grades', requireJwt, (req, res) => {
+          res.json({ sub: req.user.sub, role: req.user.role });
+        });
+      </script>
+      <script type="text/plain" class="code" data-lang="js" data-title="Client: sending the Bearer token with fetch()">
+        async function loadMyGrades(token) {
+          const res = await fetch('/api/my-grades', {
+            headers: {
+              Authorization: 'Bearer ' + token
+            }
+          });
+
+          if (res.status === 401) {
+            throw new Error('Session expired — please sign in again');
+          }
+          if (!res.ok) {
+            throw new Error('Request failed: ' + res.status);
+          }
+          return res.json();
+        }
+      </script>
+    </div>
+    <p>Trace how the two halves interlock. In Express, header names are always lowercased on <code>req.headers</code>, so the server reads <code>req.headers.authorization</code>. Checking <code>auth.startsWith('Bearer ')</code> and slicing off the 7-character prefix isolates the raw JWT string, which <code>jwt.verify</code> validates against <code>process.env.JWT_SECRET</code> (rejecting altered payloads, wrong secrets, wrong algorithms, or expired <code>exp</code> claims). On success, attaching the verified claims to <code>req.user</code> lets the route handler — and any role guard after it — read <code>req.user.sub</code> and <code>req.user.role</code> safely.</p>
+
     <p>The claim names are short because tokens travel with every request. Make sure you can read them fluently:</p>
 
     <div class="match" data-title="Match each JWT claim to its meaning">
@@ -803,6 +973,61 @@ console.log('guest, view grades:       ', can('guest', 'view grades'));</textare
     <h3>Least privilege: give each role only what it needs</h3>
     <p>When you fill in your own permission matrix, work by one rule: <strong>least privilege</strong> — every role gets the smallest set of permissions that lets it do its job, and nothing more. A student role that can also edit grades “just in case” is not convenient; it is a bug waiting for a curious student. Start every cell at <em>no</em>, and make each <em>yes</em> earn its place by naming the real task that needs it. If nobody can name the task, the answer stays no.</p>
     <p>Roles are coarse, though — “members may edit” is not enough on its own, because it does not say <em>whose</em> records a member may edit. The server also checks <strong>ownership</strong>: a member may edit only their own records, by comparing the record’s owner id with the signed-in user’s id from the session (<code>req.session.userId</code>). For example, a student in the course app may edit a book on their own list, but if they change the id in the request to reach another student’s book, the owner ids will not match and the server must refuse. An instructor or admin role is the exception: that role may touch everyone’s records, because reviewing and managing the whole class is its job.</p>
+
+    <p><strong>Example — enforcing ownership on the server AND tailoring the UI cleanly (HTML, CSS &amp; JS):</strong></p>
+    <div class="tabs c4-tabs">
+      <div data-tab="1 · Server JS (ownership check)">
+        <p>Even after <code>requireLogin</code> passes, the route loads the book and verifies that the signed-in user either owns it or holds the <code>admin</code> role before updating anything.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="PUT /api/books/:id — ownership + role override">
+          app.put('/api/books/:id', requireLogin, async (req, res) => {
+            const book = await findBookById(req.params.id);
+            if (!book) {
+              return res.status(404).json({ error: 'Book not found' });
+            }
+
+            const isOwner = book.ownerId === req.session.userId;
+            const isAdmin = req.session.role === 'admin';
+            if (!isOwner && !isAdmin) {
+              return res.status(403).json({ error: 'Only the owner or an admin can edit this book' });
+            }
+
+            const updated = await updateBook(book.id, req.body);
+            res.json(updated);
+          });
+        </script>
+      </div>
+      <div data-tab="2 · Front-End HTML &amp; CSS (role-aware controls)">
+        <p>Hides staff-only controls from students by default using the <code>hidden</code> attribute and shows a clear role badge — presentation polish paired with the real lock on the server.</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="Role-aware toolbar (HTML + CSS)">
+          <header class="app-bar">
+            <span id="role-badge" class="role-badge"></span>
+            <button id="grade-btn" type="button" hidden>Enter grades</button>
+            <button id="admin-btn" type="button" hidden>Manage users</button>
+          </header>
+          <style>
+            .app-bar { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: #f8fafc; border-bottom: 1px solid #cbd5e1; }
+            .role-badge { padding: 3px 10px; border-radius: 99px; background: #eef4ff; color: #1f4fd1; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; }
+          </style>
+        </script>
+      </div>
+      <div data-tab="3 · Browser JS (reading /api/me)">
+        <p>Asks the server who is signed in and toggles button visibility — never trusting a role saved in <code>localStorage</code> or a cookie.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="Showing UI controls for the signed-in role">
+          async function initToolbar() {
+            const res = await fetch('/api/me');
+            if (!res.ok) return; // signed out: keep staff buttons hidden
+            const user = await res.json(); // { id, username, role } — never password_hash!
+
+            document.getElementById('role-badge').textContent = user.role;
+            document.getElementById('grade-btn').hidden = !['instructor', 'admin'].includes(user.role);
+            document.getElementById('admin-btn').hidden = user.role !== 'admin';
+          }
+          initToolbar();
+        </script>
+      </div>
+    </div>
+    <p>Walk through why both halves belong together. In Tab 1, checking <code>book.ownerId === req.session.userId</code> prevents a classic flaw called <strong>broken object-level authorization</strong> — where User A logs in legitimately and simply swaps <code>/api/books/12</code> to <code>/api/books/13</code> to edit User B's record. In Tabs 2 and 3, querying <code>/api/me</code> lets the front end show a tidy interface tailored to the user's role while the server remains the single authority on every write.</p>
+
     <p><strong>Example — the same copied student session, under two different permission sets:</strong></p>
     <div class="table-wrap">
       <table class="data-table">
@@ -956,6 +1181,40 @@ To address all issues, run:
       <li><b>Never send hashes back</b> An API response must never include the stored password hash, or the salt that goes with it. Leave those fields out of every user object you return, even to the account owner themselves. A hash handed out in a response is a hash an attacker can take away and guess against offline, at their leisure.</li>
       <li><b>Watch for NoSQL injection</b> If a login route feeds a JSON body straight into a MongoDB query, an attacker can send an object instead of a string: a username of <code>{"$ne": null}</code> means “not equal to null” as a query condition, and can match the first user in the database. The defense is the Week 3 rule applied again: check the type of every value — here, that the username and password really are strings — before it goes into a query.</li>
     </ul>
+
+    <p><strong>Example — two concrete hygiene patterns in Express (throttling logins &amp; stripping sensitive fields):</strong></p>
+    <div class="grid-2">
+      <script type="text/plain" class="code" data-lang="js" data-title="Throttling POST /login (express-rate-limit)">
+        const rateLimit = require('express-rate-limit');
+
+        // At most 10 login attempts per IP every 15 minutes
+        const loginLimiter = rateLimit({
+          windowMs: 15 * 60 * 1000,
+          limit: 10,
+          standardHeaders: true,
+          legacyHeaders: false,
+          message: { error: 'Too many login attempts. Try again later.' }
+        });
+
+        // Attach the limiter right before the login handler:
+        app.post('/login', loginLimiter, handleLogin);
+      </script>
+      <script type="text/plain" class="code" data-lang="js" data-title="Never return password_hash from /api/me">
+        // BAD: res.json(user) leaks user.password_hash!
+        // GOOD: pick ONLY the public fields explicitly:
+        app.get('/api/me', requireLogin, async (req, res) => {
+          const user = await findUserById(req.session.userId);
+          if (!user) return res.status(401).json({ error: 'Not signed in' });
+
+          res.json({
+            id: user.id,
+            username: user.username,
+            role: user.role
+          });
+        });
+      </script>
+    </div>
+    <p>Read both habits side by side. On the left, <code>loginLimiter</code> is ordinary Express middleware placed right in front of <code>POST /login</code>: once an IP exceeds 10 guesses in 15 minutes, Express answers <code>429 Too Many Requests</code> before your handler even runs <code>scrypt</code>. On the right, building a fresh response object with <code>{ id, username, role }</code> guarantees that even if a future developer adds a new private column to the <code>users</code> table, it can never accidentally leak into an API response.</p>
 
     <h3>Spot the bad practice</h3>
     <p>Flip through these cards. Each front shows a habit; decide whether it is safe or a problem before you flip it over.</p>
@@ -1115,6 +1374,121 @@ To address all issues, run:
       }
     </script>
     <p>These two fragments are labeled sketches — they assemble the verified patterns from each week into capstone shape, the same way Section 4.2’s login route did. The patterns themselves (the REST responses, the session fields, the guard) are the ones you ran for real in each week’s demos.</p>
+
+    <h3>The rest of the capstone, side by side (HTML, CSS, Server &amp; DB)</h3>
+    <p>Inspect the four companion files from the <code>course-book-tracker/</code> tree above so you can see how every layer connects into one working project:</p>
+    <div class="tabs c4-tabs">
+      <div data-tab="1 · public/index.html (HTML)">
+        <p>Loads the stylesheet and <code>app.js</code>, provides the add-book form, an accessible error alert, a book list container, and a <code>POST /logout</code> button.</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="public/index.html (capstone sketch)">
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Course Book Tracker</title>
+            <link rel="stylesheet" href="/styles.css">
+          </head>
+          <body>
+            <header class="top">
+              <h1>My Course Books</h1>
+              <form method="post" action="/logout">
+                <button type="submit" class="btn-ghost">Log out</button>
+              </form>
+            </header>
+
+            <main class="wrap">
+              <p id="err" class="alert" role="alert" hidden></p>
+              <form id="add-form" class="add-form">
+                <label>Title <input name="title" type="text" required maxlength="100"></label>
+                <label>Author <input name="author" type="text" required maxlength="60"></label>
+                <button type="submit" class="btn-primary">Add book</button>
+              </form>
+              <ul id="book-list" class="book-list"></ul>
+            </main>
+
+            <script src="/app.js" defer><\/script>
+          </body>
+          </html>
+        </script>
+      </div>
+      <div data-tab="2 · public/styles.css (CSS)">
+        <p>Clean responsive card layout, Flexbox header bar, wrapping form row, and high-contrast alert banner.</p>
+        <script type="text/plain" class="code" data-lang="css" data-title="public/styles.css (capstone sketch)">
+          body { font-family: system-ui, sans-serif; margin: 0; background: #f8fafc; color: #1f2937; }
+          .top { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; background: #ffffff; border-bottom: 1px solid #cbd5e1; }
+          .wrap { max-width: 640px; margin: 24px auto; padding: 0 16px; }
+          .add-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 18px; }
+          .add-form label { display: grid; gap: 4px; flex: 1 1 180px; font-size: 0.88rem; font-weight: 700; }
+          .add-form input { padding: 8px 10px; border: 1px solid #94a3b8; border-radius: 6px; font: inherit; }
+          .btn-primary { padding: 9px 16px; border: 0; border-radius: 6px; background: #1f4fd1; color: #ffffff; font: inherit; font-weight: 700; cursor: pointer; }
+          .btn-ghost { padding: 6px 12px; border: 1px solid #94a3b8; border-radius: 6px; background: #ffffff; color: #1f2937; font: inherit; cursor: pointer; }
+          .book-list { list-style: none; padding: 0; display: grid; gap: 8px; }
+          .book-list li { padding: 12px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; }
+          .alert { padding: 10px 14px; background: #fef2f2; border: 1px solid #ef4444; border-radius: 8px; color: #991b1b; font-weight: 700; }
+        </script>
+      </div>
+      <div data-tab="3 · server.js (Express wiring)">
+        <p>Assembles the exact Week 2 middleware order with Week 3/4 sessions, static files, auth + books routers, 404, and error handler.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="server.js (capstone sketch)">
+          const express = require('express');
+          const session = require('express-session');
+          const morgan = require('morgan');
+          const authRouter = require('./routes/auth');
+          const booksRouter = require('./routes/books');
+
+          const app = express();
+          app.use(morgan('dev'));
+          app.use(express.json());
+          app.use(express.urlencoded({ extended: false }));
+          app.use(session({
+            secret: process.env.SESSION_SECRET,
+            resave: false,
+            saveUninitialized: false,
+            cookie: { httpOnly: true, sameSite: 'lax', maxAge: 1000 * 60 * 60 * 2, secure: 'auto' }
+          }));
+          app.use(express.static('public'));
+
+          app.use('/', authRouter);
+          app.use('/api/books', booksRouter);
+
+          app.use((req, res) => res.status(404).json({ error: 'Not found' }));
+          app.use((err, req, res, next) => {
+            const status = err.status || 500;
+            if (status >= 500) console.error(err);
+            res.status(status).json({ error: status >= 500 ? 'Internal server error' : err.message });
+          });
+
+          const port = process.env.PORT || 3000;
+          app.listen(port, () => console.log('Listening on port ' + port));
+        </script>
+      </div>
+      <div data-tab="4 · db.js (MySQL helper)">
+        <p>Keeps the shared connection pool and parameterized SQL in one module so routes stay readable and injection-safe.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="db.js (capstone sketch — mysql2/promise)">
+          const mysql = require('mysql2/promise');
+
+          const pool = mysql.createPool({
+            host: process.env.DB_HOST || 'localhost',
+            user: process.env.DB_USER || 'root',
+            password: process.env.DB_PASSWORD,
+            database: process.env.DB_NAME || 'book_tracker',
+            connectionLimit: 10
+          });
+
+          async function insertBook({ title, author, ownerId }) {
+            const [res] = await pool.execute(
+              'INSERT INTO books (title, author, owner_id) VALUES (?, ?, ?)',
+              [title, author, ownerId]
+            );
+            return { id: res.insertId, title, author, ownerId };
+          }
+
+          module.exports = { pool, insertBook };
+        </script>
+      </div>
+    </div>
+    <p>Follow the thread across all four tabs: <code>server.js</code> sets up logging, body parsing, sessions, and <code>express.static('public')</code> in strict top-to-bottom order; <code>public/index.html</code> and <code>public/styles.css</code> give the browser a clean interface; <code>public/app.js</code> talks to <code>routes/books.js</code> over JSON; and <code>db.js</code> isolates the parameterized SQL pool so swapping MySQL for MongoDB later touches only one file.</p>
 
     <h3>Where every piece came from</h3>
     <div class="table-wrap">

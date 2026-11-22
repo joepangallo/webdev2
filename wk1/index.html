@@ -19,6 +19,8 @@
     .stepper-stage .wk1-node.active { border-color: var(--mod); background: color-mix(in srgb, var(--mod) 12%, var(--surface)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--mod) 35%, transparent); }
     .wk1-caption { font-size: .85rem; color: var(--ink-3); margin: 14px 0 6px; }
     .wk1-err { font-family: var(--font-mono); font-size: .85rem; }
+    .wk1-tabs .tab-panel > .code-block:first-child { margin-top: 8px; }
+    .wk1-tabs .tab-panel > p + .code-block { margin-top: 14px; }
   </style>
 </head>
 <body data-module="wk1">
@@ -63,6 +65,74 @@ Response body: Hello, Ada!
 GET /greeting?name=Grace
 Response body: Hello, Grace!</div>
 
+    <p><strong>Look at the actual code behind that difference.</strong> A static page is just HTML and CSS saved ahead of time; a dynamic answer is a small JavaScript function running on the server when the request arrives. Click through all three tabs:</p>
+    <div class="tabs wk1-tabs">
+      <div data-tab="Static HTML (about.html)">
+        <p>This file sits finished on disk. Every visitor receives the exact same bytes — Ada and Grace see the exact same words.</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="about.html (static)">
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <title>About Us</title>
+            <link rel="stylesheet" href="style.css">
+          </head>
+          <body>
+            <main class="card">
+              <h1>About the Bookstore</h1>
+              <p>Open daily from 9am to 6pm.</p>
+            </main>
+          </body>
+          </html>
+        </script>
+      </div>
+      <div data-tab="Static CSS (style.css)">
+        <p>Stylesheets are almost always static files too. The browser reads the <code>&lt;link&gt;</code> tag in the HTML above and sends a second GET request for this CSS file.</p>
+        <script type="text/plain" class="code" data-lang="css" data-title="style.css (static)">
+          body {
+            font-family: system-ui, sans-serif;
+            background: #f6f7fb;
+            color: #1f2937;
+            margin: 0;
+            padding: 32px 16px;
+          }
+          .card {
+            max-width: 520px;
+            margin: 0 auto;
+            padding: 24px;
+            background: #ffffff;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+          }
+          .card h1 {
+            margin-top: 0;
+            color: #1f4fd1;
+          }
+        </script>
+      </div>
+      <div data-tab="Dynamic Server JS (greeting-route.js)">
+        <p>Nothing here is saved in advance. Every time a request arrives at <code>/greeting</code>, Node runs this function, reads the visitor's name from the URL, and builds a fresh response.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="greeting-route.js (dynamic, Express)">
+          const express = require('express');
+          const app = express();
+
+          app.get('/greeting', (req, res) => {
+            // Read ?name=... from the request URL; fall back to 'visitor' if omitted
+            const name = req.query.name || 'visitor';
+            res.type('text/plain').send(`Hello, ${name}!`);
+          });
+
+          app.listen(3000);
+        </script>
+      </div>
+    </div>
+    <p>Walk through all three tabs to see how the pieces fit together:</p>
+    <ul>
+      <li><strong><code>about.html</code> (HTML):</strong> <code>&lt;!DOCTYPE html&gt;</code> tells the browser to use modern HTML5 parsing, <code>&lt;meta charset=&quot;utf-8&quot;&gt;</code> ensures punctuation and symbols display cleanly, and <code>&lt;link rel=&quot;stylesheet&quot; href=&quot;style.css&quot;&gt;</code> triggers a separate request for the stylesheet. Notice there are no placeholders or variables inside <code>&lt;main class=&quot;card&quot;&gt;</code> — the words are frozen on disk.</li>
+      <li><strong><code>style.css</code> (CSS):</strong> <code>margin: 0 auto</code> combined with <code>max-width: 520px</code> centers the card horizontally on any screen, while <code>background</code>, <code>border</code>, and <code>border-radius</code> give it a clean card frame. Like the HTML file, this CSS does not change from visitor to visitor.</li>
+      <li><strong><code>greeting-route.js</code> (Server JS):</strong> <code>app.get('/greeting', (req, res) =&gt; { ... })</code> registers a function that runs <em>at request time</em>. When Ada asks for <code>/greeting?name=Ada</code>, <code>req.query.name</code> is <code>'Ada'</code>; when someone asks for plain <code>/greeting</code>, <code>req.query.name</code> is <code>undefined</code>, so the <code>|| 'visitor'</code> fallback supplies a default. Finally, <code>res.type('text/plain').send(...)</code> sends a plain-text answer tailored to that one request. (You will build full Express apps like this from scratch in Section 1.4.)</li>
+    </ul>
+
     <h3>Client and server, in plain words</h3>
     <p>A <strong>client</strong> is the program that asks for something. On the web, that is usually your browser. A <strong>server</strong> is a program that waits for requests, does work, and sends back a <strong>response</strong> — the answer to one request. The word "server" also gets used for the computer the program runs on, which causes endless confusion. In this course, when we say "your server," we almost always mean <em>your program</em>.</p>
     <p>The conversation is always the same shape: the client sends a <strong>request</strong> (a message that says what it wants, like "GET /about"), and the server sends back one response (the page, some data, or an error). The client always speaks first. A server sitting alone in a room says nothing until somebody asks.</p>
@@ -82,6 +152,35 @@ About page</div>
       <strong>Why does the work move to the server at all?</strong>
       <p>Three reasons. <strong>Fresh data:</strong> the server can read the current state of a database instead of a file frozen last month. <strong>Secrets:</strong> code on the server can hold passwords and keys that visitors must never see — anything you send to a browser is public. <strong>Trust:</strong> you control the server, but you do not control the visitor's browser, so prices, grades and permissions are always checked on the server, never only in the page.</p>
     </aside>
+
+    <p><strong>Example — why trust and secrets belong on the server, in code:</strong> compare a checkout calculation written in browser JavaScript (unsafe) with the same calculation running in Node on your server (safe):</p>
+    <div class="grid-2">
+      <script type="text/plain" class="code" data-lang="js" data-title="Unsafe: browser JS (public &amp; editable)">
+        // Sent to every visitor's browser!
+        // Anyone can open DevTools and read this key:
+        const PAYMENT_SECRET = 'sk_live_never_put_here';
+
+        // A visitor can open the Console and change price to 0:
+        let price = 40;
+        const discount = 0.25;
+        const total = price * (1 - discount);
+        console.log('Charging:', total);
+      </script>
+      <script type="text/plain" class="code" data-lang="js" data-title="Safe: server JS in Node (private)">
+        // Stays on your server — visitors never see this file.
+        // Secret keys come from the server's environment:
+        const PAYMENT_SECRET = process.env.PAYMENT_SECRET;
+
+        // The server looks up the real price itself:
+        const CATALOG = { 'web-dev-book': 40 };
+        function calculateTotal(itemId, coupon) {
+          const basePrice = CATALOG[itemId];
+          const rate = coupon === 'SAVE25' ? 0.25 : 0;
+          return basePrice * (1 - rate);
+        }
+      </script>
+    </div>
+    <p>Trace the difference line by line. On the left, because browser JavaScript is downloaded onto the visitor's laptop before it runs, pressing F12 in the browser exposes <code>PAYMENT_SECRET</code> in plain text and lets a clever shopper overwrite <code>price</code> before submitting the order. On the right, Node executes the file on <em>your</em> machine: <code>process.env.PAYMENT_SECRET</code> reads a private system variable that never crosses the network, and <code>CATALOG[itemId]</code> looks up the authoritative price on the server so the browser can only say <em>which item</em> and <em>which coupon code</em> it wants — never what it feels like paying.</p>
 
     <h3>What is a runtime?</h3>
     <p>JavaScript code cannot run by itself. Something has to read it, carry out its instructions, and give it ways to interact with the world. That something is a <strong>runtime</strong>: the environment a program runs inside, including the engine that executes the code plus the tools the code is allowed to use.</p>
@@ -103,8 +202,31 @@ About page</div>
 
     <p>So "server-side logic with a JavaScript runtime" — the wording of Objective 2 for this course — simply means: <em>your JavaScript, running in Node, on the server, deciding what each response should be.</em> Same language as the browser, different toolbox, different job.</p>
 
+    <p><strong>Example — same JavaScript syntax, completely different runtime tools:</strong></p>
+    <div class="grid-2">
+      <script type="text/plain" class="code" data-lang="js" data-title="Browser runtime (browser-greeting.js)">
+        // Works ONLY in a browser (there is a live HTML page)
+        const heading = document.querySelector('#welcome');
+        const btn = document.querySelector('#greet-btn');
+
+        btn.addEventListener('click', () => {
+          heading.textContent = 'Hello from the browser!';
+        });
+      </script>
+      <script type="text/plain" class="code" data-lang="js" data-title="Node runtime (node-info.js)">
+        // Works ONLY in Node (there is an operating system, no page)
+        const os = require('os');
+
+        console.log(`Node version: ${process.version}`);
+        console.log(`Current folder: ${process.cwd()}`);
+        console.log(`Operating system: ${os.platform()}`);
+        // console.log(document); -> ReferenceError: document is not defined
+      </script>
+    </div>
+    <p>Look closely at what stays identical and what changes. Both files use <code>const</code>, arrow functions, template literals, and method calls — that is the core JavaScript language running inside V8. The difference is the global tools each runtime hands you: the browser provides <code>document</code> and DOM events like <code>'click'</code> because it is displaying an HTML page; Node provides <code>require()</code>, <code>process</code> (which exposes <code>process.version</code> and the working folder <code>process.cwd()</code>), and core modules like <code>os</code>, <code>fs</code>, and <code>http</code>. Try to use <code>document</code> inside Node and it immediately throws <code>ReferenceError: document is not defined</code>, because Node has no browser window at all.</p>
+
     <p><strong>Example — Node running one line of JavaScript:</strong></p>
-    <script type="text/plain" class="code" data-lang="js" data-title="Terminal">
+    <script type="text/plain" class="code" data-lang="text" data-title="Terminal">
       node -e "console.log(2 + 2)"
     </script>
     <p class="wk1-caption">Real output — captured by running this exact program (Node 26, Express 5).</p>
@@ -133,6 +255,51 @@ About page</div>
       <p>Never make the worker stand and watch. Node's file tools come in pairs like <code>readFile</code> (non-blocking: starts the read, runs your callback later) and <code>readFileSync</code> (blocking: the worker waits). Later in this course you will use the <code>Sync</code> versions, because they keep a short example easy to follow, and they are fine in tiny scripts and startup code. In a request handler, they stall every other visitor.</p>
     </aside>
 
+    <p><strong>Example — blocking <code>readFileSync</code> vs. non-blocking <code>readFile</code> side by side:</strong> suppose a small file named <code>notes.txt</code> contains the line <code>Welcome to Week 1</code>. Compare what each program prints:</p>
+    <div class="grid-2">
+      <script type="text/plain" class="code" data-lang="js" data-title="blocking-read.js (waits on the spot)">
+        const fs = require('fs');
+
+        console.log('1. Starting file read');
+        // Worker stops here until the disk finishes:
+        const text = fs.readFileSync('notes.txt', 'utf8');
+        console.log('2. File says:', text.trim());
+        console.log('3. Ready for next visitor');
+      </script>
+      <script type="text/plain" class="code" data-lang="js" data-title="nonblocking-read.js (uses a callback)">
+        const fs = require('fs');
+
+        console.log('1. Starting file read');
+        // Worker hands the read to the system and moves on:
+        fs.readFile('notes.txt', 'utf8', (err, text) => {
+          if (err) {
+            console.error('Read failed:', err.message);
+            return;
+          }
+          console.log('3. File says:', text.trim());
+        });
+        console.log('2. Ready for next visitor');
+      </script>
+    </div>
+    <p class="wk1-caption">Expected output — notice how the non-blocking version reaches "Ready for next visitor" before the disk finishes:</p>
+    <div class="output">--- blocking-read.js ---
+1. Starting file read
+2. File says: Welcome to Week 1
+3. Ready for next visitor
+
+--- nonblocking-read.js ---
+1. Starting file read
+2. Ready for next visitor
+3. File says: Welcome to Week 1</div>
+    <p>Every detail in <code>nonblocking-read.js</code> is a pattern you will see throughout Node:</p>
+    <ul>
+      <li><strong><code>const fs = require('fs')</code>:</strong> loads Node's built-in file-system core module.</li>
+      <li><strong><code>'utf8'</code>:</strong> tells Node to decode the raw bytes from disk into a readable JavaScript string. Leave <code>'utf8'</code> out and Node hands you a raw <code>Buffer</code> of hexadecimal bytes instead of text.</li>
+      <li><strong><code>(err, text) =&gt; { ... }</code>:</strong> an <strong>error-first callback</strong>, Node's long-standing convention for asynchronous callbacks. If the file is missing or unreadable, <code>err</code> is an Error object and <code>if (err) { ... return; }</code> exits safely before touching <code>text</code>. If the read succeeds, <code>err</code> is <code>null</code> and <code>text</code> holds the file's contents.</li>
+      <li><strong><code>text.trim()</code>:</strong> strips the trailing newline character at the end of the file so the log stays on one tidy line.</li>
+      <li><strong>Why line <code>2</code> prints before line <code>3</code>:</strong> <code>fs.readFile</code> starts the disk operation and immediately returns control to the worker, which prints <code>2. Ready for next visitor</code>. Only after the disk answers does the event loop invoke the callback and print <code>3. File says: Welcome to Week 1</code>.</li>
+    </ul>
+
     <h3>Two halves of every web app</h3>
     <p>You will hear the two sides called the <strong>front end</strong> and the <strong>back end</strong>. The front end is everything that runs in the visitor's browser: the HTML, CSS and browser JavaScript from Web Dev I. The back end is everything that runs on the server: your Node program, its routes, and the data it guards. This course is mostly about the back end — but notice that the boundary between them is exactly the request/response conversation. The front end asks; the back end answers.</p>
     <div class="table-wrap">
@@ -146,6 +313,82 @@ About page</div>
         </tbody>
       </table>
     </div>
+
+    <p><strong>Example — one tiny feature across both halves (HTML, CSS, Browser JS, and Server JS):</strong> picture a "Quote of the Day" box with a button. Inspect all four tabs to see exactly which job belongs to which language and which side of the wire:</p>
+    <div class="tabs wk1-tabs">
+      <div data-tab="1 · HTML (Front end)">
+        <p>Defines the structure in the browser and places <code>id</code> hooks (<code>quote-text</code> and <code>load-btn</code>) so CSS can style them and browser JavaScript can update them.</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="index.html (runs in browser)">
+          <main class="quote-box">
+            <h1>Study Tip</h1>
+            <p id="quote-text">Click the button to fetch a tip from the server.</p>
+            <button id="load-btn" type="button">New tip</button>
+          </main>
+          <script src="client.js" defer><\/script>
+        </script>
+      </div>
+      <div data-tab="2 · CSS (Front end)">
+        <p>Controls visual presentation in the browser — layout, contrast, spacing, and button hover state. CSS never touches the server's data.</p>
+        <script type="text/plain" class="code" data-lang="css" data-title="styles.css (runs in browser)">
+          .quote-box {
+            max-width: 480px;
+            padding: 20px 24px;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            background: #ffffff;
+          }
+          #quote-text {
+            font-size: 1.05rem;
+            line-height: 1.5;
+            color: #1f2937;
+          }
+          #load-btn {
+            padding: 8px 16px;
+            border: 0;
+            border-radius: 6px;
+            background: #1f4fd1;
+            color: #ffffff;
+            font-weight: 700;
+            cursor: pointer;
+          }
+          #load-btn:hover { background: #173ca3; }
+        </script>
+      </div>
+      <div data-tab="3 · Browser JS (Front end)">
+        <p>Listens for the click in the browser, sends an HTTP GET request to <code>/api/tip</code> with <code>fetch()</code>, and writes the server's reply into the page.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="client.js (runs in browser)">
+          const quoteEl = document.querySelector('#quote-text');
+          const loadBtn = document.querySelector('#load-btn');
+
+          loadBtn.addEventListener('click', async () => {
+            const response = await fetch('/api/tip'); // 1. Ask the server
+            const data = await response.json();       // 2. Parse JSON reply
+            quoteEl.textContent = data.tip;           // 3. Update the page safely
+          });
+        </script>
+      </div>
+      <div data-tab="4 · Server JS (Back end)">
+        <p>Runs in Node on your server. It holds the list of tips, picks one when a request arrives at <code>/api/tip</code>, and sends it back as JSON.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="server.js (runs in Node)">
+          const express = require('express');
+          const app = express();
+
+          const tips = [
+            'Read the first line of every error message before editing.',
+            'Restart your server after saving a change (or use node --watch).',
+            'Every HTML form field needs a name attribute to reach req.body.'
+          ];
+
+          app.get('/api/tip', (req, res) => {
+            const pick = tips[Math.floor(Math.random() * tips.length)];
+            res.json({ tip: pick });
+          });
+
+          app.listen(3000);
+        </script>
+      </div>
+    </div>
+    <p>Follow the boundary between the two halves. Everything in Tabs 1, 2, and 3 (<code>index.html</code>, <code>styles.css</code>, and <code>client.js</code>) executes inside the visitor's browser: HTML creates the elements (notice <code>type="button"</code> stops the button from submitting a form, and <code>defer</code> waits until the HTML is parsed before running <code>client.js</code>), CSS styles them, and <code>client.js</code> uses <code>textContent</code> (never raw <code>innerHTML</code>) to display the text safely. Tab 4 (<code>server.js</code>) runs in Node on your server: it waits for <code>GET /api/tip</code>, selects one tip from the array, and sends <code>{"tip":"..."}</code> back over HTTP. Notice how <code>client.js</code> and <code>server.js</code> never share memory or variables — the <em>only</em> bridge between them is the HTTP request and response.</p>
 
     <h3>Follow one request on its whole journey</h3>
     <p>Step through what happens when a visitor asks your server for a page that needs fresh data:</p>
@@ -279,6 +522,34 @@ Server listening on http://localhost:3000</div>
       <p><code>req.url</code> is the path <em>plus</em> any <strong>query string</strong> — the extra data after a <code>?</code> in an address, like <code>?lang=en</code>. So a request for <code>/about?lang=en</code> does <em>not</em> equal <code>'/about'</code>, and this hand-written chain would send it to the final <code>else</code> branch: "Page not found", even though the visitor asked for a page that exists. The curl examples above carry no query strings, which is why they match cleanly. Real programs handle this in one of two ways: they pull the address apart with the built-in <code>URL</code> class and compare only the path, or they let Express do the matching — Express compares the path and sets the query string aside for you. That is one more reason Express exists.</p>
     </aside>
 
+    <p><strong>Example — pulling the path and query string apart with Node's built-in <code>URL</code> class:</strong></p>
+    <script type="text/plain" class="code" data-lang="js" data-title="http-url-parse.js">
+      const http = require('http');
+
+      const server = http.createServer((req, res) => {
+        // Combine req.url with a base origin so URL can parse it cleanly
+        const parsed = new URL(req.url, 'http://localhost:3000');
+        const path = parsed.pathname;                         // '/about' (no '?lang=es')
+        const lang = parsed.searchParams.get('lang') || 'en'; // 'es', or default 'en'
+
+        if (path === '/about') {
+          res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end(`About page (language: ${lang})`);
+        } else {
+          res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end('Page not found');
+        }
+      });
+
+      server.listen(3000);
+    </script>
+    <p class="wk1-caption">Expected output — now a query string no longer breaks the route match:</p>
+    <div class="output">$ curl "http://localhost:3000/about?lang=es"
+About page (language: es)
+$ curl http://localhost:3000/about
+About page (language: en)</div>
+    <p>Read those three parsing lines closely. Because <code>req.url</code> is only the relative part (<code>'/about?lang=es'</code>), passing a second argument (<code>'http://localhost:3000'</code>) gives <code>new URL(...)</code> a valid full address to parse. From there, <code>parsed.pathname</code> gives you just the path (<code>'/about'</code>) so your <code>if</code> test matches reliably, and <code>parsed.searchParams.get('lang')</code> extracts the value for <code>lang</code> — returning <code>null</code> when absent, which triggers the <code>|| 'en'</code> fallback. (Quotes around the curl URL stop your terminal shell from treating <code>?</code> or <code>&amp;</code> as special shell characters.)</p>
+
     <h3>Reading the program, piece by piece</h3>
     <div class="table-wrap">
       <table class="data-table">
@@ -296,6 +567,70 @@ Server listening on http://localhost:3000</div>
     </div>
 
     <p>Look at the shape of the handler once more. It is a chain of <code>if / else if / else</code> tests on <code>req.url</code> — that chain <em>is</em> routing, done by hand. Every path needs its own branch, its own <code>writeHead</code>, its own <code>end</code>. Two pages and one fallback took sixteen lines of code. Imagine forty pages, plus forms, plus JSON. Hold that thought until Section 1.4.</p>
+
+    <h3>Sending real HTML and CSS: why <code>Content-Type</code> matters</h3>
+    <p>Our first server only sent <code>text/plain</code>. What happens when a Node server sends a real web page with HTML and CSS? Notice that a browser does not guess what a response is — it obeys the <code>Content-Type</code> header you write in <code>res.writeHead</code>:</p>
+    <ul>
+      <li>Send <code>&lt;h1&gt;Home&lt;/h1&gt;</code> with <code>'Content-Type': 'text/plain'</code> and the browser prints the literal angle brackets <code>&lt;h1&gt;Home&lt;/h1&gt;</code> on screen as plain text.</li>
+      <li>Send the exact same string with <code>'Content-Type': 'text/html; charset=utf-8'</code> and the browser parses the tags, requests any linked stylesheet, and renders a real styled page.</li>
+    </ul>
+    <p>This raw <code>http</code> server delivers <em>both</em> an HTML page (on <code>/</code>) and its CSS stylesheet (on <code>/style.css</code>), stamping the current server time into the HTML on every request:</p>
+
+    <script type="text/plain" class="code" data-lang="js" data-title="http-html-server.js">
+      const http = require('http');
+
+      const css = `
+        body { font-family: system-ui, sans-serif; max-width: 560px; margin: 40px auto; padding: 0 16px; color: #1f2937; }
+        .card { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 10px; padding: 20px; }
+        .card h1 { margin-top: 0; color: #1f4fd1; }
+        .time { font-family: monospace; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; }
+      `;
+
+      const server = http.createServer((req, res) => {
+        if (req.url === '/') {
+          const now = new Date().toLocaleTimeString();
+          const html = `<!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="utf-8">
+        <title>Node HTML Server</title>
+        <link rel="stylesheet" href="/style.css">
+      </head>
+      <body>
+        <main class="card">
+          <h1>Served by Node</h1>
+          <p>Server clock when you loaded this page: <span class="time">${now}</span></p>
+        </main>
+      </body>
+      </html>`;
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end(html);
+        } else if (req.url === '/style.css') {
+          res.writeHead(200, { 'Content-Type': 'text/css; charset=utf-8' });
+          res.end(css);
+        } else {
+          res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end('<h1>404 — Page not found</h1>');
+        }
+      });
+
+      server.listen(3000, () => {
+        console.log('Open http://localhost:3000 in a browser');
+      });
+    </script>
+
+    <p>Trace what happens behind the scenes when you visit <code>http://localhost:3000/</code> in your browser — one page load is actually <strong>two separate HTTP requests</strong>:</p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th scope="col">Step</th><th scope="col">What happens</th><th scope="col">Key detail in the code</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">1 · Request 1 (<code>GET /</code>)</th><td>The browser asks for the page. Node runs <code>new Date().toLocaleTimeString()</code>, builds the HTML string, and replies with status <code>200</code> and <code>text/html; charset=utf-8</code>.</td><td>Adding <code>charset=utf-8</code> guarantees symbols like em dashes (<code>—</code>) display properly. Refresh the page and <code>${now}</code> updates because the HTML is built fresh each time.</td></tr>
+          <tr><th scope="row">2 · Browser reads HTML</th><td>While parsing <code>&lt;head&gt;</code>, the browser spots <code>&lt;link rel=&quot;stylesheet&quot; href=&quot;/style.css&quot;&gt;</code> and realizes it needs another file to paint the page.</td><td>The leading <code>/</code> in <code>href=&quot;/style.css&quot;</code> asks the same server at port 3000 for the path <code>/style.css</code>.</td></tr>
+          <tr><th scope="row">3 · Request 2 (<code>GET /style.css</code>)</th><td>The server matches the <code>else if (req.url === '/style.css')</code> branch and answers with <code>Content-Type: text/css; charset=utf-8</code> and the CSS rules.</td><td>Without this branch, <code>/style.css</code> would hit the 404 branch and the page would appear completely unstyled. (In Week 2, Express's <code>express.static</code> automates serving every CSS, image, and front-end JS file from a folder.)</td></tr>
+          <tr><th scope="row">4 · Browser paints the page</th><td>The browser applies <code>.card</code> and <code>.time</code> rules to the parsed HTML elements and shows the styled card.</td><td>HTML provides the structure (<code>&lt;main class="card"&gt;</code>, <code>&lt;span class="time"&gt;</code>), CSS provides the styling, and Node JS decided what bytes to send for each URL.</td></tr>
+        </tbody>
+      </table>
+    </div>
 
     <h3>Ports: the numbered doors</h3>
     <p>One computer runs many programs that use the network, so an address alone is not enough — the request also names a <strong>port</strong>, a number from 0 to 65535 that identifies which listening program should receive it. You met ports in Web Dev I with addresses like <code>localhost:5500</code>. Three ports matter this week:</p>
@@ -451,6 +786,19 @@ server.[[listen]](3000);
       <p>The <code>node_modules</code> folder can hold tens of thousands of files and is completely rebuildable: anyone with your <code>package.json</code> can recreate it by running plain <code>npm install</code> with no package name. That is the whole point of recording dependencies — the file travels, the folder does not. It is also why "it worked on my machine" so often means "my <code>node_modules</code> had something my <code>package.json</code> forgot to mention."</p>
     </aside>
 
+    <p><strong>Example — telling Git to skip <code>node_modules</code> with a <code>.gitignore</code> file:</strong> create a plain text file named <code>.gitignore</code> in your project's root folder (right beside <code>package.json</code>):</p>
+    <script type="text/plain" class="code" data-lang="text" data-title=".gitignore">
+      # Rebuildable downloaded packages — never commit
+      node_modules/
+
+      # Local secret keys and passwords (you will use this in Week 3)
+      .env
+
+      # macOS folder metadata files
+      .DS_Store
+    </script>
+    <p>Every line in <code>.gitignore</code> is a pattern Git leaves untracked. Lines starting with <code>#</code> are comments for humans. The trailing slash on <code>node_modules/</code> matches the entire folder and everything inside it, so <code>git status</code> stays clean and pushing your project uploads only your own code, <code>package.json</code>, and <code>package-lock.json</code>.</p>
+
     <h3>Dependencies vs devDependencies</h3>
     <p>Not every package is needed to <em>run</em> your program. Some are only needed while you <em>develop</em> it: test runners, code formatters, the auto-restart tool you will meet in Section 1.6. Those go in a separate list:</p>
     <div class="table-wrap">
@@ -464,9 +812,17 @@ server.[[listen]](3000);
     </div>
     <p>The practical test: <em>if this package vanished on the day your site goes live, would visitors notice?</em> If yes, it is a dependency. If only you would notice, it is a devDependency.</p>
 
-    <p><strong>Example — both lists in one project's package.json:</strong></p>
-    <script type="text/plain" class="code" data-lang="js" data-title="package.json (excerpt)">
+    <p><strong>Example — both lists and npm scripts in one project's <code>package.json</code>:</strong></p>
+    <script type="text/plain" class="code" data-lang="json" data-title="package.json">
       {
+        "name": "first-server",
+        "version": "1.0.0",
+        "description": "My first Express server",
+        "main": "server.js",
+        "scripts": {
+          "start": "node server.js",
+          "dev": "node --watch server.js"
+        },
         "dependencies": {
           "express": "^5.3.0"
         },
@@ -475,7 +831,12 @@ server.[[listen]](3000);
         }
       }
     </script>
-    <p>Trace the two packages. <code>express</code> sits in <code>dependencies</code> because your server code loads it with <code>require('express')</code> every time it runs — a visitor-facing program breaks without it. <code>nodemon</code> sits in <code>devDependencies</code> because nothing in your running code ever loads it; it is a tool for you, the developer, and Section 1.6 shows what it does.</p>
+    <p>Read every section of this JSON file carefully — strict JSON rules apply here (every key and string must use double quotes, and no trailing comma is allowed after the last item in a block):</p>
+    <ul>
+      <li><strong><code>"scripts"</code>:</strong> command shortcuts you run from the terminal. Built-in names like <code>"start"</code> run with <code>npm start</code>; custom names like <code>"dev"</code> need the word <code>run</code> — <code>npm run dev</code>. That way teammates never have to guess which file starts your app or which flags to pass.</li>
+      <li><strong><code>"dependencies"</code>:</strong> <code>express</code> sits here because your server code loads it with <code>require('express')</code> every time it runs — a visitor-facing program breaks without it.</li>
+      <li><strong><code>"devDependencies"</code>:</strong> <code>nodemon</code> sits here because nothing in your running code ever loads it; it is a tool for you, the developer, and Section 1.6 explains how watch tools work.</li>
+    </ul>
 
     <h3>Version numbers: semantic versioning</h3>
     <p>Every package version is three numbers — <code>5.3.0</code> — following <strong>semantic versioning</strong> ("semver"), a promise about what changed:</p>
@@ -522,6 +883,41 @@ server.[[listen]](3000);
         <p><strong>Share it?</strong> Never. It is fully rebuildable from the other two files with one <code>npm install</code>.</p>
       </div>
     </div>
+
+    <h3>How <code>require()</code> finds three kinds of modules</h3>
+    <p>Earlier we noted that a <strong>module</strong> is any file of code you can load into another file. As your projects grow, you will load code from three different places with <code>require()</code> — and the string inside the quotes tells Node where to look:</p>
+    <div class="grid-2">
+      <script type="text/plain" class="code" data-lang="js" data-title="format.js (your own local module)">
+        // A reusable helper you wrote in your own project folder
+        function formatGreeting(name) {
+          const clean = (name || 'visitor').trim();
+          return `Hello, ${clean}!`;
+        }
+
+        // Export an object so other files can import this function
+        module.exports = { formatGreeting };
+      </script>
+      <script type="text/plain" class="code" data-lang="js" data-title="app.js (loading all three module kinds)">
+        // 1. Core module — built into Node (no './', no install)
+        const http = require('http');
+
+        // 2. npm package — inside node_modules/ (no './', installed via npm)
+        const express = require('express');
+
+        // 3. Your own local file — MUST begin with './' or '../'
+        const { formatGreeting } = require('./format');
+
+        console.log(formatGreeting('  Ada  '));
+      </script>
+    </div>
+    <p class="wk1-caption">Expected output when running <code>node app.js</code>:</p>
+    <div class="output">Hello, Ada!</div>
+    <p>Look closely at the two halves of loading your own file:</p>
+    <ul>
+      <li><strong>Exporting (<code>module.exports = { formatGreeting }</code>):</strong> every file in Node has private variables by default. Putting <code>formatGreeting</code> onto <code>module.exports</code> makes it public to any file that requires <code>format.js</code>.</li>
+      <li><strong>Importing with destructuring (<code>const { formatGreeting } = require('./format')</code>):</strong> the curly braces pull the <code>formatGreeting</code> property straight out of the exported object. Notice you do not need to write <code>.js</code> at the end — Node appends <code>.js</code> automatically.</li>
+      <li><strong>Why the <code>./</code> matters:</strong> omit the <code>./</code> and write <code>require('format')</code>, and Node looks inside <code>node_modules/</code> for an npm package named <code>format</code> instead of your own file — causing the classic <code>Error: Cannot find module</code> you will diagnose in Section 1.6.</li>
+    </ul>
 
     <div class="order" data-title="Put a new project in order">
       <script type="application/json">
@@ -601,6 +997,104 @@ Server listening on http://localhost:3000</div>
       <strong>The mental model to keep</strong>
       <p>An Express app is a list of routes, checked from top to bottom. A request arrives, Express walks the list asking "method and path — match?" and the first matching handler runs and sends the response. No match at all? Express sends its built-in 404. When you add a route, you are adding one line to that list — order matters, which becomes important in Week 2.</p>
     </aside>
+
+    <h3>Four ways an Express route can answer: text, styled HTML, JSON, and 404</h3>
+    <p><code>express-hello.js</code> sent short strings, but real routes return all kinds of content. This Express app demonstrates four everyday response styles in one file — including a dynamic HTML page styled with CSS, a JSON endpoint, and a custom 404 page:</p>
+    <script type="text/plain" class="code" data-lang="js" data-title="express-responses.js">
+      const express = require('express');
+      const app = express();
+
+      let visits = 0;
+
+      // 1. Plain text — explicitly override Express's default text/html header
+      app.get('/ping', (req, res) => {
+        res.type('text/plain').send('pong');
+      });
+
+      // 2. Dynamic HTML + CSS — rebuilt on every request with the latest visit count
+      app.get('/', (req, res) => {
+        visits++;
+        const time = new Date().toLocaleTimeString();
+        res.send(`<!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="utf-8">
+        <title>Express Demo</title>
+        <style>
+          body { font-family: system-ui, sans-serif; max-width: 600px; margin: 40px auto; padding: 0 16px; color: #1f2937; }
+          nav { margin-bottom: 16px; }
+          nav a { margin-right: 14px; color: #1f4fd1; font-weight: 700; text-decoration: none; }
+          nav a:hover { text-decoration: underline; }
+          .banner { background: #eef4ff; border-left: 4px solid #1f4fd1; padding: 18px 20px; border-radius: 8px; }
+          .badge { display: inline-block; background: #1f4fd1; color: #ffffff; padding: 2px 8px; border-radius: 99px; font-size: .85rem; }
+        </style>
+      </head>
+      <body>
+        <nav>
+          <a href="/">Home</a>
+          <a href="/ping">Ping (text)</a>
+          <a href="/api/status">Status (JSON)</a>
+        </nav>
+        <main class="banner">
+          <h1>Welcome to Express!</h1>
+          <p>Visit <span class="badge">#${visits}</span> · Built on the server at <strong>${time}</strong>.</p>
+        </main>
+      </body>
+      </html>`);
+      });
+
+      // 3. JSON data — Express sets Content-Type: application/json and runs JSON.stringify for you
+      app.get('/api/status', (req, res) => {
+        res.json({ ok: true, visits, routes: ['/', '/ping', '/api/status'] });
+      });
+
+      // 4. Custom 404 fallback — MUST sit after every route so it only catches unmatched paths
+      app.use((req, res) => {
+        res.status(404).send('<h1>404 — Page Not Found</h1><p>Check the URL or <a href="/">go home</a>.</p>');
+      });
+
+      app.listen(3000, () => {
+        console.log('Listening on http://localhost:3000');
+      });
+    </script>
+    <p class="wk1-caption">Expected output when testing the three routes and one missing path with curl:</p>
+    <div class="output">$ curl http://localhost:3000/ping
+pong
+$ curl http://localhost:3000/api/status
+{"ok":true,"visits":0,"routes":["/","/ping","/api/status"]}
+$ curl -i http://localhost:3000/nope
+HTTP/1.1 404 Not Found
+Content-Type: text/html; charset=utf-8
+...
+&lt;h1&gt;404 — Page Not Found&lt;/h1&gt;&lt;p&gt;Check the URL or &lt;a href=&quot;/&quot;&gt;go home&lt;/a&gt;.&lt;/p&gt;</div>
+    <p>Walk through every piece of <code>express-responses.js</code>:</p>
+    <ul>
+      <li><strong><code>res.send(string)</code> vs. <code>res.type('text/plain').send(string)</code>:</strong> when you pass a string to <code>res.send()</code>, Express sets <code>Content-Type: text/html; charset=utf-8</code> by default so browsers render HTML tags immediately. Calling <code>res.type('text/plain')</code> first changes that header to plain text when you do not want HTML rendering.</li>
+      <li><strong>Embedded HTML &amp; CSS inside the response:</strong> the <code>/</code> route returns a complete HTML document containing a <code>&lt;style&gt;</code> block. Inside CSS, <code>border-left: 4px solid #1f4fd1</code> creates the accent stripe on <code>.banner</code>, <code>border-radius: 99px</code> rounds <code>.badge</code> into a pill, and <code>visits++</code> proves the page is genuinely dynamic — every refresh bumps the counter in server memory. (In Week 2, you will move CSS and browser JS into separate files inside a <code>public/</code> folder using <code>express.static</code>.)</li>
+      <li><strong><code>res.json(object)</code>:</strong> turns a JavaScript object into a JSON string, sets <code>Content-Type: application/json; charset=utf-8</code>, and sends it. Notice the shorthand <code>{ ok: true, visits, routes: [...] }</code> — writing <code>visits</code> alone is JavaScript shorthand for <code>visits: visits</code>.</li>
+      <li><strong>Method chaining and route order (<code>res.status(404).send(...)</code>):</strong> <code>res.status(404)</code> sets the status code and returns <code>res</code> itself, letting you chain <code>.send(...)</code> right onto the same line. Putting <code>app.use(...)</code> at the <em>bottom</em> means Express tries <code>/ping</code>, <code>/</code>, and <code>/api/status</code> first and only runs the 404 handler when nothing above matched.</li>
+    </ul>
+
+    <p><strong>Side by side — returning JSON in raw Node <code>http</code> vs. Express:</strong></p>
+    <div class="grid-2">
+      <script type="text/plain" class="code" data-lang="js" data-title="Raw Node http module (manual)">
+        // You must check method AND path, set the header,
+        // and convert the object to a JSON string yourself:
+        if (req.method === 'GET' && req.url === '/api/info') {
+          const data = { course: 'Web Dev II', week: 1 };
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(data));
+        }
+      </script>
+      <script type="text/plain" class="code" data-lang="js" data-title="Express (declarative)">
+        // Express matches method + path, sets Content-Type,
+        // runs JSON.stringify, and finishes the response:
+        app.get('/api/info', (req, res) => {
+          res.json({ course: 'Web Dev II', week: 1 });
+        });
+      </script>
+    </div>
+    <p>Compare those two blocks line for line. The raw version forces you to test both <code>req.method</code> and <code>req.url</code>, remember the exact spelling of <code>'application/json'</code>, and call <code>JSON.stringify(data)</code> before passing text to <code>res.end()</code> (because <code>res.end()</code> only accepts strings or Buffers, not objects). Express collapses all of that repetitive ceremony into three readable lines.</p>
 
     <p>Notice what did <em>not</em> change from the raw server: <code>req</code> and <code>res</code> are still the request and response objects, a handler still runs once per request, and <code>listen</code> still takes a port. Express is not a different world — it is the same world with the repetitive parts removed. That is why this course taught you the raw version first: now you know what Express is doing for you, and when something goes wrong you will know where to look.</p>
 
@@ -682,6 +1176,99 @@ What Express hands your handler as req.query:
 { term: 'vue', page: '2' }</div>
     <p>Notice the quotes on the <code>'2'</code>. Everything in an address is text, so <code>page</code> arrives as the string <code>'2'</code>, not the number 2 — if your code needs to do arithmetic with it, converting it is your job.</p>
 
+    <p><strong>Full GET example — HTML search form, CSS layout, and Express route working together:</strong> click through all three tabs to trace a search from the browser's HTML input all the way into Express's <code>req.query</code>:</p>
+    <div class="tabs wk1-tabs">
+      <div data-tab="1 · HTML Form (search.html)">
+        <p><code>method="get"</code> tells the browser to pack every named control into the URL query string and request <code>/search?...</code>.</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="search.html">
+          <form class="search-form" method="get" action="/search">
+            <label for="search-term">Search lessons</label>
+            <div class="search-row">
+              <input id="search-term" type="search" name="term" placeholder="e.g. express" required>
+              <select name="sort" aria-label="Sort results by">
+                <option value="relevance">Relevance</option>
+                <option value="newest">Newest first</option>
+              </select>
+              <button type="submit">Search</button>
+            </div>
+          </form>
+        </script>
+      </div>
+      <div data-tab="2 · CSS Styling (search.css)">
+        <p>Flexbox aligns the input, dropdown, and button cleanly on one row and lets them wrap on small phones. CSS affects appearance only — it never changes the query string.</p>
+        <script type="text/plain" class="code" data-lang="css" data-title="search.css">
+          .search-form {
+            max-width: 540px;
+            font-family: system-ui, sans-serif;
+          }
+          .search-form label {
+            display: block;
+            font-weight: 700;
+            margin-bottom: 6px;
+          }
+          .search-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+          }
+          .search-row input,
+          .search-row select {
+            padding: 8px 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font: inherit;
+          }
+          .search-row input { flex: 1 1 200px; }
+          .search-row button {
+            padding: 8px 16px;
+            background: #1f4fd1;
+            color: #ffffff;
+            border: 0;
+            border-radius: 6px;
+            font-weight: 700;
+            cursor: pointer;
+          }
+        </script>
+      </div>
+      <div data-tab="3 · Express Route (search-route.js)">
+        <p>Reads <code>req.query.term</code> and <code>req.query.sort</code>, filters the server's catalog, and responds with JSON.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="search-route.js (Express)">
+          const express = require('express');
+          const app = express();
+
+          const lessons = [
+            { title: 'Express Basics', year: 2026 },
+            { title: 'Node Streams', year: 2025 },
+            { title: 'Express Routing', year: 2026 }
+          ];
+
+          app.get('/search', (req, res) => {
+            const term = (req.query.term || '').toLowerCase();
+            const sort = req.query.sort || 'relevance';
+
+            let matches = lessons.filter((item) =>
+              item.title.toLowerCase().includes(term)
+            );
+            if (sort === 'newest') {
+              matches = matches.slice().sort((a, b) => b.year - a.year);
+            }
+
+            res.json({ term, sort, count: matches.length, matches });
+          });
+
+          app.listen(3000);
+        </script>
+      </div>
+    </div>
+    <p class="wk1-caption">Expected output when a visitor types <code>express</code> and picks <code>Newest first</code> (the browser sends <code>GET /search?term=express&amp;sort=newest</code>):</p>
+    <div class="output">{"term":"express","sort":"newest","count":2,"matches":[{"title":"Express Basics","year":2026},{"title":"Express Routing","year":2026}]}</div>
+    <p>Notice the exact handoff between HTML, CSS, and Express JS:</p>
+    <ul>
+      <li><strong><code>id</code> vs. <code>name</code> in HTML:</strong> <code>id="search-term"</code> and <code>for="search-term"</code> link the label to the input inside the browser (clicking the label focuses the input, and screen readers announce it). <code>name="term"</code> and <code>name="sort"</code> are the keys the browser sends over HTTP, which become <code>req.query.term</code> and <code>req.query.sort</code> in Express.</li>
+      <li><strong>Responsive layout in CSS:</strong> <code>display: flex; flex-wrap: wrap; gap: 8px</code> places the controls side by side with consistent spacing, while <code>flex: 1 1 200px</code> lets the search box grow to fill the row or drop to its own line on a narrow screen.</li>
+      <li><strong>Defensive defaults in Express JS:</strong> <code>(req.query.term || '').toLowerCase()</code> guards against someone visiting plain <code>/search</code> with no query string (where <code>req.query.term</code> is <code>undefined</code> — calling <code>.toLowerCase()</code> directly on <code>undefined</code> would throw a <code>TypeError</code>!). And <code>matches.slice().sort(...)</code> copies the filtered array before sorting so it never mutates shared server data.</li>
+    </ul>
+
     <h3>POST data: forms pack, the server unpacks</h3>
     <p>Quick recap from Web Dev I, because everything here hangs on it. When a visitor submits an HTML form, the browser packs each form control into a <code>name=value</code> pair — and the <code>name</code> attribute is the label on each package. <strong>A control with no <code>name</code> is left out entirely</strong>, no matter what the visitor typed. With <code>method="post"</code>, those pairs are joined with <code>&amp;</code> and placed in the request body: <code>name=Ada&amp;plan=free</code>.</p>
     <p>But there is a catch. The body arrives at your server as raw text. Express does not automatically know how to turn <code>name=Ada&amp;plan=free</code> into something your code can use — and a different kind of client, like a phone app or another program, might send the same data as <strong>JSON</strong> instead: <code>{"name":"Ada","plan":"pro"}</code>. JSON (JavaScript Object Notation) is a text format for structured data that looks like a JavaScript object; it is how programs talk to each other all over the web.</p>
@@ -729,7 +1316,48 @@ title=Dune&amp;author=Frank+Herbert
 req.body after express.urlencoded has translated it:
 { title: 'Dune', author: 'Frank Herbert' }</div>
     <p>The <code>+</code> in the body is an encoded space — the same encoding you met in query strings — so <code>Frank+Herbert</code> reaches your code as <code>Frank Herbert</code>. The pairs split on <code>&amp;</code>, each name becomes a property, and your handler reads <code>req.body.title</code> and <code>req.body.author</code> without ever touching the raw text.</p>
-    <p><code>express.urlencoded()</code> is middleware; s2-3 explains where it comes from. Without it, <code>req.body</code> is undefined in Express 5.</p>
+    <p><code>express.urlencoded()</code> is middleware; <a href="../wk2/index.html#s2-3">Section 2.3</a> explains where it comes from. Without it, <code>req.body</code> is undefined in Express 5.</p>
+
+    <p><strong>Example — how a real browser sends each POST format to <code>express-post.js</code>:</strong> curl is great for testing from the terminal, but in a real web app your front end sends those exact two formats using either an HTML form or browser JavaScript's <code>fetch()</code>:</p>
+    <div class="grid-2">
+      <script type="text/plain" class="code" data-lang="html" data-title="Form POST → express.urlencoded()">
+        <!-- Browser automatically sends:
+             Content-Type: application/x-www-form-urlencoded
+             Body: name=Ada&plan=free -->
+        <form method="post" action="/signup">
+          <label for="u-name">Name</label>
+          <input id="u-name" type="text" name="name" value="Ada" required>
+
+          <label for="u-plan">Plan</label>
+          <select id="u-plan" name="plan">
+            <option value="free">Free</option>
+            <option value="pro">Pro</option>
+          </select>
+
+          <button type="submit">Sign up</button>
+        </form>
+      </script>
+      <script type="text/plain" class="code" data-lang="js" data-title="fetch() JSON POST → express.json()">
+        // Runs in the browser (no full page reload)
+        async function submitSignup(name, plan) {
+          const response = await fetch('/signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, plan })
+          });
+
+          const data = await response.json();
+          console.log('Server replied:', data);
+        }
+
+        submitSignup('Ada', 'pro');
+      </script>
+    </div>
+    <p>Compare the two clients side by side against <code>express-post.js</code>:</p>
+    <ul>
+      <li><strong>Left (HTML form):</strong> clicking <code>&lt;button type="submit"&gt;</code> makes the browser encode every named control as <code>name=Ada&amp;plan=free</code>, attach <code>Content-Type: application/x-www-form-urlencoded</code>, and navigate to the server's response. On the server, <code>express.urlencoded({ extended: true })</code> recognizes that header and builds <code>req.body</code>.</li>
+      <li><strong>Right (Browser JS <code>fetch</code>):</strong> sends the POST request in the background without reloading the page. Every option in the second argument matters: <code>method: 'POST'</code> overrides <code>fetch</code>'s default <code>GET</code>; <code>headers: { 'Content-Type': 'application/json' }</code> is the browser equivalent of curl's <code>-H</code> flag (omit it and <code>express.json()</code> ignores the body); and <code>JSON.stringify({ name, plan })</code> converts the JavaScript object into the text <code>'{"name":"Ada","plan":"pro"}'</code> so it can travel over HTTP. Finally, <code>await response.json()</code> parses Express's JSON answer back into a JavaScript object.</li>
+    </ul>
 
     <aside class="callout warn">
       <strong>req.body is untrusted mail</strong>
@@ -738,7 +1366,8 @@ req.body after express.urlencoded has translated it:
 
     <h3>See exactly what a form sends</h3>
     <p>This playground runs in your browser, and its preview does something special with forms: when you press the submit button, it intercepts the submission and shows you precisely what the browser <em>would</em> send — the method, the address, and the body as a table of names and values. Press <strong>Sign up</strong> and read the report. The body is <code>name=Ada&amp;plan=free</code>, and a warning says one field was not sent: the coupon code, because its control has no <code>name</code>.</p>
-    <p><strong>Your task:</strong> get the coupon code to the server. Give the coupon input the attribute <code>name="coupon"</code>, then press <strong>Sign up</strong> again. The warning disappears, and the body grows to <code>name=Ada&amp;plan=free&amp;coupon=SAVE10</code>.</p>
+    <p>Notice the <strong>CSS</strong> tab alongside <strong>HTML</strong>: click it to see how clean styling (block-level labels, consistent input spacing, visible focus rings, and a styled submit button) makes the form easy to read and use without changing a single byte of what the browser sends over HTTP — only the HTML attributes <code>method</code>, <code>action</code>, and <code>name</code> shape the request.</p>
+    <p><strong>Your task:</strong> get the coupon code to the server. In the <strong>HTML</strong> tab, give the coupon input the attribute <code>name="coupon"</code>, then press <strong>Sign up</strong> again. The warning disappears, and the body grows to <code>name=Ada&amp;plan=free&amp;coupon=SAVE10</code>.</p>
 
     <div class="playground" data-title="Try it: what the browser sends" data-height="320">
       <textarea data-lang="html"><h1>Sign up</h1>
@@ -765,6 +1394,49 @@ req.body after express.urlencoded has translated it:
 </form>
 <p>Press <strong>Sign up</strong> and read the report: it shows the exact
 request this form would send to the server in express-post.js.</p></textarea>
+      <textarea data-lang="css">/* CSS styles how the form looks in the browser — it never alters
+   the method, action, or name=value pairs sent to Express. */
+body {
+  font-family: system-ui, sans-serif;
+  max-width: 420px;
+  padding: 16px;
+  color: #1f2937;
+}
+form {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 16px;
+}
+label {
+  display: block;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+input, select {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: 1px solid #94a3b8;
+  border-radius: 6px;
+  font: inherit;
+  box-sizing: border-box;
+}
+input:focus-visible, select:focus-visible {
+  outline: 2px solid #1f4fd1;
+  outline-offset: 2px;
+}
+button[type="submit"] {
+  background: #1f4fd1;
+  color: #ffffff;
+  border: 0;
+  border-radius: 6px;
+  padding: 9px 16px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}</textarea>
       <script type="application/json" class="checks">
       [
         {"label": "The form still sends with POST to `/signup`", "test": "var f = $('form'); return !!f && (f.getAttribute('method') || '').toLowerCase() === 'post' && f.getAttribute('action') === '/signup'"},
@@ -888,12 +1560,36 @@ Body received: { name: 'Ada', plan: 'free' }</div>
     <details class="reveal">
       <summary><span class="wk1-err">Cannot GET /</span> in the browser</summary>
       <p><strong>What it means:</strong> this is Express's built-in 404 page. The server is running fine and received your request — but no route matches a GET for the path <code>/</code>. Notice it names the method as well as the path: <span class="wk1-err">Cannot POST /signup</span> would mean the path exists in your mind but no <em>POST</em> route matches it.</p>
-      <p><strong>The fix:</strong> compare the message with your route registrations, character by character. Did you register <code>app.get('/home', …)</code> instead of <code>'/'</code>? Did you register the route <em>after</em> starting a different copy of the server? Is the browser's address exactly the path you think it is? The message is never wrong about what it looked for.</p>
+      <div class="grid-2">
+        <script type="text/plain" class="code" data-lang="js" data-title="Causes Cannot GET /">
+          // Browser asks for '/', but only '/home' is registered
+          app.get('/home', (req, res) => {
+            res.send('Welcome!');
+          });
+        </script>
+        <script type="text/plain" class="code" data-lang="js" data-title="Fixed">
+          // Path '/' matches http://localhost:3000/
+          app.get('/', (req, res) => {
+            res.send('Welcome!');
+          });
+        </script>
+      </div>
+      <p><strong>The fix:</strong> compare the message with your route registrations, character by character. Did you register <code>app.get('/home', …)</code> instead of <code>'/'</code>? Did you register <code>app.get('/signup', …)</code> when the form sends <code>POST /signup</code>? Did you register the route <em>after</em> starting a different copy of the server? The message is never wrong about what it looked for.</p>
     </details>
 
     <details class="reveal">
       <summary><span class="wk1-err">Error: Cannot find module './sever'</span></summary>
-      <p><strong>What it means:</strong> your code asked Node to load a file or package that is not there. In this example the file is named <code>server.js</code> but the code says <code>sever</code> — a one-letter typo. The same message appears when you <code>require('express')</code> in a project where you never ran <code>npm install</code>: the module genuinely is not there to find.</p>
+      <p><strong>What it means:</strong> your code asked Node to load a file or package that is not there. In this example the file is named <code>server.js</code> but the code says <code>sever</code> — a one-letter typo. The same message appears when you <code>require('express')</code> in a project where you never ran <code>npm install</code>, or when you forget the leading <code>./</code> for one of your own files.</p>
+      <div class="grid-2">
+        <script type="text/plain" class="code" data-lang="js" data-title="Causes Cannot find module">
+          const server = require('./sever'); // typo: missing 'r'
+          const helper = require('format');  // missing './' for local file
+        </script>
+        <script type="text/plain" class="code" data-lang="js" data-title="Fixed">
+          const server = require('./server'); // matches server.js
+          const helper = require('./format'); // './' tells Node: this folder
+        </script>
+      </div>
       <p><strong>The fix:</strong> read the name in the message and compare it, letter by letter, with the real file name or package name. If the name is right, check the location: are you running the command from the project folder, and does <code>node_modules</code> exist? Nine times out of ten it is spelling; the tenth time it is a forgotten install.</p>
     </details>
 
@@ -921,6 +1617,102 @@ ReferenceError: total is not defined
     <h3>Catching errors on purpose: try / catch</h3>
     <p>Some failures you can predict. Code that calls a method on a value that turned out to be <code>undefined</code>, uses <code>JSON.parse</code> to turn text a visitor typed into an object, or reads a file that might not exist <em>will</em> fail sometimes. JavaScript's answer is <code>try / catch</code>: put risky code in a <code>try</code> block; if anything inside it <strong>throws</strong> an error (raises it, deliberately or by accident), execution jumps straight to the <code>catch</code> block, which receives the error as a value — its <code>message</code> property is the headline text — and the program carries on.</p>
     <p>What happens when <em>nothing</em> catches the error depends on where it was thrown, and the three cases are worth telling apart. In the raw <code>http</code> server from Section 1.2, a throw inside the request handler crashes the whole Node process, taking every other visitor down with it. In an Express route handler, Express catches the throw for you: the stack trace prints in your terminal, that one client gets a <code>500 Internal Server Error</code> response, and the server keeps running. But an error thrown <em>later</em> — inside a timer or another callback that runs after your handler has returned — is beyond Express's reach, and it crashes the process just as it would in the raw server. Week 2 shows how to decide for yourself what a 500 response says.</p>
+
+    <p><strong>Example — catching bad visitor input with <code>try / catch</code> inside an Express route:</strong> suppose a route accepts raw JSON text from a form field and parses it with <code>JSON.parse</code>. Without <code>try / catch</code>, broken JSON turns into a generic <code>500</code>; with it, you return a clear <code>400 Bad Request</code>:</p>
+    <script type="text/plain" class="code" data-lang="js" data-title="safe-parse-route.js (Express)">
+      app.post('/import', (req, res) => {
+        try {
+          // Risky: a visitor might type broken JSON like "{ name: Ada }"
+          const parsed = JSON.parse(req.body.rawJson);
+          res.status(200).json({ ok: true, keys: Object.keys(parsed) });
+        } catch (err) {
+          // Runs ONLY if JSON.parse threw an error
+          console.error('Bad JSON submitted:', err.message);
+          res.status(400).json({
+            ok: false,
+            error: 'That text is not valid JSON. Check your quotes and braces.',
+            detail: err.message
+          });
+        }
+      });
+    </script>
+    <p class="wk1-caption">Expected responses — trace both the happy path and the caught-error path:</p>
+    <div class="output">Valid input  -> rawJson = '{"name":"Ada","plan":"pro"}'
+HTTP 200 OK  -> {"ok":true,"keys":["name","plan"]}
+
+Broken input -> rawJson = '{ name: Ada }'
+HTTP 400 Bad Request -> {"ok":false,"error":"That text is not valid JSON. Check your quotes and braces.","detail":"Expected property name or '}' in JSON at position 2 (line 1 column 3)"}</div>
+    <p>Follow how execution flows through the two blocks:</p>
+    <ul>
+      <li><strong>When input is valid:</strong> <code>JSON.parse</code> succeeds and returns <code>{ name: 'Ada', plan: 'pro' }</code>, line 5 sends status <code>200</code> with the list of keys, and the entire <code>catch</code> block is skipped.</li>
+      <li><strong>When input is broken:</strong> <code>JSON.parse</code> immediately throws a <code>SyntaxError</code>. Line 5 <em>never runs</em>; JavaScript jumps straight into <code>catch (err)</code>. <code>console.error</code> prints the reason in your server terminal, and <code>res.status(400).json(...)</code> sends a <code>400 Bad Request</code> (meaning "the client sent invalid input," rather than <code>500</code> which blames the server).</li>
+    </ul>
+
+    <h3>Debugging both sides: showing a server error cleanly in the browser</h3>
+    <p>When a full-stack feature fails, always check <strong>two places</strong>: your <strong>Node terminal</strong> for server stack traces, and your <strong>browser DevTools</strong> (Console + Network tab) for HTTP status codes like <code>400</code> or <code>404</code>. On the front end, never swallow a failed response silently — pair a small HTML status element, clear CSS styling, and a check on <code>response.ok</code>:</p>
+    <div class="tabs wk1-tabs">
+      <div data-tab="1 · HTML (status element)">
+        <p>Starts hidden (<code>hidden</code>) and uses <code>role="alert"</code> so screen readers announce an error immediately when it appears.</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="error-banner.html">
+          <p id="form-status" class="status-msg" role="alert" hidden></p>
+        </script>
+      </div>
+      <div data-tab="2 · CSS (error &amp; success styles)">
+        <p>Pairs distinct border/background colors with high-contrast text — and our JS also adds a word prefix (<code>Error:</code>) so meaning never relies on color alone.</p>
+        <script type="text/plain" class="code" data-lang="css" data-title="error-banner.css">
+          .status-msg {
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid transparent;
+            font-weight: 700;
+            margin: 12px 0;
+          }
+          .status-msg.is-error {
+            background: #fef2f2;
+            border-color: #ef4444;
+            color: #991b1b;
+          }
+          .status-msg.is-ok {
+            background: #ecfdf5;
+            border-color: #10b981;
+            color: #065f46;
+          }
+        </script>
+      </div>
+      <div data-tab="3 · Browser JS (checking response.ok)">
+        <p><code>fetch()</code> does <em>not</em> throw on a 400 or 404 status — you must check <code>response.ok</code> yourself, and wrap the network call in <code>try / catch</code> in case the server is offline.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="client-error-check.js">
+          const statusEl = document.querySelector('#form-status');
+
+          function showStatus(message, isError) {
+            statusEl.hidden = false;
+            statusEl.className = 'status-msg ' + (isError ? 'is-error' : 'is-ok');
+            statusEl.textContent = (isError ? 'Error: ' : 'Saved: ') + message;
+          }
+
+          async function sendImport(rawJson) {
+            try {
+              const res = await fetch('/import', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rawJson })
+              });
+              const data = await res.json();
+              if (!res.ok) {
+                showStatus(data.error || `Request failed (${res.status})`, true);
+                return;
+              }
+              showStatus(`Imported ${data.keys.length} fields.`, false);
+            } catch (err) {
+              // Runs when the server is stopped or the network drops
+              showStatus('Could not reach the server. Is Node running?', true);
+            }
+          }
+        </script>
+      </div>
+    </div>
+    <p>Notice the subtle trap <code>client-error-check.js</code> prevents: <code>fetch()</code> only jumps to <code>catch</code> when the network itself fails (for example, you forgot to start <code>node server.js</code>). When Express answers with <code>400 Bad Request</code> or <code>404 Not Found</code>, the HTTP conversation succeeded, so <code>fetch()</code> resolves normally with <code>res.ok === false</code>. Checking <code>if (!res.ok)</code> catches server rejections, and <code>statusEl.textContent</code> prints the error safely without executing any HTML.</p>
+
     <p>Read the console in this playground before you change anything. <code>greet('')</code> throws, and <code>safeGreet</code> does nothing to stop it, so the error escapes all the way out to the <code>try / catch</code> near the bottom. The line that starts with <code>Escaped:</code> is that outer <code>catch</code> speaking. It saves the script, but every caller of <code>safeGreet</code> would need the same safety net.</p>
     <p><strong>Your task:</strong> move the protection inside. Rewrite <code>safeGreet</code> so that it wraps its call to <code>greet</code> in its own <code>try / catch</code> and, when an error is thrown, returns <code>'Caught: '</code> followed by the error's <code>message</code>. You will know it worked when the console's second line changes to <code>Caught: A name is required</code> and every check is green.</p>
 
@@ -1052,6 +1844,86 @@ console.log('The program kept running.');</textarea>
           <tr><th scope="row">"It worked yesterday, I changed nothing."</th><td>Something changed — an edit saved after the server started (it is still running the old file), a second server on another port, a deleted <code>node_modules</code>. Section 1.6's routine exists to find which.</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <h3>Week 1 code quick-reference: HTML, CSS &amp; JS patterns</h3>
+    <p>Keep these four starter templates handy when building your Week 1 practice servers — they gather the HTML, CSS, raw Node, and Express patterns from all six sections in one place:</p>
+    <div class="tabs wk1-tabs">
+      <div data-tab="HTML Forms (GET &amp; POST)">
+        <p>Remember: <code>method</code> chooses query string vs. body, <code>action</code> chooses the route path, and every control needs a <code>name</code> to be sent.</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="forms-starter.html">
+          <!-- GET form: packs fields into /search?q=... -->
+          <form method="get" action="/search">
+            <label for="q">Search</label>
+            <input id="q" type="search" name="q" required>
+            <button type="submit">Go</button>
+          </form>
+
+          <!-- POST form: packs fields into the request body for /signup -->
+          <form method="post" action="/signup">
+            <label for="u-name">Name</label>
+            <input id="u-name" type="text" name="name" required>
+            <button type="submit">Sign up</button>
+          </form>
+        </script>
+      </div>
+      <div data-tab="CSS Form &amp; Card">
+        <p>A clean, accessible baseline for styling pages and forms returned by your server.</p>
+        <script type="text/plain" class="code" data-lang="css" data-title="starter.css">
+          body { font-family: system-ui, sans-serif; max-width: 560px; margin: 32px auto; padding: 0 16px; color: #1f2937; }
+          .card { background: #ffffff; border: 1px solid #cbd5e1; border-radius: 10px; padding: 20px; }
+          label { display: block; font-weight: 700; margin-top: 12px; }
+          input, select { display: block; width: 100%; padding: 8px 10px; margin-top: 4px; border: 1px solid #94a3b8; border-radius: 6px; font: inherit; box-sizing: border-box; }
+          button { margin-top: 14px; padding: 9px 16px; border: 0; border-radius: 6px; background: #1f4fd1; color: #ffffff; font: inherit; font-weight: 700; cursor: pointer; }
+        </script>
+      </div>
+      <div data-tab="Raw Node http Server">
+        <p>Zero external packages — parses the URL cleanly, sets status and <code>Content-Type</code>, and always finishes with <code>res.end()</code>.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="raw-http-starter.js">
+          const http = require('http');
+
+          const server = http.createServer((req, res) => {
+            const { pathname } = new URL(req.url, 'http://localhost:3000');
+
+            if (pathname === '/') {
+              res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+              res.end('<h1>Home page</h1>');
+            } else {
+              res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+              res.end('Page not found');
+            }
+          });
+
+          server.listen(3000, () => console.log('http://localhost:3000'));
+        </script>
+      </div>
+      <div data-tab="Express Starter">
+        <p>Body translators switched on at the top, GET query route, POST body route, and a checked <code>app.listen</code> callback.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="express-starter.js">
+          const express = require('express');
+          const app = express();
+
+          // Switch on both body translators before registering routes
+          app.use(express.urlencoded({ extended: true }));
+          app.use(express.json());
+
+          app.get('/search', (req, res) => {
+            res.json({ q: req.query.q || '' });
+          });
+
+          app.post('/signup', (req, res) => {
+            res.status(200).json({ received: req.body });
+          });
+
+          app.listen(3000, (err) => {
+            if (err) {
+              console.error(err);
+              process.exit(1);
+            }
+            console.log('Listening on http://localhost:3000');
+          });
+        </script>
+      </div>
     </div>
 
     <h3>Week 1 cheat sheet: the commands</h3>

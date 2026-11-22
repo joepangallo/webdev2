@@ -7,6 +7,10 @@
 <meta name="description" content="The Web Development II final project: one full-stack web app, built a milestone at a time — Express server, REST API, database persistence, and logins with roles.">
 <link rel="stylesheet" href="../assets/css/course.css">
 <script src="../assets/js/course.js"></script>
+<style>
+  .proj-tabs .tab-panel > .code-block:first-child { margin-top: 8px; }
+  .proj-tabs .tab-panel > p + .code-block { margin-top: 14px; }
+</style>
 </head>
 <body data-page="project">
 <main id="main">
@@ -71,7 +75,7 @@
       </tbody>
     </table></div>
     <p><strong>Done looks like:</strong></p>
-    <script type="text/plain" class="code" data-title="Request — POST /api/books">
+    <script type="text/plain" class="code" data-lang="text" data-title="Request — POST /api/books">
       POST /api/books HTTP/1.1
       Host: localhost:3000
       Content-Type: application/json
@@ -83,6 +87,59 @@
 Content-Type: application/json
 
 { "title": "Dune", "category": "Sci-fi", "year": 1965 }</div>
+    <p><strong>Reference starter blueprint (adapt the routes to your own theme):</strong></p>
+    <div class="tabs proj-tabs">
+      <div data-tab="server.js (Express)">
+        <p>Reads <code>process.env.PORT</code> with a fallback to <code>3000</code>, turns on JSON and form body parsers, answers three GET routes plus one POST route, and includes a clean 404 fallback.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="server.js (Milestone 1 blueprint)">
+          const express = require('express');
+          const app = express();
+
+          // Translate incoming JSON and HTML form bodies into req.body
+          app.use(express.json());
+          app.use(express.urlencoded({ extended: true }));
+
+          app.get('/', (req, res) => {
+            res.send('<h1>Book Shelf Tracker</h1><p>Try /about, /api/books, or POST /api/books.</p>');
+          });
+          app.get('/about', (req, res) => {
+            res.json({ app: 'Book Shelf Tracker', collection: 'books' });
+          });
+          app.get('/api/books', (req, res) => {
+            res.json([{ title: 'Dune', category: 'Sci-fi', year: 1965 }]);
+          });
+          app.post('/api/books', (req, res) => {
+            res.json(req.body);
+          });
+
+          // Last station: clear 404 for unknown addresses
+          app.use((req, res) => {
+            res.status(404).json({ error: 'Not found' });
+          });
+
+          const port = process.env.PORT || 3000;
+          app.listen(port, () => console.log('Listening on http://localhost:' + port));
+        </script>
+      </div>
+      <div data-tab="package.json (JSON)">
+        <p>Declares <code>express</code> under <code>dependencies</code> and a <code>start</code> script so <code>npm start</code> launches your server with one command.</p>
+        <script type="text/plain" class="code" data-lang="json" data-title="package.json (Milestone 1 blueprint)">
+          {
+            "name": "book-shelf-tracker",
+            "version": "1.0.0",
+            "main": "server.js",
+            "scripts": {
+              "start": "node server.js",
+              "dev": "node --watch server.js"
+            },
+            "dependencies": {
+              "express": "^5.3.0"
+            }
+          }
+        </script>
+      </div>
+    </div>
+    <p>Every Milestone 1 requirement is visible in those two files: <code>process.env.PORT || 3000</code> lets hosting platforms choose the port while keeping <code>3000</code> locally, <code>express.json()</code> and <code>express.urlencoded()</code> make <code>POST /api/books</code> work for both curl JSON requests and HTML forms, and the final <code>app.use(...)</code> prevents hangs or ugly defaults on unknown paths.</p>
     <p><strong>Deliverable:</strong> your project folder (or repo link) plus a one-paragraph note naming your theme and your main collection.</p>
     <div class="quiz" data-title="Milestone 1 self-check">
       <script type="application/json">
@@ -144,7 +201,7 @@ Content-Type: application/json
       </tbody>
     </table></div>
     <p><strong>Done looks like:</strong></p>
-    <script type="text/plain" class="code" data-title="Request — POST /api/books">
+    <script type="text/plain" class="code" data-lang="text" data-title="Request — POST /api/books">
       POST /api/books HTTP/1.1
       Host: localhost:3000
       Content-Type: application/json
@@ -156,6 +213,132 @@ Content-Type: application/json
 Content-Type: application/json
 
 { "id": 3, "title": "The Left Hand of Darkness", "category": "Sci-fi", "year": 1969, "note": "First edition" }</div>
+    <p><strong>Reference starter blueprint (router + styled Vue SPA served by <code>express.static('public')</code>):</strong></p>
+    <div class="tabs proj-tabs">
+      <div data-tab="routes/books.js (Router JS)">
+        <p>Moves all five CRUD routes into their own module, mounted with <code>app.use('/api/books', booksRouter)</code> in <code>server.js</code>.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="routes/books.js (Milestone 2 blueprint)">
+          const express = require('express');
+          const router = express.Router();
+
+          let books = [
+            { id: 1, title: 'Dune', category: 'Sci-fi', year: 1965, note: 'Paperback' },
+            { id: 2, title: 'Emma', category: 'Classic', year: 1815, note: 'Annotated' }
+          ];
+          let nextId = 3;
+
+          router.get('/', (req, res) => res.json(books));
+          router.get('/:id', (req, res) => {
+            const book = books.find((b) => b.id === Number(req.params.id));
+            if (!book) return res.status(404).json({ error: 'Book not found' });
+            res.json(book);
+          });
+          router.post('/', (req, res) => {
+            const { title, category, year, note } = req.body || {};
+            if (!title || !category) return res.status(400).json({ error: 'title and category are required' });
+            const book = { id: nextId++, title, category, year: Number(year) || null, note: note || '' };
+            books.push(book);
+            res.status(201).json(book);
+          });
+          router.put('/:id', (req, res) => {
+            const book = books.find((b) => b.id === Number(req.params.id));
+            if (!book) return res.status(404).json({ error: 'Book not found' });
+            Object.assign(book, {
+              title: req.body.title ?? book.title,
+              category: req.body.category ?? book.category,
+              year: req.body.year ?? book.year,
+              note: req.body.note ?? book.note
+            });
+            res.json(book);
+          });
+          router.delete('/:id', (req, res) => {
+            const i = books.findIndex((b) => b.id === Number(req.params.id));
+            if (i === -1) return res.status(404).json({ error: 'Book not found' });
+            books.splice(i, 1);
+            res.status(204).send();
+          });
+
+          module.exports = router;
+        </script>
+      </div>
+      <div data-tab="public/index.html (HTML + Vue)">
+        <p>Uses Vue 3 from a pinned CDN script (no build step): <code>@submit.prevent</code> stops page reloads and calls <code>addBook()</code>, which POSTs JSON and pushes the server's <code>201</code> response into reactive state.</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="public/index.html (Milestone 2 blueprint)">
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Book Shelf Tracker</title>
+            <link rel="stylesheet" href="/styles.css">
+            <script src="https://unpkg.com/vue@3.5.45/dist/vue.global.prod.js"><\/script>
+          </head>
+          <body>
+            <main id="app" class="container">
+              <h1>Book Shelf Tracker</h1>
+              <p v-if="error" class="alert" role="alert">{{ error }}</p>
+
+              <form class="add-form" @submit.prevent="addBook">
+                <input v-model="form.title" placeholder="Title" required>
+                <input v-model="form.category" placeholder="Category" required>
+                <input v-model.number="form.year" type="number" placeholder="Year">
+                <button type="submit">Add book</button>
+              </form>
+
+              <ul class="item-list">
+                <li v-for="b in books" :key="b.id">
+                  <span><strong>{{ b.title }}</strong> ({{ b.category }}, {{ b.year }})</span>
+                  <button type="button" class="btn-del" @click="removeBook(b.id)">Delete</button>
+                </li>
+              </ul>
+            </main>
+            <script>
+              Vue.createApp({
+                data: () => ({ books: [], error: '', form: { title: '', category: '', year: '' } }),
+                async mounted() {
+                  const res = await fetch('/api/books');
+                  this.books = await res.json();
+                },
+                methods: {
+                  async addBook() {
+                    this.error = '';
+                    const res = await fetch('/api/books', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(this.form)
+                    });
+                    const data = await res.json();
+                    if (!res.ok) { this.error = data.error || 'Could not add book'; return; }
+                    this.books.push(data);
+                    this.form = { title: '', category: '', year: '' };
+                  },
+                  async removeBook(id) {
+                    const res = await fetch('/api/books/' + id, { method: 'DELETE' });
+                    if (res.ok) this.books = this.books.filter((b) => b.id !== id);
+                  }
+                }
+              }).mount('#app');
+            <\/script>
+          </body>
+          </html>
+        </script>
+      </div>
+      <div data-tab="public/styles.css (CSS)">
+        <p>Clean responsive CSS for the SPA list, form row, delete buttons, and error banner — served automatically at <code>/styles.css</code>.</p>
+        <script type="text/plain" class="code" data-lang="css" data-title="public/styles.css (Milestone 2 blueprint)">
+          body { font-family: system-ui, sans-serif; margin: 0; padding: 24px 16px; background: #f8fafc; color: #1f2937; }
+          .container { max-width: 640px; margin: 0 auto; }
+          .add-form { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+          .add-form input { flex: 1 1 130px; padding: 8px 10px; border: 1px solid #94a3b8; border-radius: 6px; font: inherit; }
+          .add-form button { padding: 8px 16px; border: 0; border-radius: 6px; background: #1f4fd1; color: #fff; font-weight: 700; cursor: pointer; }
+          .item-list { list-style: none; padding: 0; display: grid; gap: 8px; }
+          .item-list li { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; }
+          .btn-del { padding: 4px 10px; border: 1px solid #dc2626; border-radius: 6px; background: #fff; color: #b91c1c; cursor: pointer; }
+          .alert { padding: 10px 12px; background: #fef2f2; border: 1px solid #ef4444; border-radius: 8px; color: #991b1b; font-weight: 700; }
+        </script>
+      </div>
+    </div>
+    <p>Notice how <code>@submit.prevent</code> in Vue replaces <code>event.preventDefault()</code>, letting the form work cleanly with the Enter key while sending JSON via <code>fetch()</code> and updating the screen with zero full-page reload.</p>
     <p><strong>Deliverable:</strong> the updated project, plus a short list of your endpoints (method + path + what it does).</p>
     <div class="quiz" data-title="Milestone 2 self-check">
       <script type="application/json">
@@ -228,6 +411,51 @@ Content-Type: application/json
     </script>
     <p>MongoDB generates the <code>_id</code> when the record is saved — yours will differ. Restart the server and this record is still there; that is the milestone.</p>
     <p class="muted">A note on ids: the milestone checks keep illustrating the API with the simple numeric ids from the in-memory stage (Milestone 2). In the MongoDB version, the document's <code>_id</code> — that 24-character ObjectId — is what plays the id role in the URL.</p>
+    <p><strong>Reference starter blueprint (seed script + environment template):</strong></p>
+    <div class="tabs proj-tabs">
+      <div data-tab="seed.js (MongoDB seed script)">
+        <p>Run once with <code>node --env-file=.env seed.js</code> so a fresh clone starts with visible starter records instead of an empty list.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="seed.js (Milestone 3 blueprint)">
+          const { MongoClient } = require('mongodb');
+
+          const STARTER_BOOKS = [
+            { title: 'Dune', category: 'Sci-fi', year: 1965, note: 'Paperback' },
+            { title: 'Emma', category: 'Classic', year: 1815, note: 'Annotated' },
+            { title: 'The Left Hand of Darkness', category: 'Sci-fi', year: 1969, note: 'First edition' }
+          ];
+
+          async function seed() {
+            const client = new MongoClient(process.env.MONGO_URI);
+            await client.connect();
+            const books = client.db('bookshelf').collection('books');
+
+            // Only insert starter books if the collection is empty
+            if ((await books.countDocuments()) === 0) {
+              await books.insertMany(STARTER_BOOKS);
+              console.log('Inserted', STARTER_BOOKS.length, 'starter books.');
+            } else {
+              console.log('Collection already has data — skipping seed.');
+            }
+            await client.close();
+          }
+
+          seed().catch((err) => { console.error(err); process.exit(1); });
+        </script>
+      </div>
+      <div data-tab=".env.example (Config template)">
+        <p>Commit <code>.env.example</code> with placeholder text and keep your real <code>.env</code> in <code>.gitignore</code>.</p>
+        <script type="text/plain" class="code" data-lang="text" data-title=".env.example (Milestone 3 blueprint)">
+          PORT=3000
+          MONGO_URI=mongodb://localhost:27017/bookshelf
+          # Or for MySQL:
+          # DB_HOST=localhost
+          # DB_USER=root
+          # DB_PASSWORD=replace-me
+          # DB_NAME=bookshelf
+        </script>
+      </div>
+    </div>
+    <p>Notice the idempotent guard <code>if ((await books.countDocuments()) === 0)</code> in <code>seed.js</code>: running the seed command twice by accident will never duplicate your starter records.</p>
     <p><strong>Deliverable:</strong> the updated project; your README now includes setup steps that end with a running app and visible seed data.</p>
     <div class="quiz" data-title="Milestone 3 self-check">
       <script type="application/json">
@@ -290,7 +518,7 @@ Content-Type: application/json
     </table></div>
     <p><strong>Done looks like:</strong></p>
     <p>Ask to edit a book with no login cookie, and the server refuses before anything is touched:</p>
-    <script type="text/plain" class="code" data-title="Request — PUT /api/books/3, signed out">
+    <script type="text/plain" class="code" data-lang="text" data-title="Request — PUT /api/books/3, signed out">
       PUT /api/books/3 HTTP/1.1
       Host: localhost:3000
       Content-Type: application/json
@@ -302,7 +530,7 @@ Content-Type: application/json
 
 { "error": "Please log in" }</div>
     <p>The same request with the session cookie from logging in as the book's owner (your session id will differ):</p>
-    <script type="text/plain" class="code" data-title="Request — PUT /api/books/3, signed in as the owner">
+    <script type="text/plain" class="code" data-lang="text" data-title="Request — PUT /api/books/3, signed in as the owner">
       PUT /api/books/3 HTTP/1.1
       Host: localhost:3000
       Cookie: sid=9f2e7a1c
@@ -315,7 +543,7 @@ Content-Type: application/json
 
 { "id": 3, "title": "The Left Hand of Darkness", "category": "Sci-fi", "year": 1969, "note": "First edition, good condition" }</div>
     <p>Signed in is not always enough. The same request carrying a different user's session cookie — someone signed in, but not the book's owner — is refused as well, and the stored book is left unchanged:</p>
-    <script type="text/plain" class="code" data-title="Request — PUT /api/books/3, signed in as a non-owner">
+    <script type="text/plain" class="code" data-lang="text" data-title="Request — PUT /api/books/3, signed in as a non-owner">
       PUT /api/books/3 HTTP/1.1
       Host: localhost:3000
       Cookie: sid=4b8c1d9e
@@ -327,6 +555,86 @@ Content-Type: application/json
 Content-Type: application/json
 
 { "error": "Only the owner can edit this book" }</div>
+    <p><strong>Reference starter blueprint (guards + HTML/CSS login &amp; register page):</strong></p>
+    <div class="tabs proj-tabs">
+      <div data-tab="middleware/auth.js (JS Guards)">
+        <p>Two small reusable middleware functions enforcing authentication (<code>401</code>) first, then role authorization (<code>403</code>).</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="middleware/auth.js (Milestone 4 blueprint)">
+          function requireLogin(req, res, next) {
+            if (!req.session || !req.session.userId) {
+              return res.status(401).json({ error: 'Please log in' });
+            }
+            next();
+          }
+
+          function requireRole(...allowedRoles) {
+            return (req, res, next) => {
+              if (!req.session || !req.session.userId) {
+                return res.status(401).json({ error: 'Please log in' });
+              }
+              if (!allowedRoles.includes(req.session.role)) {
+                return res.status(403).json({ error: 'You are not allowed to do this' });
+              }
+              next();
+            };
+          }
+
+          module.exports = { requireLogin, requireRole };
+        </script>
+      </div>
+      <div data-tab="public/login.html (HTML)">
+        <p>Two separate <code>POST</code> forms — notice neither form includes a <code>role</code> input, because the server always assigns the default role at registration.</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="public/login.html (Milestone 4 blueprint)">
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Account · Book Shelf Tracker</title>
+            <link rel="stylesheet" href="/auth.css">
+          </head>
+          <body>
+            <main class="auth-grid">
+              <section class="auth-panel">
+                <h1>Log in</h1>
+                <form method="post" action="/login">
+                  <label for="li-user">Username</label>
+                  <input id="li-user" name="username" type="text" autocomplete="username" required>
+                  <label for="li-pass">Password</label>
+                  <input id="li-pass" name="password" type="password" autocomplete="current-password" required>
+                  <button type="submit">Log in</button>
+                </form>
+              </section>
+
+              <section class="auth-panel">
+                <h2>Create an account</h2>
+                <form method="post" action="/register">
+                  <label for="rg-user">Username</label>
+                  <input id="rg-user" name="username" type="text" autocomplete="username" required>
+                  <label for="rg-pass">Password (15+ characters)</label>
+                  <input id="rg-pass" name="password" type="password" autocomplete="new-password" minlength="15" required>
+                  <button type="submit">Register</button>
+                </form>
+              </section>
+            </main>
+          </body>
+          </html>
+        </script>
+      </div>
+      <div data-tab="public/auth.css (CSS)">
+        <p>Two-column responsive layout that stacks cleanly on phones, with clear focus outlines and full-width buttons.</p>
+        <script type="text/plain" class="code" data-lang="css" data-title="public/auth.css (Milestone 4 blueprint)">
+          body { font-family: system-ui, sans-serif; margin: 0; padding: 32px 16px; background: #f8fafc; color: #1f2937; }
+          .auth-grid { max-width: 760px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+          .auth-panel { background: #ffffff; border: 1px solid #cbd5e1; border-radius: 12px; padding: 22px; }
+          .auth-panel label { display: block; font-weight: 700; margin-top: 12px; font-size: 0.9rem; }
+          .auth-panel input { display: block; width: 100%; margin-top: 4px; padding: 9px 10px; border: 1.5px solid #94a3b8; border-radius: 6px; font: inherit; box-sizing: border-box; }
+          .auth-panel input:focus-visible { outline: 2px solid #1f4fd1; outline-offset: 2px; }
+          .auth-panel button { width: 100%; margin-top: 16px; padding: 10px; border: 0; border-radius: 6px; background: #1f4fd1; color: #ffffff; font: inherit; font-weight: 700; cursor: pointer; }
+        </script>
+      </div>
+    </div>
+    <p>Pair <code>middleware/auth.js</code> with an ownership check inside your <code>PUT</code> and <code>DELETE</code> handlers (<code>book.ownerId !== req.session.userId &amp;&amp; req.session.role !== 'admin'</code> → <code>403</code>) to satisfy every Milestone 4 requirement end to end.</p>
     <p><strong>Deliverable:</strong> the finished project, a README with setup and test accounts (a demo member and a demo admin — give the admin its role in your seed data, not through sign-up), and a half-page reflection: what your app does, and which course idea was hardest to make real.</p>
     <div class="quiz" data-title="Milestone 4 self-check">
       <script type="application/json">

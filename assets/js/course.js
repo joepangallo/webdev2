@@ -1462,7 +1462,7 @@
     });
     const openB = iconBtn('open', 'Open in playground', 'ghost', () => {
       try { localStorage.setItem('wd2:handoff', JSON.stringify({ html: code.html || '', css: code.css || '', js: code.js || '', title })); } catch (e) { /* ignore */ }
-      window.open(WD1.url('tools/playground.html#handoff'), '_blank');
+      window.open(WD1.url('tools/playground.html#handoff'), '_blank', 'noopener');
     });
     frame(el, 'Playground', title, [resetB, openB]);
 
