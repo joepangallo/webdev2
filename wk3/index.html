@@ -215,8 +215,20 @@ Max-Age=3600  keep it for 3600 seconds (one hour), then discard it</div>
           });
         </script>
       </div>
+      <div data-tab="4 · Browser JS (why HttpOnly hides cookies)">
+        <p>Compare what browser JavaScript can see in <code>document.cookie</code>: a plain preference cookie set <em>without</em> <code>httpOnly</code> is readable, while an <code>HttpOnly</code> cookie is completely invisible to page scripts.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="cookie-visibility.js (browser JS)">
+          // Suppose the server sent:
+          //   Set-Cookie: ui_density=compact; Path=/
+          //   Set-Cookie: sid=k9f2x; HttpOnly; SameSite=Lax; Path=/
+          console.log(document.cookie);
+          // Prints: "ui_density=compact"
+          // Notice "sid=k9f2x" is NOT here — HttpOnly hides it from page JS,
+          // even though the browser still attaches it automatically to every request!
+        </script>
+      </div>
     </div>
-    <p>Trace how all three pieces cooperate. In HTML, putting <code>name="theme"</code> and <code>value="dark"</code> directly on a <code>&lt;button type="submit"&gt;</code> sends only the clicked button's value in the POST body. In Express, checking <code>req.body.theme === 'dark' ? 'dark' : 'light'</code> guarantees only one of two safe strings can ever land in the cookie (so even if a visitor edits the request with curl, they cannot inject unexpected text into <code>&lt;body data-theme="..."&gt;</code>), and <code>res.clearCookie('theme')</code> removes a cookie by sending an expired <code>Set-Cookie</code> header. In CSS, switching <code>body[data-theme="dark"]</code> flips every component built on <code>var(--bg)</code> and <code>var(--ink)</code> at once.</p>
+    <p>Trace how all four pieces cooperate. In HTML, putting <code>name="theme"</code> and <code>value="dark"</code> directly on a <code>&lt;button type="submit"&gt;</code> sends only the clicked button's value in the POST body. In Express, checking <code>req.body.theme === 'dark' ? 'dark' : 'light'</code> guarantees only one of two safe strings can ever land in the cookie (so even if a visitor edits the request with curl, they cannot inject unexpected text into <code>&lt;body data-theme="..."&gt;</code>), and <code>res.clearCookie('theme')</code> removes a cookie by sending an expired <code>Set-Cookie</code> header. In CSS, switching <code>body[data-theme="dark"]</code> flips every component built on <code>var(--bg)</code> and <code>var(--ink)</code> at once. And Tab 4 shows why <code>HttpOnly</code> matters in the browser: page JavaScript can inspect non-HttpOnly cookies through <code>document.cookie</code>, while sensitive cookies stay locked out of reach.</p>
 
     <aside class="callout warn">
       <strong>Cookies live on the visitor's machine — never trust them</strong>
@@ -353,11 +365,78 @@ sessions["k9f2x"] = { "visits": 3, "cart": ["Dune", "Emma"] }</div>
         </div>
       </div>
       <ol class="steps">
-        <li><p><strong>The request arrives.</strong> Your browser asks for a page, like any HTTP request. Nothing about the request itself says who you are.</p></li>
-        <li><p><strong>The browser attaches the cookie automatically.</strong> Stored from an earlier <code>Set-Cookie</code>, the cookie carries only the session ID — a long random string. No name, no cart, no personal data travels with it.</p></li>
-        <li><p><strong>The session middleware looks the ID up.</strong> Before your route runs, <code>express-session</code> reads the ID and finds the data stored under it on the server. If there is no cookie, or the ID is unknown, it starts a fresh, empty session and arranges for a new ID cookie to be sent back.</p></li>
-        <li><p><strong>Your code sees <code>req.session</code>.</strong> The stored data appears as an ordinary object. Read from it, write to it — changes are saved under the same ID when the response is sent.</p></li>
-        <li><p><strong>The response goes back.</strong> It may carry a <code>Set-Cookie</code> header if a new session was created. The data itself never leaves the server; only the ticket does.</p></li>
+        <li>
+          <p><strong>The request arrives.</strong> Your browser asks for a page, like any HTTP request. Nothing about the request itself says who you are.</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="js" data-title="Client — Browser initiates request">
+              // Visitor navigates to /count or calls fetch('/count')
+              const res = await fetch('/count');
+            </script>
+            <script type="text/plain" class="code" data-lang="text" data-title="Server — Stateless HTTP arrives">
+              GET /count HTTP/1.1
+              Host: localhost:3000
+              (HTTP itself has no built-in memory of prior visits.)
+            </script>
+          </div>
+        </li>
+        <li>
+          <p><strong>The browser attaches the cookie automatically.</strong> Stored from an earlier <code>Set-Cookie</code>, the cookie carries only the session ID — a long random string. No name, no cart, no personal data travels with it.</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="text" data-title="Client — Cookie header added automatically">
+              GET /count HTTP/1.1
+              Host: localhost:3000
+              Cookie: connect.sid=s%3Ak9f2x.sig...
+              (Page JS never touches this HttpOnly cookie!)
+            </script>
+            <script type="text/plain" class="code" data-lang="js" data-title="Server — Reads cookie header">
+              // express-session extracts & verifies the signature
+              // on req.headers.cookie -> session ID "k9f2x"
+            </script>
+          </div>
+        </li>
+        <li>
+          <p><strong>The session middleware looks the ID up.</strong> Before your route runs, <code>express-session</code> reads the ID and finds the data stored under it on the server. If there is no cookie, or the ID is unknown, it starts a fresh, empty session and arranges for a new ID cookie to be sent back.</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="text" data-title="Client — Waiting for response">
+              Browser holds ONLY the ticket: k9f2x
+              (The actual visit count & cart never sit in the browser.)
+            </script>
+            <script type="text/plain" class="code" data-lang="js" data-title="Server — Session store lookup">
+              // Middleware finds the record in the server store:
+              // store.get('k9f2x') -> { visits: 2, cart: ['Dune'] }
+              // Attaches it to req.session, then calls next()
+            </script>
+          </div>
+        </li>
+        <li>
+          <p><strong>Your code sees <code>req.session</code>.</strong> The stored data appears as an ordinary object. Read from it, write to it — changes are saved under the same ID when the response is sent.</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="text" data-title="Client — Still waiting">
+              Waiting for /count response...
+            </script>
+            <script type="text/plain" class="code" data-lang="js" data-title="Server — Route reads &amp; updates session">
+              app.get('/count', (req, res) => {
+                req.session.visits = (req.session.visits || 0) + 1;
+                res.send(`Visit number ${req.session.visits}`);
+              });
+            </script>
+          </div>
+        </li>
+        <li>
+          <p><strong>The response goes back.</strong> It may carry a <code>Set-Cookie</code> header if a new session was created. The data itself never leaves the server; only the ticket does.</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="text" data-title="Client — Receives answer (+ cookie if new)">
+              HTTP/1.1 200 OK
+              (Set-Cookie: connect.sid=...; HttpOnly; SameSite=Lax)
+
+              Visit number 3
+            </script>
+            <script type="text/plain" class="code" data-lang="js" data-title="Server — Saved under ID k9f2x">
+              // Updated server-side session record:
+              // sessions['k9f2x'] = { visits: 3, cart: ['Dune'] }
+            </script>
+          </div>
+        </li>
       </ol>
     </div>
 
@@ -442,6 +521,71 @@ Lines: 2</div>
       </script>
     </div>
     <p>Compare the two patterns line by line. On the left, <code>if (!req.session.cart) req.session.cart = []</code> initializes a private cart array per session so Visitor A's books never mix with Visitor B's, and the cookie still carries only the session ID. On the right, requiring <code>'fs/promises'</code> lets you <code>await fs.readFile(...)</code> and <code>await fs.appendFile(...)</code> without blocking the event loop; <code>path.join(__dirname, 'notes.txt')</code> locks the file path to the script's own folder regardless of which terminal directory launched Node; and <code>.catch(() =&gt; '')</code> treats a not-yet-created file as an empty list instead of crashing with <code>ENOENT</code>.</p>
+
+    <p><strong>The client side of that session cart (HTML, CSS &amp; Browser JS):</strong> notice that browser code <em>never</em> reads or sends the session ID itself — the browser attaches the <code>HttpOnly</code> session cookie automatically on every same-origin <code>fetch()</code> call:</p>
+    <div class="tabs wk3-tabs">
+      <div data-tab="1 · Client HTML (cart widget)">
+        <p>Buttons trigger <code>POST /api/cart</code>, and the badge + list redraw from the server's session response.</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="cart-client.html">
+          <section class="cart-box">
+            <div class="cart-head">
+              <h2>Book Cart</h2>
+              <span id="cart-count" class="cart-badge">0 items</span>
+            </div>
+            <div class="cart-actions">
+              <button type="button" data-add="Dune">Add Dune</button>
+              <button type="button" data-add="Emma">Add Emma</button>
+            </div>
+            <ul id="cart-items" class="cart-list"></ul>
+          </section>
+        </script>
+      </div>
+      <div data-tab="2 · Client CSS (cart layout &amp; badge)">
+        <p>Aligns the heading with the item-count pill and styles the add buttons and cart list cleanly.</p>
+        <script type="text/plain" class="code" data-lang="css" data-title="cart-client.css">
+          .cart-box { max-width: 440px; padding: 18px; border: 1px solid #cbd5e1; border-radius: 10px; background: #ffffff; font-family: system-ui, sans-serif; }
+          .cart-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+          .cart-badge { padding: 3px 10px; border-radius: 99px; background: #eef4ff; color: #1f4fd1; font-weight: 700; font-size: 0.85rem; }
+          .cart-actions { display: flex; gap: 8px; margin-bottom: 12px; }
+          .cart-actions button { padding: 8px 12px; border: 0; border-radius: 6px; background: #1f4fd1; color: #ffffff; font-weight: 700; cursor: pointer; }
+          .cart-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+          .cart-list li { padding: 8px 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; }
+        </script>
+      </div>
+      <div data-tab="3 · Client JS (talking to /api/cart)">
+        <p>Loads the visitor's existing session cart on startup and sends new additions via JSON POST — reload the page and the server's session still remembers every item.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="cart-client.js (browser JS)">
+          const countEl = document.getElementById('cart-count');
+          const listEl = document.getElementById('cart-items');
+
+          function renderCart(items) {
+            countEl.textContent = `${items.length} ${items.length === 1 ? 'item' : 'items'}`;
+            listEl.replaceChildren();
+            items.forEach((title) => {
+              const li = document.createElement('li');
+              li.textContent = title;
+              listEl.appendChild(li);
+            });
+          }
+
+          // Load whatever is already in this visitor's server-side session
+          fetch('/api/cart').then((r) => r.json()).then((d) => renderCart(d.cart));
+
+          document.querySelectorAll('[data-add]').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+              const res = await fetch('/api/cart', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: btn.dataset.add })
+              });
+              const data = await res.json();
+              renderCart(data.cart);
+            });
+          });
+        </script>
+      </div>
+    </div>
+    <p>Follow the full round trip: click <strong>Add Dune</strong>, refresh the browser tab, and <code>fetch('/api/cart')</code> still gets back <code>["Dune"]</code>. Nothing was saved in <code>localStorage</code> and no item names went into the cookie — the browser silently presented its <code>connect.sid</code> ticket, and Express looked up <code>req.session.cart</code> on the server.</p>
 
     <h3>Why files stop being enough</h3>
     <p>Files are a fine first step, and for small tools they may be all you need. But watch what breaks as a site grows:</p>
@@ -583,6 +727,44 @@ Lines: 2</div>
           { "_id": 3, "title": "The Hobbit", "author": "J.R.R. Tolkien" }
         </script>
         <p>Ask for a book and you get back the whole document, fields and all. (Real MongoDB <code>_id</code> values are long generated identifiers, not small numbers — small numbers are used here so the two tabs line up.)</p>
+      </div>
+      <div data-tab="Client UI (same HTML/CSS/JS for either DB)">
+        <p>Your front end never talks to MySQL or MongoDB directly — it only receives JSON from Express, so the exact same HTML, CSS, and browser JS renders books from <em>either</em> database:</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="book-card.html (database-agnostic client)">
+          <ul id="catalog" class="book-grid"></ul>
+        </script>
+        <script type="text/plain" class="code" data-lang="css" data-title="book-card.css">
+          .book-grid { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+          .book-tile { padding: 14px; border: 1px solid #cbd5e1; border-radius: 10px; background: #ffffff; }
+          .book-tile .tag { display: inline-block; margin-top: 6px; padding: 2px 8px; border-radius: 99px; background: #eef4ff; color: #1f4fd1; font-size: 0.78rem; }
+        </script>
+        <script type="text/plain" class="code" data-lang="js" data-title="render-book.js (works with MySQL OR MongoDB JSON)">
+          function renderBooks(books) {
+            const grid = document.getElementById('catalog');
+            grid.replaceChildren();
+            books.forEach((book) => {
+              const li = document.createElement('li');
+              li.className = 'book-tile';
+              // Handles either MySQL's id or MongoDB's _id cleanly
+              li.dataset.id = book.id ?? book._id;
+
+              const title = document.createElement('strong');
+              title.textContent = book.title;
+              const author = document.createElement('div');
+              author.textContent = book.author;
+              li.append(title, author);
+
+              // Optional nested field (common in MongoDB documents)
+              (book.genres || []).forEach((g) => {
+                const tag = document.createElement('span');
+                tag.className = 'tag';
+                tag.textContent = g;
+                li.appendChild(tag);
+              });
+              grid.appendChild(li);
+            });
+          }
+        </script>
       </div>
     </div>
 
@@ -919,6 +1101,77 @@ Lines: 2</div>
     </script>
     <p>Walk through the three driver reports doing the work here. In <code>POST</code>, <code>{ _id: result.insertedId, ...doc }</code> merges the database-generated <code>_id</code> with the validated fields and answers <code>201 Created</code>. In <code>PUT</code>, checking <code>result.matchedCount === 0</code> (rather than <code>modifiedCount</code>) is a crucial subtlety: if a user saves the same title twice, <code>matchedCount</code> is <code>1</code> (the book exists) while <code>modifiedCount</code> is <code>0</code> (nothing changed) — checking <code>matchedCount</code> prevents falsely returning <code>404</code>. In <code>DELETE</code>, <code>result.deletedCount === 0</code> means no document had that <code>_id</code> (<code>404</code>); otherwise <code>204 No Content</code> confirms removal.</p>
 
+    <p><strong>The client side talking to MongoDB routes (HTML, CSS &amp; Browser JS):</strong> the one adjustment your front end makes when moving from an in-memory array to MongoDB is reading the 24-character string <code>book._id</code> instead of a numeric <code>book.id</code>:</p>
+    <div class="tabs wk3-tabs">
+      <div data-tab="1 · Client HTML">
+        <p>Each rendered card stores MongoDB's string <code>_id</code> on <code>data-id</code> so Rename and Delete buttons know which document URL to call.</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="mongo-books-client.html">
+          <section class="shelf">
+            <h2>Bookstore (MongoDB)</h2>
+            <p id="mongo-err" class="err-box" role="alert" hidden></p>
+            <ul id="mongo-books" class="shelf-list"></ul>
+          </section>
+        </script>
+      </div>
+      <div data-tab="2 · Client CSS">
+        <p>Spaces the book details and action buttons cleanly on one row with clear button contrast.</p>
+        <script type="text/plain" class="code" data-lang="css" data-title="mongo-books-client.css">
+          .shelf { max-width: 560px; font-family: system-ui, sans-serif; }
+          .shelf-list { list-style: none; padding: 0; display: grid; gap: 8px; }
+          .shelf-list li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; background: #ffffff; }
+          .shelf-btns { display: flex; gap: 6px; }
+          .shelf-btns button { padding: 5px 10px; border-radius: 6px; border: 1px solid #94a3b8; background: #f8fafc; cursor: pointer; }
+          .err-box { padding: 8px 12px; border-radius: 6px; background: #fef2f2; border: 1px solid #ef4444; color: #991b1b; font-weight: 700; }
+        </script>
+      </div>
+      <div data-tab="3 · Client JS (using book._id)">
+        <p>Uses <code>book._id</code> in <code>DELETE /api/books/${book._id}</code> and updates state by comparing string IDs (<code>b._id !== id</code>).</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="mongo-books-client.js (browser JS)">
+          let books = [];
+          const list = document.getElementById('mongo-books');
+          const errBox = document.getElementById('mongo-err');
+
+          async function loadBooks() {
+            const res = await fetch('/api/books');
+            books = await res.json();
+            render();
+          }
+
+          async function removeBook(id) {
+            errBox.hidden = true;
+            // id is MongoDB's 24-character string _id (e.g. "66f1c2a4...")
+            const res = await fetch(`/api/books/${encodeURIComponent(id)}`, { method: 'DELETE' });
+            if (!res.ok) {
+              const data = await res.json().catch(() => ({}));
+              errBox.textContent = data.error || 'Delete failed';
+              errBox.hidden = false;
+              return;
+            }
+            books = books.filter((b) => b._id !== id);
+            render();
+          }
+
+          function render() {
+            list.replaceChildren();
+            books.forEach((b) => {
+              const li = document.createElement('li');
+              const info = document.createElement('span');
+              info.textContent = `${b.title} — ${b.author}`;
+              const del = document.createElement('button');
+              del.type = 'button';
+              del.textContent = 'Delete';
+              del.addEventListener('click', () => removeBook(b._id));
+              li.append(info, del);
+              list.appendChild(li);
+            });
+          }
+
+          loadBooks();
+        </script>
+      </div>
+    </div>
+    <p>Notice why <code>encodeURIComponent(id)</code> and <code>b._id !== id</code> work seamlessly here: MongoDB's <code>ObjectId</code> serializes to a plain string in JSON, so the browser passes that exact string back in the URL and Express converts it back with <code>new ObjectId(req.params.id)</code>.</p>
+
     <div class="quiz" data-title="Check your understanding: MongoDB CRUD">
       <script type="application/json">
       [
@@ -1155,6 +1408,70 @@ Rows deleted: 1</div>
     </script>
     <p>Trace how every lesson in this section shows up in those four routes: <code>mysql.createPool</code> hands out idle connections automatically so you never call <code>createConnection</code> or <code>end</code> per request; <code>Number.isInteger(id) &amp;&amp; id &gt;= 1</code> rejects non-numeric IDs with <code>400</code> before touching MySQL; every query uses <code>?</code> placeholders; <code>rows.length === 0</code> and <code>result.affectedRows === 0</code> turn misses into <code>404</code>; and database errors flow to <code>next(err)</code>.</p>
 
+    <p><strong>The client side querying and rendering MySQL rows (HTML, CSS &amp; Browser JS):</strong> watch how an author name with an apostrophe like <code>O'Brien</code> travels safely from an HTML search input, through <code>fetch()</code> and a parameterized MySQL <code>?</code> placeholder, back into a styled HTML table:</p>
+    <div class="tabs wk3-tabs">
+      <div data-tab="1 · Client HTML (search &amp; table)">
+        <p>Uses a semantic <code>&lt;table&gt;</code> with <code>&lt;thead&gt;</code> and an empty <code>&lt;tbody id="book-rows"&gt;</code> that browser JavaScript populates from MySQL's row objects.</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="mysql-table-client.html">
+          <form id="author-search" class="author-bar">
+            <label for="author-q">Filter by author</label>
+            <input id="author-q" name="author" type="search" placeholder="e.g. Jane Austen or O'Brien">
+            <button type="submit">Search</button>
+          </form>
+
+          <table class="sql-table">
+            <thead>
+              <tr><th scope="col">ID</th><th scope="col">Title</th><th scope="col">Author</th></tr>
+            </thead>
+            <tbody id="book-rows"></tbody>
+          </table>
+        </script>
+      </div>
+      <div data-tab="2 · Client CSS (striped table)">
+        <p>Uses <code>border-collapse: collapse</code> and <code>tbody tr:nth-child(even)</code> striping so relational rows are easy to scan.</p>
+        <script type="text/plain" class="code" data-lang="css" data-title="mysql-table-client.css">
+          .author-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; font-family: system-ui, sans-serif; }
+          .author-bar input { padding: 7px 10px; border: 1px solid #94a3b8; border-radius: 6px; font: inherit; }
+          .sql-table { width: 100%; max-width: 560px; border-collapse: collapse; font-family: system-ui, sans-serif; }
+          .sql-table th, .sql-table td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #cbd5e1; }
+          .sql-table thead th { background: #f1f5f9; font-size: 0.85rem; text-transform: uppercase; }
+          .sql-table tbody tr:nth-child(even) { background: #f8fafc; }
+        </script>
+      </div>
+      <div data-tab="3 · Client JS (fetching &amp; building rows)">
+        <p>URL-encodes the search value, receives the array of MySQL row objects <code>[{ id, title, author }]</code>, and fills each <code>&lt;td&gt;</code> safely with <code>textContent</code>.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="mysql-table-client.js (browser JS)">
+          const form = document.getElementById('author-search');
+          const tbody = document.getElementById('book-rows');
+
+          async function loadRows(author = '') {
+            const url = author ? '/api/books?author=' + encodeURIComponent(author) : '/api/books';
+            const res = await fetch(url);
+            const rows = await res.json();
+
+            tbody.replaceChildren();
+            rows.forEach((row) => {
+              const tr = document.createElement('tr');
+              [row.id, row.title, row.author].forEach((val) => {
+                const td = document.createElement('td');
+                td.textContent = String(val);
+                tr.appendChild(td);
+              });
+              tbody.appendChild(tr);
+            });
+          }
+
+          form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            loadRows(form.elements.author.value.trim());
+          });
+
+          loadRows();
+        </script>
+      </div>
+    </div>
+    <p>Follow the apostrophe in <code>O'Brien</code> end to end: <code>encodeURIComponent</code> safely encodes it in the URL, Express decodes it into <code>req.query.author</code>, MySQL's <code>?</code> placeholder treats it strictly as data (never breaking quotes or allowing SQL injection), and <code>td.textContent</code> renders it safely in the browser table without parsing markup.</p>
+
     <h3>Try it: complete the SELECT</h3>
     <p>Fill in the blanks to write the query that reads the title and author of the book with <code>id</code> 3:</p>
 
@@ -1255,7 +1572,44 @@ Rows deleted: 1</div>
           }
         </script>
       </div>
-      <div data-tab="3 · Express JS (the real guard)">
+      <div data-tab="3 · Browser JS (sending JSON &amp; showing 400 errors)">
+        <p>Converts the year input to a real number with <code>Number(...)</code> before sending JSON, and renders every server error message returned in <code>data.errors</code> inside <code>#form-errors</code>.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="validate-client.js (browser JS)">
+          const form = document.getElementById('book-form');
+          const errList = document.getElementById('form-errors');
+
+          form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            errList.hidden = true;
+            errList.replaceChildren();
+
+            const payload = {
+              title: form.elements.title.value.trim(),
+              author: form.elements.author.value.trim(),
+              year: Number(form.elements.year.value)
+            };
+
+            const res = await fetch('/api/books', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+
+            if (!res.ok && Array.isArray(data.errors)) {
+              data.errors.forEach((msg) => {
+                const li = document.createElement('li');
+                li.textContent = msg;
+                errList.appendChild(li);
+              });
+              errList.hidden = false;
+              return;
+            }
+            form.reset();
+          });
+        </script>
+      </div>
+      <div data-tab="4 · Express JS (the real guard)">
         <p>Calls <code>validateBook(req.body)</code> before touching the database; if any error came back, stops with <code>400 Bad Request</code> and returns the whole <code>errors</code> array as JSON.</p>
         <script type="text/plain" class="code" data-lang="js" data-title="validate-in-route.js (Express)">
           app.post('/api/books', async (req, res, next) => {
@@ -1275,7 +1629,7 @@ Rows deleted: 1</div>
         </script>
       </div>
     </div>
-    <p>Notice the clean separation of duties: HTML attributes give instant feedback while typing, CSS <code>:user-invalid</code> and <code>.error-list</code> make problems visually unmistakable, and Express's <code>validateBook(req.body)</code> enforces the exact same rules on the server — and builds a fresh <code>cleanBook</code> object with only the three allowed properties, automatically ignoring any unexpected extra fields (like <code>role: 'admin'</code>) that a visitor might sneak into the JSON body.</p>
+    <p>Notice the clean separation of duties across all four tabs: HTML attributes give instant feedback while typing, CSS <code>:user-invalid</code> and <code>.error-list</code> make problems visually unmistakable, browser JS sends typed JSON (converting <code>year</code> with <code>Number(...)</code>) and displays every item in <code>data.errors</code>, and Express's <code>validateBook(req.body)</code> enforces the exact same rules on the server — building a fresh <code>cleanBook</code> object with only the three allowed properties so unexpected extra fields (like <code>role: 'admin'</code>) are ignored.</p>
 
     <h3>Try it: add a rule to the validator</h3>
     <p>The same function runs below, and it already does its job for <code>title</code> and <code>author</code>. Now the shop wants every book to carry the year it was published. <strong>Your task: add a third rule to <code>validateBook</code>, so that <code>year</code> must be a whole number from 1000 to 2100.</strong> Both ends are allowed.</p>
@@ -1491,9 +1845,9 @@ console.log('Year too big:', validateBook({ title: 'The Hobbit', author: 'J.R.R.
         <script type="text/plain" class="code" data-lang="html" data-title="validated-field.html">
           <label for="title">Title</label>
           <input id="title" name="title" type="text" required maxlength="100">
-          <style>
-            input:user-invalid { border-color: #dc2626; background: #fef2f2; }
-          </style>
+        </script>
+        <script type="text/plain" class="code" data-lang="css" data-title="validated-field.css">
+          input:user-invalid { border-color: #dc2626; background: #fef2f2; }
         </script>
       </div>
     </div>

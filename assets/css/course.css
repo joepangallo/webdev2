@@ -910,7 +910,10 @@ pre.bare { background: var(--code-bg); border: 1px solid var(--code-line); borde
 }
 .stepper .steps > li > .step-body { flex: 1; min-width: 0; }
 .stepper .steps > li > .step-body > :last-child { margin-bottom: 0; }
-.stepper.show-all .steps > li { display: flex; opacity: .5; margin-bottom: 10px; }
+.stepper .step-body .grid-2 { margin-top: 14px; gap: 12px; }
+.stepper .step-body .code-block { margin-bottom: 0; }
+.stepper .step-body .code-block pre { padding: 14px 12px 10px; font-size: .8rem; line-height: 1.5; }
+.stepper.show-all .steps > li { display: flex; opacity: .5; margin-bottom: 18px; }
 .stepper.show-all .steps > li.current { opacity: 1; }
 .stepper-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); background: var(--surface-2); }
 .stepper-dots { display: flex; margin-left: auto; flex-wrap: wrap; }

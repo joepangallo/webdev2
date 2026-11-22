@@ -219,6 +219,58 @@ stored as : salt + ':' + hash, in a single column</div>
     </div>
     <p>Notice three deliberate schema choices in the SQL table: <code>UNIQUE</code> on <code>username</code> prevents duplicate accounts even if two registrations arrive at the same millisecond; <code>VARCHAR(255)</code> leaves comfortable room for the 161-character <code>salt:hash</code> (and for longer formats if you later upgrade to Argon2id); and <code>DEFAULT 'student'</code> guarantees every new account starts with least privilege unless an admin explicitly changes it.</p>
 
+    <p><strong>The client side of password entry (HTML, CSS &amp; Browser JS):</strong> the browser never hashes passwords for storage — it collects the password cleanly over HTTPS with live length feedback and lets the server run <code>scrypt</code>. Click through all three tabs:</p>
+    <div class="tabs c4-tabs">
+      <div data-tab="1 · Client HTML (password field + toggle)">
+        <p>Uses <code>type="password"</code>, <code>minlength="15"</code>, <code>autocomplete="new-password"</code>, and an accessible Show/Hide button with <code>aria-pressed</code>.</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="password-field.html">
+          <div class="pw-field">
+            <label for="new-pw">Choose a passphrase (15+ characters)</label>
+            <div class="pw-row">
+              <input id="new-pw" name="password" type="password" minlength="15" autocomplete="new-password" required>
+              <button id="toggle-pw" type="button" aria-pressed="false">Show</button>
+            </div>
+            <p id="pw-hint" class="pw-hint" aria-live="polite">0 / 15 characters</p>
+          </div>
+        </script>
+      </div>
+      <div data-tab="2 · Client CSS (field layout &amp; ready state)">
+        <p>Aligns the Show button right beside the input and shifts the hint text once the minimum length is reached.</p>
+        <script type="text/plain" class="code" data-lang="css" data-title="password-field.css">
+          .pw-field { max-width: 400px; font-family: system-ui, sans-serif; }
+          .pw-field label { display: block; font-weight: 700; margin-bottom: 6px; }
+          .pw-row { display: flex; gap: 6px; }
+          .pw-row input { flex: 1; padding: 8px 10px; border: 1.5px solid #94a3b8; border-radius: 6px; font: inherit; }
+          .pw-row button { padding: 8px 12px; border: 1px solid #94a3b8; border-radius: 6px; background: #f8fafc; font-weight: 700; cursor: pointer; }
+          .pw-hint { margin: 6px 0 0; font-size: 0.85rem; color: #64748b; }
+          .pw-hint.is-ready { color: #065f46; font-weight: 700; }
+        </script>
+      </div>
+      <div data-tab="3 · Client JS (Show/Hide + length meter)">
+        <p>Flips <code>input.type</code> between <code>'password'</code> and <code>'text'</code> and counts characters as the visitor types — pure client UX, while real hashing always runs on the server.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="password-field.js (browser JS)">
+          const pwInput = document.getElementById('new-pw');
+          const toggleBtn = document.getElementById('toggle-pw');
+          const hint = document.getElementById('pw-hint');
+
+          toggleBtn.addEventListener('click', () => {
+            const showing = pwInput.type === 'text';
+            pwInput.type = showing ? 'password' : 'text';
+            toggleBtn.setAttribute('aria-pressed', String(!showing));
+            toggleBtn.textContent = showing ? 'Show' : 'Hide';
+          });
+
+          pwInput.addEventListener('input', () => {
+            const len = pwInput.value.length;
+            const ok = len >= 15;
+            hint.classList.toggle('is-ready', ok);
+            hint.textContent = ok ? `✓ ${len} characters — ready` : `${len} / 15 characters`;
+          });
+        </script>
+      </div>
+    </div>
+    <p>Keep the division of labor clear: the browser makes typing a long 15-character passphrase comfortable (offering Show/Hide and a live counter), HTTPS encrypts the password on the wire, and Node's <code>hashPassword()</code> generates the random salt and slow <code>scrypt</code> hash on the server before anything touches the database.</p>
+
     <p>Students often ask why the app does not simply <em>encrypt</em> the passwords instead. The tabs below draw the line, because the difference decides whether a leak is embarrassing or catastrophic.</p>
     <div class="tabs">
       <div data-tab="Hashing (what you do)">
@@ -312,12 +364,105 @@ Listening on port 3000</div>
         </div>
       </div>
       <ol class="steps">
-        <li><p><strong>You submit credentials.</strong> <em>Credentials</em> are the proof you present to log in — here, a username and a password, sent in a <code>POST</code> request. This step is why login pages must use HTTPS (Section 4.5): the password travels in this request.</p></li>
-        <li><p><strong>The server checks the hash.</strong> The server looks up the stored <code>salt:hash</code> value for that username and runs the <code>checkPassword</code> function from Section 4.1. If there is no such user, or the check fails, the answer is a generic “wrong username or password” — never say which half was wrong, because that tells an attacker which usernames exist.</p></li>
-        <li><p><strong>A session is created.</strong> On success the server creates a fresh session and stores the user’s ID (and usually their role, Section 4.4) in it. “Fresh” matters: the server throws away any session ID the browser had before login and issues a new one, so an old ID planted by an attacker cannot be reused. This is called regenerating the session.</p></li>
-        <li><p><strong>The cookie carries the ID.</strong> The server’s response includes a <code>Set-Cookie</code> header with the new session ID. From here on, your browser attaches that cookie to every request to this site without you doing anything.</p></li>
-        <li><p><strong>Later requests are recognized.</strong> The session middleware reads the cookie, loads the session record, and your route handlers can read <code>req.session.userId</code> to know who is asking. No password is sent again — the session ID stands in for it until the session ends.</p></li>
-        <li><p><strong>Logout destroys the session.</strong> Logging out deletes the session record on the server, not just the cookie in the browser. Anyone holding a copy of the old session ID finds it worthless, because there is nothing left for it to unlock.</p></li>
+        <li>
+          <p><strong>You submit credentials.</strong> <em>Credentials</em> are the proof you present to log in — here, a username and a password, sent in a <code>POST</code> request. This step is why login pages must use HTTPS (Section 4.5): the password travels in this request.</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="html" data-title="Client — Browser POSTs form over HTTPS">
+              <form method="post" action="/login">
+                <input name="username" value="ada" required>
+                <input name="password" type="password" required>
+                <button type="submit">Log in</button>
+              </form>
+            </script>
+            <script type="text/plain" class="code" data-lang="js" data-title="Server — Express parses POST /login">
+              app.post('/login', async (req, res) => {
+                const { username, password } = req.body || {};
+                // express.urlencoded() populated req.body
+              });
+            </script>
+          </div>
+        </li>
+        <li>
+          <p><strong>The server checks the hash.</strong> The server looks up the stored <code>salt:hash</code> value for that username and runs the <code>checkPassword</code> function from Section 4.1. If there is no such user, or the check fails, the answer is a generic “wrong username or password” — never say which half was wrong, because that tells an attacker which usernames exist.</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="text" data-title="Client — Waiting for login verdict">
+              Waiting for POST /login response...
+              (If wrong, server replies 401 "Wrong username or password".)
+            </script>
+            <script type="text/plain" class="code" data-lang="js" data-title="Server — DB lookup + slow scrypt check">
+              const user = await findUser(username);
+              const ok = await checkPassword(
+                password,
+                user ? user.password_hash : DUMMY_HASH
+              );
+              if (!user || !ok) return res.status(401).send('Wrong username or password');
+            </script>
+          </div>
+        </li>
+        <li>
+          <p><strong>A session is created.</strong> On success the server creates a fresh session and stores the user’s ID (and usually their role, Section 4.4) in it. “Fresh” matters: the server throws away any session ID the browser had before login and issues a new one, so an old ID planted by an attacker cannot be reused. This is called regenerating the session.</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="text" data-title="Client — Still waiting">
+              Any pre-login session ID the browser held
+              is about to be replaced with a brand-new ID.
+            </script>
+            <script type="text/plain" class="code" data-lang="js" data-title="Server — Regenerates session ID &amp; stores user">
+              req.session.regenerate((err) => {
+                if (err) return res.status(500).send('Login failed');
+                req.session.userId = user.id;   // Never store password!
+                req.session.role = user.role;
+              });
+            </script>
+          </div>
+        </li>
+        <li>
+          <p><strong>The cookie carries the ID.</strong> The server’s response includes a <code>Set-Cookie</code> header with the new session ID. From here on, your browser attaches that cookie to every request to this site without you doing anything.</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="text" data-title="Client — Browser stores HttpOnly cookie">
+              HTTP/1.1 302 Found
+              Location: /dashboard
+              Set-Cookie: connect.sid=s%3AnewId...; HttpOnly; SameSite=Lax; Secure
+            </script>
+            <script type="text/plain" class="code" data-lang="js" data-title="Server — Sends redirect + Set-Cookie">
+              // Inside req.session.regenerate callback:
+              res.redirect('/dashboard');
+              // express-session attaches the Set-Cookie header
+            </script>
+          </div>
+        </li>
+        <li>
+          <p><strong>Later requests are recognized.</strong> The session middleware reads the cookie, loads the session record, and your route handlers can read <code>req.session.userId</code> to know who is asking. No password is sent again — the session ID stands in for it until the session ends.</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="text" data-title="Client — Sends cookie automatically">
+              GET /dashboard HTTP/1.1
+              Host: example.com
+              Cookie: connect.sid=s%3AnewId...
+            </script>
+            <script type="text/plain" class="code" data-lang="js" data-title="Server — Guard + handler see req.session">
+              app.get('/dashboard', requireLogin, (req, res) => {
+                res.send(`Welcome, user #${req.session.userId}`);
+              });
+            </script>
+          </div>
+        </li>
+        <li>
+          <p><strong>Logout destroys the session.</strong> Logging out deletes the session record on the server, not just the cookie in the browser. Anyone holding a copy of the old session ID finds it worthless, because there is nothing left for it to unlock.</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="html" data-title="Client — Browser POSTs /logout">
+              <form method="post" action="/logout">
+                <button type="submit">Log out</button>
+              </form>
+            </script>
+            <script type="text/plain" class="code" data-lang="js" data-title="Server — Destroys store record &amp; clears cookie">
+              app.post('/logout', (req, res) => {
+                req.session.destroy(() => {
+                  res.clearCookie('connect.sid');
+                  res.redirect('/');
+                });
+              });
+            </script>
+          </div>
+        </li>
       </ol>
     </div>
 
@@ -713,51 +858,88 @@ Signature (part 3):        not decoded — it is the HMAC of parts 1 and 2,
     <p>The word <code>Bearer</code> means “whoever bears (carries) this token” — the server does not ask for anything else. Middleware on the server reads the header, runs the same <code>verify</code> you saw in the demo, and — if it passes — copies the claims onto the request (often as <code>req.user</code>), so route handlers and role guards can use <code>sub</code> and <code>role</code> exactly the way the session version used <code>req.session</code>. Same authorization logic, different delivery van.</p>
     <p>“The client keeps the token” hides a real decision when the client is a browser. Put the token in <code>localStorage</code> and any script running on your page can read it, so one XSS bug (Section 4.5) lets an attacker copy the token and use it from their own machine. Put it in an <code>HttpOnly</code> cookie instead and page scripts cannot read it — but now the browser attaches it to requests automatically, which brings CSRF back and makes <code>SameSite</code> matter again. For this course’s app, where one server sends both the pages and the API, sessions are the simpler choice: the same cookie protections, and nothing for your own script to store.</p>
 
-    <p><strong>Example — both ends of a JWT-protected request in code:</strong> the server middleware verifies the <code>Bearer</code> token with a pinned algorithm, and the client attaches it in the <code>Authorization</code> header:</p>
-    <div class="grid-2">
-      <script type="text/plain" class="code" data-lang="js" data-title="Server: requireJwt middleware (Express)">
-        const jwt = require('jsonwebtoken');
+    <p><strong>Example — both ends of a JWT-protected request (HTML, CSS, Browser JS &amp; Express JS):</strong> see the server middleware verifying the <code>Bearer</code> token alongside the full client UI that sends it and handles <code>200</code> vs. <code>401</code>:</p>
+    <div class="tabs c4-tabs">
+      <div data-tab="1 · Server JS (requireJwt middleware)">
+        <p>Extracts the <code>Bearer</code> token from <code>req.headers.authorization</code>, verifies signature + expiry with a pinned algorithm, and attaches the trusted claims to <code>req.user</code>.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="Server: requireJwt middleware (Express)">
+          const jwt = require('jsonwebtoken');
 
-        function requireJwt(req, res, next) {
-          const auth = req.headers.authorization || '';
-          if (!auth.startsWith('Bearer ')) {
-            return res.status(401).json({ error: 'Missing or invalid token' });
-          }
-          const token = auth.slice(7); // Strip 'Bearer ' prefix
-          try {
-            // Pin the algorithm and verify signature + exp timestamp
-            req.user = jwt.verify(token, process.env.JWT_SECRET, {
-              algorithms: ['HS256']
-            });
-            next();
-          } catch {
-            return res.status(401).json({ error: 'Missing or invalid token' });
-          }
-        }
-
-        app.get('/api/my-grades', requireJwt, (req, res) => {
-          res.json({ sub: req.user.sub, role: req.user.role });
-        });
-      </script>
-      <script type="text/plain" class="code" data-lang="js" data-title="Client: sending the Bearer token with fetch()">
-        async function loadMyGrades(token) {
-          const res = await fetch('/api/my-grades', {
-            headers: {
-              Authorization: 'Bearer ' + token
+          function requireJwt(req, res, next) {
+            const auth = req.headers.authorization || '';
+            if (!auth.startsWith('Bearer ')) {
+              return res.status(401).json({ error: 'Missing or invalid token' });
             }
-          });
+            const token = auth.slice(7); // Strip 'Bearer ' prefix
+            try {
+              // Pin the algorithm and verify signature + exp timestamp
+              req.user = jwt.verify(token, process.env.JWT_SECRET, {
+                algorithms: ['HS256']
+              });
+              next();
+            } catch {
+              return res.status(401).json({ error: 'Missing or invalid token' });
+            }
+          }
 
-          if (res.status === 401) {
-            throw new Error('Session expired — please sign in again');
+          app.get('/api/my-grades', requireJwt, (req, res) => {
+            res.json({ sub: req.user.sub, role: req.user.role, grades: [{ course: 'Web Dev II', grade: 'A' }] });
+          });
+        </script>
+      </div>
+      <div data-tab="2 · Client HTML (grades view)">
+        <p>Shows either the signed-in grades list or a clear <code>401</code> prompt asking the user to sign in again when a token is missing or expired.</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="grades-view.html (client)">
+          <section class="grades-card">
+            <h2>My Grades</h2>
+            <p id="grades-msg" class="grades-msg" role="status" hidden></p>
+            <ul id="grades-list" class="grades-list"></ul>
+          </section>
+        </script>
+      </div>
+      <div data-tab="3 · Client CSS (grades card &amp; 401 notice)">
+        <p>Styles each course/grade row cleanly and highlights an expired-token notice.</p>
+        <script type="text/plain" class="code" data-lang="css" data-title="grades-view.css (client)">
+          .grades-card { max-width: 460px; padding: 18px; border: 1px solid #cbd5e1; border-radius: 10px; background: #ffffff; font-family: system-ui, sans-serif; }
+          .grades-msg { padding: 8px 12px; border-radius: 6px; background: #fef2f2; border: 1px solid #ef4444; color: #991b1b; font-weight: 700; }
+          .grades-list { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 8px; }
+          .grades-list li { display: flex; justify-content: space-between; padding: 10px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; }
+        </script>
+      </div>
+      <div data-tab="4 · Client JS (sending Bearer token)">
+        <p>Attaches <code>Authorization: Bearer &lt;token&gt;</code>, handles a <code>401</code> expired/invalid token clearly, and renders the verified grades safely via <code>textContent</code>.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="Client: sending the Bearer token with fetch()">
+          async function loadMyGrades(token) {
+            const msg = document.getElementById('grades-msg');
+            const list = document.getElementById('grades-list');
+            msg.hidden = true;
+
+            const res = await fetch('/api/my-grades', {
+              headers: { Authorization: 'Bearer ' + token }
+            });
+
+            if (res.status === 401) {
+              msg.textContent = 'Session expired (401) — please sign in again.';
+              msg.hidden = false;
+              list.replaceChildren();
+              return;
+            }
+            const data = await res.json();
+            list.replaceChildren();
+            data.grades.forEach((g) => {
+              const li = document.createElement('li');
+              const name = document.createElement('span');
+              const grade = document.createElement('strong');
+              name.textContent = g.course;
+              grade.textContent = g.grade;
+              li.append(name, grade);
+              list.appendChild(li);
+            });
           }
-          if (!res.ok) {
-            throw new Error('Request failed: ' + res.status);
-          }
-          return res.json();
-        }
-      </script>
+        </script>
+      </div>
     </div>
-    <p>Trace how the two halves interlock. In Express, header names are always lowercased on <code>req.headers</code>, so the server reads <code>req.headers.authorization</code>. Checking <code>auth.startsWith('Bearer ')</code> and slicing off the 7-character prefix isolates the raw JWT string, which <code>jwt.verify</code> validates against <code>process.env.JWT_SECRET</code> (rejecting altered payloads, wrong secrets, wrong algorithms, or expired <code>exp</code> claims). On success, attaching the verified claims to <code>req.user</code> lets the route handler — and any role guard after it — read <code>req.user.sub</code> and <code>req.user.role</code> safely.</p>
+    <p>Trace how all four tabs interlock. In Express, header names are always lowercased on <code>req.headers</code>, so the server reads <code>req.headers.authorization</code>. Checking <code>auth.startsWith('Bearer ')</code> and slicing off the 7-character prefix isolates the raw JWT string, which <code>jwt.verify</code> validates against <code>process.env.JWT_SECRET</code> (rejecting altered payloads, wrong secrets, wrong algorithms, or expired <code>exp</code> claims). On success, attaching the verified claims to <code>req.user</code> lets the route handler — and any role guard after it — answer with data that the browser renders into <code>#grades-list</code>.</p>
 
     <p>The claim names are short because tokens travel with every request. Make sure you can read them fluently:</p>
 
@@ -996,21 +1178,40 @@ console.log('guest, view grades:       ', can('guest', 'view grades'));</textare
           });
         </script>
       </div>
-      <div data-tab="2 · Front-End HTML &amp; CSS (role-aware controls)">
-        <p>Hides staff-only controls from students by default using the <code>hidden</code> attribute and shows a clear role badge — presentation polish paired with the real lock on the server.</p>
-        <script type="text/plain" class="code" data-lang="html" data-title="Role-aware toolbar (HTML + CSS)">
+      <div data-tab="2 · Client HTML (role-aware toolbar)">
+        <p>Hides staff-only controls by default using the <code>hidden</code> attribute and shows a clear role badge — presentation polish paired with the real lock on the server.</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="role-toolbar.html">
           <header class="app-bar">
             <span id="role-badge" class="role-badge"></span>
             <button id="grade-btn" type="button" hidden>Enter grades</button>
             <button id="admin-btn" type="button" hidden>Manage users</button>
           </header>
-          <style>
-            .app-bar { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: #f8fafc; border-bottom: 1px solid #cbd5e1; }
-            .role-badge { padding: 3px 10px; border-radius: 99px; background: #eef4ff; color: #1f4fd1; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; }
-          </style>
         </script>
       </div>
-      <div data-tab="3 · Browser JS (reading /api/me)">
+      <div data-tab="3 · Client CSS (toolbar &amp; role badge)">
+        <p>Aligns the role pill and action buttons cleanly on one horizontal bar.</p>
+        <script type="text/plain" class="code" data-lang="css" data-title="role-toolbar.css">
+          .app-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            background: #f8fafc;
+            border-bottom: 1px solid #cbd5e1;
+          }
+          .role-badge {
+            padding: 3px 10px;
+            border-radius: 99px;
+            background: #eef4ff;
+            color: #1f4fd1;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+          }
+        </script>
+      </div>
+      <div data-tab="4 · Browser JS (reading /api/me)">
         <p>Asks the server who is signed in and toggles button visibility — never trusting a role saved in <code>localStorage</code> or a cookie.</p>
         <script type="text/plain" class="code" data-lang="js" data-title="Showing UI controls for the signed-in role">
           async function initToolbar() {
@@ -1026,7 +1227,7 @@ console.log('guest, view grades:       ', can('guest', 'view grades'));</textare
         </script>
       </div>
     </div>
-    <p>Walk through why both halves belong together. In Tab 1, checking <code>book.ownerId === req.session.userId</code> prevents a classic flaw called <strong>broken object-level authorization</strong> — where User A logs in legitimately and simply swaps <code>/api/books/12</code> to <code>/api/books/13</code> to edit User B's record. In Tabs 2 and 3, querying <code>/api/me</code> lets the front end show a tidy interface tailored to the user's role while the server remains the single authority on every write.</p>
+    <p>Walk through why all four tabs belong together. In Tab 1, checking <code>book.ownerId === req.session.userId</code> prevents a classic flaw called <strong>broken object-level authorization</strong> — where User A logs in legitimately and simply swaps <code>/api/books/12</code> to <code>/api/books/13</code> to edit User B's record. In Tabs 2–4, querying <code>/api/me</code> lets the front end show a tidy interface tailored to the user's role while the server remains the single authority on every write.</p>
 
     <p><strong>Example — the same copied student session, under two different permission sets:</strong></p>
     <div class="table-wrap">
@@ -1154,6 +1355,52 @@ eb2b48df232a7b2a5cdcf0f9ba69e33f9dffd2c08e92e378cb7fed0281a95b02
            exactly like innerHTML above. -->
       <p v-html="displayName"></p>
     </script>
+
+    <p><strong>Example — building a rich styled profile card safely without ever using <code>innerHTML</code> (HTML, CSS &amp; Browser JS):</strong> beginners often reach for <code>innerHTML</code> because they want styled cards with badges and bios. Use an HTML <code>&lt;template&gt;</code> + CSS + <code>textContent</code> instead:</p>
+    <div class="tabs c4-tabs">
+      <div data-tab="1 · Client HTML (&lt;template&gt;)">
+        <p>Declares the card's structure once in HTML; browser JS clones it and fills the slots safely with <code>textContent</code>.</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="safe-profile-card.html">
+          <div id="profile-host"></div>
+
+          <template id="profile-tpl">
+            <article class="profile-card">
+              <h4 class="profile-name"></h4>
+              <p class="profile-bio"></p>
+            </article>
+          </template>
+        </script>
+      </div>
+      <div data-tab="2 · Client CSS (card styling)">
+        <p>Gives the profile card rich visual polish while keeping layout and styling completely separated from untrusted user strings.</p>
+        <script type="text/plain" class="code" data-lang="css" data-title="safe-profile-card.css">
+          .profile-card {
+            max-width: 420px;
+            padding: 16px 18px;
+            border: 1px solid #cbd5e1;
+            border-left: 4px solid #1f4fd1;
+            border-radius: 10px;
+            background: #ffffff;
+            font-family: system-ui, sans-serif;
+          }
+          .profile-name { margin: 0 0 6px; color: #1f2937; }
+          .profile-bio { margin: 0; color: #475569; line-height: 1.5; }
+        </script>
+      </div>
+      <div data-tab="3 · Client JS (cloning + textContent)">
+        <p>Clones the inert <code>&lt;template&gt;</code> and writes every user-supplied string via <code>textContent</code> — even an XSS payload like <code>&lt;img onerror=...&gt;</code> prints as harmless plain text.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="safe-profile-card.js (browser JS)">
+          function renderProfile(user) {
+            const tpl = document.getElementById('profile-tpl');
+            const card = tpl.content.cloneNode(true);
+            card.querySelector('.profile-name').textContent = user.displayName;
+            card.querySelector('.profile-bio').textContent = user.bio;
+            document.getElementById('profile-host').replaceChildren(card);
+          }
+        </script>
+      </div>
+    </div>
+    <p>That <code>&lt;template&gt;</code> + <code>textContent</code> pattern gives you full HTML structure and CSS design without ever concatenating untrusted user text into an HTML string.</p>
 
     <h3>5 · Keep dependencies updated</h3>
     <p>Your app stands on packages you did not write, and vulnerabilities are found in popular packages regularly. Node ships with a scanner for exactly this: running <code>npm audit</code> in a project compares your installed dependency versions against a database of known vulnerabilities and reports what it finds, with suggested fixes (often <code>npm audit fix</code>, or updating the package yourself). Be honest about what it is: <code>npm audit</code> is a scanner, not a shield. It can only flag problems that are already known and catalogued, and a clean report does not prove your app is secure. Run it before every deployment anyway — it catches the known, fixable problems, which are the embarrassing ones to ship.</p>
@@ -1314,13 +1561,115 @@ To address all issues, run:
         </div>
       </div>
       <ol class="steps">
-        <li><p><strong>The browser sends the request.</strong> The student fills in a title and author and clicks Add. <code>app.js</code> sends <code>POST /api/books</code> with a JSON body. Because the page and the API share a site, the browser attaches the session cookie automatically — the front end never handles the session ID itself.</p></li>
-        <li><p><strong>Middleware runs first.</strong> The request passes down the Week 2 assembly line: the JSON body parser turns the body into <code>req.body</code>, and the session middleware reads the cookie and loads this student’s session, so <code>req.session.userId</code> is ready before any route sees the request.</p></li>
-        <li><p><strong>The guard checks identity.</strong> The route is mounted behind <code>requireLogin</code>. No valid session would mean <code>401</code> here and the journey would end. This student is signed in, so the request continues. (Adding your <em>own</em> book needs no special role; viewing <em>everyone’s</em> lists is the staff route, guarded by <code>requireRole('instructor', 'admin')</code>.)</p></li>
-        <li><p><strong>The route handler validates and prepares.</strong> The handler checks that a title and author are actually present — input from the network is never trusted — and builds the record to store, stamping it with the owner’s ID taken from the session, never from the request body. A client that claims someone else’s ID in the body is ignored.</p></li>
-        <li><p><strong>The database stores it.</strong> Week 3’s CRUD does its one job: an insert — a MongoDB <code>insertOne</code> or a MySQL <code>INSERT</code> with placeholders — and the database returns the new record, including its generated ID.</p></li>
-        <li><p><strong>The API answers with JSON.</strong> Following Week 2’s REST conventions, the route replies <code>201 Created</code> and sends the saved book back as JSON. If anything had failed, the answer would be an honest status code — <code>400</code> for bad input, <code>401</code> or <code>403</code> from the guards — never a silent success.</p></li>
-        <li><p><strong>The page updates itself.</strong> The <code>fetch</code> promise resolves, and <code>app.js</code> adds the new book to the list already on screen. No reload, no second page load: the front end and the back end each did the half they are good at.</p></li>
+        <li>
+          <p><strong>The browser sends the request.</strong> The student fills in a title and author and clicks Add. <code>app.js</code> sends <code>POST /api/books</code> with a JSON body. Because the page and the API share a site, the browser attaches the session cookie automatically — the front end never handles the session ID itself.</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="js" data-title="Client — public/app.js sends JSON POST">
+              const response = await fetch('/api/books', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, author })
+              });
+            </script>
+            <script type="text/plain" class="code" data-lang="text" data-title="Server — Request + cookie arrive">
+              POST /api/books HTTP/1.1
+              Cookie: connect.sid=s%3A9f2e7a1c...
+              Content-Type: application/json
+
+              {"title":"Dune","author":"Frank Herbert"}
+            </script>
+          </div>
+        </li>
+        <li>
+          <p><strong>Middleware runs first.</strong> The request passes down the Week 2 assembly line: the JSON body parser turns the body into <code>req.body</code>, and the session middleware reads the cookie and loads this student’s session, so <code>req.session.userId</code> is ready before any route sees the request.</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="text" data-title="Client — fetch() waiting">
+              Browser awaits response from POST /api/books...
+            </script>
+            <script type="text/plain" class="code" data-lang="js" data-title="Server — server.js middleware runs">
+              app.use(express.json());  // fills req.body
+              app.use(session({ ... }));// fills req.session.userId = 42
+            </script>
+          </div>
+        </li>
+        <li>
+          <p><strong>The guard checks identity.</strong> The route is mounted behind <code>requireLogin</code>. No valid session would mean <code>401</code> here and the journey would end. This student is signed in, so the request continues. (Adding your <em>own</em> book needs no special role; viewing <em>everyone’s</em> lists is the staff route, guarded by <code>requireRole('instructor', 'admin')</code>.)</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="text" data-title="Client — Still waiting">
+              If session expired, browser would receive 401 here
+              and app.js would redirect to /login.html.
+            </script>
+            <script type="text/plain" class="code" data-lang="js" data-title="Server — middleware/auth.js">
+              function requireLogin(req, res, next) {
+                if (!req.session.userId)
+                  return res.status(401).json({ error: 'Please log in' });
+                next(); // userId === 42 -> pass to router
+              }
+            </script>
+          </div>
+        </li>
+        <li>
+          <p><strong>The route handler validates and prepares.</strong> The handler checks that a title and author are actually present — input from the network is never trusted — and builds the record to store, stamping it with the owner’s ID taken from the session, never from the request body. A client that claims someone else’s ID in the body is ignored.</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="text" data-title="Client — Still waiting">
+              Even if someone forged ownerId in the JSON body,
+              the server ignores it completely.
+            </script>
+            <script type="text/plain" class="code" data-lang="js" data-title="Server — routes/books.js validation">
+              const { title, author } = req.body || {};
+              if (typeof title !== 'string' || !title.trim())
+                return res.status(400).json({ error: 'title required' });
+              const ownerId = req.session.userId; // Trusted session ID
+            </script>
+          </div>
+        </li>
+        <li>
+          <p><strong>The database stores it.</strong> Week 3’s CRUD does its one job: an insert — a MongoDB <code>insertOne</code> or a MySQL <code>INSERT</code> with placeholders — and the database returns the new record, including its generated ID.</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="text" data-title="Client — Browser never touches DB">
+              Browser has no database driver or credentials;
+              it only ever speaks HTTP to Express.
+            </script>
+            <script type="text/plain" class="code" data-lang="js" data-title="Server — db.js parameterized INSERT">
+              const [res] = await pool.execute(
+                'INSERT INTO books (title, author, owner_id) VALUES (?, ?, ?)',
+                [title.trim(), author.trim(), ownerId]
+              );
+              return { id: res.insertId, title, author, ownerId };
+            </script>
+          </div>
+        </li>
+        <li>
+          <p><strong>The API answers with JSON.</strong> Following Week 2’s REST conventions, the route replies <code>201 Created</code> and sends the saved book back as JSON. If anything had failed, the answer would be an honest status code — <code>400</code> for bad input, <code>401</code> or <code>403</code> from the guards — never a silent success.</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="json" data-title="Client — Receives 201 Created JSON">
+              {
+                "id": 7,
+                "title": "Dune",
+                "author": "Frank Herbert",
+                "ownerId": 42
+              }
+            </script>
+            <script type="text/plain" class="code" data-lang="js" data-title="Server — routes/books.js replies 201">
+              res.status(201).json(book);
+            </script>
+          </div>
+        </li>
+        <li>
+          <p><strong>The page updates itself.</strong> The <code>fetch</code> promise resolves, and <code>app.js</code> adds the new book to the list already on screen. No reload, no second page load: the front end and the back end each did the half they are good at.</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="js" data-title="Client — public/app.js renders safely">
+              const book = await response.json();
+              const li = document.createElement('li');
+              li.textContent = `${book.title} by ${book.author}`;
+              document.getElementById('book-list').appendChild(li);
+            </script>
+            <script type="text/plain" class="code" data-lang="text" data-title="Server — Persisted &amp; waiting">
+              Book #7 is saved on disk in MySQL/MongoDB.
+              Restart the server and it is still there.
+            </script>
+          </div>
+        </li>
       </ol>
     </div>
 
@@ -1546,6 +1895,67 @@ To address all issues, run:
       </ul>
       <p>If every box feels easy, you are ready. If one does not, its section number is your study plan — each item above maps to exactly one section of this week.</p>
     </details>
+
+    <h3>Week 4 code quick-reference: auth across HTML, CSS &amp; JS</h3>
+    <p>Review all four layers of authentication and authorization in one place before your final exam and Milestone 4:</p>
+    <div class="tabs c4-tabs">
+      <div data-tab="HTML Login &amp; Logout">
+        <p>Both login and logout use <code>method="post"</code>; login includes <code>autocomplete</code> hints and never includes a role field.</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="auth-forms-starter.html">
+          <form method="post" action="/login" class="auth-box">
+            <label for="u">Username</label>
+            <input id="u" name="username" type="text" autocomplete="username" required>
+            <label for="p">Password</label>
+            <input id="p" name="password" type="password" autocomplete="current-password" required>
+            <button type="submit">Log in</button>
+          </form>
+
+          <form method="post" action="/logout">
+            <button type="submit">Log out</button>
+          </form>
+        </script>
+      </div>
+      <div data-tab="CSS Auth Card">
+        <p>High-contrast form inputs, visible keyboard focus outlines, and an accessible error banner.</p>
+        <script type="text/plain" class="code" data-lang="css" data-title="auth-starter.css">
+          .auth-box { max-width: 360px; padding: 20px; border: 1px solid #cbd5e1; border-radius: 10px; background: #ffffff; font-family: system-ui, sans-serif; }
+          .auth-box label { display: block; font-weight: 700; margin-top: 10px; }
+          .auth-box input { display: block; width: 100%; margin-top: 4px; padding: 8px 10px; border: 1.5px solid #94a3b8; border-radius: 6px; font: inherit; box-sizing: border-box; }
+          .auth-box input:focus-visible { outline: 2px solid #1f4fd1; outline-offset: 2px; }
+          .auth-box button { width: 100%; margin-top: 14px; padding: 10px; border: 0; border-radius: 6px; background: #1f4fd1; color: #ffffff; font-weight: 700; cursor: pointer; }
+        </script>
+      </div>
+      <div data-tab="Server Guards (JS)">
+        <p>Check identity first (<code>401</code>), then role permission (<code>403</code>), then record ownership inside the handler.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="guards-starter.js (Express)">
+          function requireLogin(req, res, next) {
+            if (!req.session.userId) return res.status(401).json({ error: 'Please log in' });
+            next();
+          }
+
+          function requireRole(...roles) {
+            return (req, res, next) => {
+              if (!req.session.userId) return res.status(401).json({ error: 'Please log in' });
+              if (!roles.includes(req.session.role)) return res.status(403).json({ error: 'Forbidden' });
+              next();
+            };
+          }
+        </script>
+      </div>
+      <div data-tab="Client Auth fetch() (JS)">
+        <p>Handles <code>401</code> (redirect to login), <code>403</code> (show permission error), and renders response data safely with <code>textContent</code>.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="auth-fetch-starter.js (browser JS)">
+          async function callProtected(url, options) {
+            const res = await fetch(url, options);
+            if (res.status === 401) { window.location = '/login.html'; return null; }
+            const data = await res.json().catch(() => ({}));
+            if (res.status === 403) { showError(data.error || 'Not allowed (403)'); return null; }
+            if (!res.ok) { showError(data.error || `Error (${res.status})`); return null; }
+            return data;
+          }
+        </script>
+      </div>
+    </div>
 
     <div class="flashcards" data-title="Week 4 key terms" data-front="Term" data-back="Definition">
       <script type="application/json">

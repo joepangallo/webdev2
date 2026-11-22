@@ -157,7 +157,20 @@ Listening on port 3000</div>
           }
         </script>
       </div>
-      <div data-tab="3 · Express JS (multi-param + query route)">
+      <div data-tab="3 · Browser JS (building URLs safely)">
+        <p>When browser JavaScript calls the same endpoint dynamically, build the query string with <code>URLSearchParams</code> so spaces and punctuation are encoded safely.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="catalog-client.js (browser JS)">
+          async function fetchUserBooks(userId, sort, limit) {
+            // Route parameter goes in the path; options go in URLSearchParams
+            const params = new URLSearchParams({ sort, limit: String(limit) });
+            const url = `/users/${encodeURIComponent(userId)}/books?${params}`;
+            const res = await fetch(url);
+            return res.json();
+          }
+          // Produces: /users/42/books?sort=title&limit=5
+        </script>
+      </div>
+      <div data-tab="4 · Express JS (multi-param + query route)">
         <p>Notice the order: the specific route <code>/users/featured</code> sits <em>above</em> <code>/users/:userId/books</code>, and the handler reads both <code>req.params</code> and <code>req.query</code> while converting numeric strings safely.</p>
         <script type="text/plain" class="code" data-lang="js" data-title="multi-param-route.js (Express)">
           // Specific route FIRST so ':userId' never swallows the word 'featured'
@@ -184,10 +197,11 @@ Listening on port 3000</div>
         </script>
       </div>
     </div>
-    <p>Walk through every connection across the three tabs:</p>
+    <p>Walk through every connection across all four tabs:</p>
     <ul>
       <li><strong>HTML:</strong> clicking <code>Ada's shelf</code> requests <code>GET /users/42/books</code>; submitting the form requests <code>GET /users/42/books?sort=title&amp;limit=5</code>. Both hit the exact same Express route — the parameter identifies <em>whose</em> shelf, and the query string tunes <em>how</em> the list comes back.</li>
       <li><strong>CSS:</strong> <code>border-radius: 99px</code> turns ordinary <code>&lt;a&gt;</code> links into pills, and <code>align-items: center</code> vertically aligns labels, inputs, and the button inside the flex toolbar.</li>
+      <li><strong>Browser JS:</strong> <code>new URLSearchParams({ sort, limit })</code> formats <code>key=value&amp;...</code> cleanly without hand-gluing <code>?</code> and <code>&amp;</code> characters, while <code>encodeURIComponent(userId)</code> protects the path segment.</li>
       <li><strong>Express JS:</strong> <code>Number(req.params.userId)</code> and <code>Number(req.query.limit) || 10</code> turn incoming URL text into numbers with a safe fallback when <code>limit</code> is omitted or invalid (<code>NaN || 10</code> evaluates to <code>10</code>). Putting <code>/users/featured</code> above <code>/users/:userId/books</code> illustrates top-to-bottom route matching.</li>
     </ul>
 
@@ -321,10 +335,67 @@ Route handler: sending the response</div>
         </div>
       </div>
       <ol class="steps">
-        <li><p><strong>The request arrives.</strong> A browser asks for <code>GET /</code>. Express starts at the top of your file and looks for the first function registered for this request. Nothing has run yet — no logging, no checking, no response.</p></li>
-        <li><p><strong>The logger runs.</strong> The first middleware writes a line to the console (in <code>middleware-order.js</code> that is “Middleware 1: request received”). Its job is done, but the request is not answered. Calling <code>next()</code> moves the request one station down the line.</p></li>
-        <li><p><strong>The checker runs.</strong> The second middleware inspects the request (“Middleware 2: checking the request”). A real checker might reject a request that lacks a required header — by sending an error response itself and <em>not</em> calling <code>next()</code>, which stops the line on purpose. This one is satisfied, so it calls <code>next()</code>.</p></li>
-        <li><p><strong>The route handler answers.</strong> The last station matches <code>GET /</code>, logs its line, and calls <code>res.send('Done')</code>. Sending the response is what ends the request's journey — there is no <code>next()</code> after this because there is nothing left to hand off to.</p></li>
+        <li>
+          <p><strong>The request arrives.</strong> A browser asks for <code>GET /</code>. Express starts at the top of your file and looks for the first function registered for this request. Nothing has run yet — no logging, no checking, no response.</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="text" data-title="Client — Browser sends GET /">
+              GET / HTTP/1.1
+              Host: localhost:3000
+              (Waiting for server response...)
+            </script>
+            <script type="text/plain" class="code" data-lang="js" data-title="Server — Express starts at line 1">
+              // Express receives GET / and enters the middleware
+              // stack from top to bottom in registration order.
+            </script>
+          </div>
+        </li>
+        <li>
+          <p><strong>The logger runs.</strong> The first middleware writes a line to the console (in <code>middleware-order.js</code> that is “Middleware 1: request received”). Its job is done, but the request is not answered. Calling <code>next()</code> moves the request one station down the line.</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="text" data-title="Client — Still waiting">
+              No response sent yet.
+              (The client never sees server console.log output.)
+            </script>
+            <script type="text/plain" class="code" data-lang="js" data-title="Server — Station 1: Logger">
+              app.use((req, res, next) => {
+                console.log('Middleware 1: request received');
+                next(); // Pass req + res to Station 2
+              });
+            </script>
+          </div>
+        </li>
+        <li>
+          <p><strong>The checker runs.</strong> The second middleware inspects the request (“Middleware 2: checking the request”). A real checker might reject a request that lacks a required header — by sending an error response itself and <em>not</em> calling <code>next()</code>, which stops the line on purpose. This one is satisfied, so it calls <code>next()</code>.</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="text" data-title="Client — Still waiting">
+              No response sent yet.
+              (If the checker rejected here, client would get 401 now.)
+            </script>
+            <script type="text/plain" class="code" data-lang="js" data-title="Server — Station 2: Checker">
+              app.use((req, res, next) => {
+                console.log('Middleware 2: checking the request');
+                next(); // Request passed — move to the route handler
+              });
+            </script>
+          </div>
+        </li>
+        <li>
+          <p><strong>The route handler answers.</strong> The last station matches <code>GET /</code>, logs its line, and calls <code>res.send('Done')</code>. Sending the response is what ends the request's journey — there is no <code>next()</code> after this because there is nothing left to hand off to.</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="text" data-title="Client — Receives 200 OK">
+              HTTP/1.1 200 OK
+              Content-Type: text/html; charset=utf-8
+
+              Done
+            </script>
+            <script type="text/plain" class="code" data-lang="js" data-title="Server — Final Station: Route handler">
+              app.get('/', (req, res) => {
+                console.log('Route handler: sending the response');
+                res.send('Done'); // Ends the line — no next()
+              });
+            </script>
+          </div>
+        </li>
       </ol>
     </div>
 
@@ -342,6 +413,59 @@ Route handler: sending the response</div>
       app.use('/api', requireToken);
     </script>
     <p>Read the two exits carefully, because every middleware you ever write has exactly these two: <strong>call <code>next()</code></strong> (the request continues) or <strong>send a response</strong> (the request ends here). The bug in the callout below is simply a middleware that takes neither exit. In Week 4 this exact shape — mounted on <code>/api</code>, checking a credential, answering or passing — becomes real login protection.</p>
+
+    <p><strong>The client side of the gatekeeper (HTML, CSS &amp; Browser JS):</strong> see how a browser page sends the <code>x-token</code> header and reacts differently to <code>200 OK</code> (passed the gatekeeper) vs. <code>401 Unauthorized</code> (stopped by the gatekeeper):</p>
+    <div class="tabs wk2-tabs">
+      <div data-tab="1 · Client HTML">
+        <p>Collects the token value and displays the server's allow/deny verdict inside an accessible status box.</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="gatekeeper-client.html">
+          <form id="gate-form" class="gate-box">
+            <label for="api-token">Access token</label>
+            <input id="api-token" name="token" type="text" placeholder="Enter token">
+            <button type="submit">Request /api/secret</button>
+            <p id="gate-result" class="gate-status" role="status" hidden></p>
+          </form>
+        </script>
+      </div>
+      <div data-tab="2 · Client CSS">
+        <p>Distinct visual badges for an allowed response (<code>.is-ok</code>) vs. a 401 rejection (<code>.is-denied</code>).</p>
+        <script type="text/plain" class="code" data-lang="css" data-title="gatekeeper-client.css">
+          .gate-box { max-width: 400px; display: grid; gap: 10px; padding: 16px; border: 1px solid #cbd5e1; border-radius: 10px; font-family: system-ui, sans-serif; }
+          .gate-box input { padding: 8px 10px; border: 1px solid #94a3b8; border-radius: 6px; font: inherit; }
+          .gate-box button { padding: 9px 14px; border: 0; border-radius: 6px; background: #1f4fd1; color: #ffffff; font-weight: 700; cursor: pointer; }
+          .gate-status { margin: 0; padding: 8px 12px; border-radius: 6px; font-weight: 700; }
+          .gate-status.is-ok { background: #ecfdf5; color: #065f46; border: 1px solid #10b981; }
+          .gate-status.is-denied { background: #fef2f2; color: #991b1b; border: 1px solid #ef4444; }
+        </script>
+      </div>
+      <div data-tab="3 · Client JS (attaching custom header)">
+        <p>Attaches the custom <code>x-token</code> request header inside <code>fetch()</code> and reads the status code to tell whether the gatekeeper let the request reach the route.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="gatekeeper-client.js (browser JS)">
+          const form = document.getElementById('gate-form');
+          const out = document.getElementById('gate-result');
+
+          form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const token = form.elements.token.value.trim();
+
+            const res = await fetch('/api/secret', {
+              headers: { 'x-token': token }
+            });
+            const data = await res.json();
+
+            out.hidden = false;
+            if (res.status === 401) {
+              out.className = 'gate-status is-denied';
+              out.textContent = `Denied (401): ${data.error}`;
+              return;
+            }
+            out.className = 'gate-status is-ok';
+            out.textContent = `Allowed (200): ${data.message}`;
+          });
+        </script>
+      </div>
+    </div>
+    <p>Notice how both ends agree on the contract: browser JS sends <code>headers: { 'x-token': token }</code>, Express's <code>requireToken</code> reads <code>req.headers['x-token']</code>, and when the token fails, <code>res.status(401).json({ error: 'Unauthorized' })</code> stops the pipeline immediately — so the browser displays <code>Denied (401): Unauthorized</code> and the protected route handler never executes.</p>
 
     <aside class="callout warn">
       <strong>The classic beginner bug: forgetting <code>next()</code></strong>
@@ -747,45 +871,78 @@ Listening on port 3000</div>
     <p>Trace the final list and check it against the session: book 1 was renamed by the <code>PUT</code>, book 2 (<em>Emma</em>) was deleted, book 3 (<em>The Hobbit</em>) was created by the first <code>POST</code>. The two requests that failed on purpose changed nothing: the second <code>POST</code>, sent without an author, was refused with <code>400</code>, and the request for book 99 reported <code>404</code> — each in JSON. That is a complete CRUD story told in eight requests.</p>
     <p>Two practical notes on typing those commands. The <code>-H "Content-Type: application/json"</code> part is not decoration: leave it out and <code>express.json()</code> ignores the body, <code>req.body</code> is <code>undefined</code>, and the guard answers the same 400 you saw above. And the single quotes around the JSON after <code>-d</code> only work in macOS and Linux terminals and in Git Bash, so on Windows run these commands in Git Bash. (In Command Prompt, use double quotes and put a backslash before each inner one: <code>-d "{\"title\":\"The Hobbit\",\"author\":\"J.R.R. Tolkien\"}"</code>. In PowerShell, type <code>curl.exe</code> rather than <code>curl</code>, and expect its quoting rules to differ again.)</p>
 
-    <p><strong>Example — calling all four CRUD verbs on <code>rest-api.js</code> from browser JavaScript (<code>fetch</code>):</strong> here is the exact browser equivalent of that curl session, ready for the front end in Section 2.5:</p>
-    <script type="text/plain" class="code" data-lang="js" data-title="crud-fetch-examples.js (browser JS)">
-      // 1. READ (GET /api/books) — status 200 + JSON array
-      async function getBooks() {
-        const res = await fetch('/api/books');
-        if (!res.ok) throw new Error('Could not load books: ' + res.status);
-        return res.json();
-      }
+    <p><strong>Example — the full REST client talking to <code>rest-api.js</code> (HTML, CSS &amp; Browser JS):</strong> here is the browser equivalent of that curl session, showing the interface controls, status-pill styling, and all four <code>fetch()</code> CRUD calls ready for Section 2.5:</p>
+    <div class="tabs wk2-tabs">
+      <div data-tab="1 · Client HTML (REST controls)">
+        <p>Provides a form for <code>POST /api/books</code>, a status indicator showing HTTP response codes, and a list where each item can trigger <code>PUT</code> or <code>DELETE</code>.</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="rest-client.html">
+          <section class="api-panel">
+            <h2>Book API Client</h2>
+            <p id="api-status" class="status-pill" aria-live="polite">Ready</p>
+            <form id="create-form" class="create-row">
+              <input name="title" placeholder="Title" required>
+              <input name="author" placeholder="Author" required>
+              <button type="submit">POST book</button>
+            </form>
+            <ul id="api-books" class="api-list"></ul>
+          </section>
+        </script>
+      </div>
+      <div data-tab="2 · Client CSS (status pills &amp; list)">
+        <p>Styles the toolbar and visually separates 2xx success pills from 4xx error pills while keeping readable text contrast.</p>
+        <script type="text/plain" class="code" data-lang="css" data-title="rest-client.css">
+          .api-panel { max-width: 560px; font-family: system-ui, sans-serif; }
+          .status-pill { display: inline-block; padding: 3px 10px; border-radius: 99px; font-size: 0.82rem; font-weight: 700; background: #e2e8f0; color: #1f2937; }
+          .status-pill.ok { background: #dcfce7; color: #166534; }
+          .status-pill.err { background: #fee2e2; color: #991b1b; }
+          .create-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+          .create-row input { flex: 1 1 140px; padding: 7px 10px; border: 1px solid #94a3b8; border-radius: 6px; font: inherit; }
+          .api-list { list-style: none; padding: 0; display: grid; gap: 8px; }
+          .api-list li { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; background: #ffffff; }
+        </script>
+      </div>
+      <div data-tab="3 · Client JS (GET, POST, PUT, DELETE)">
+        <p>Each function maps one CRUD verb to its exact REST route, headers, and expected status code.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="crud-fetch-examples.js (browser JS)">
+          // 1. READ (GET /api/books) — status 200 + JSON array
+          async function getBooks() {
+            const res = await fetch('/api/books');
+            if (!res.ok) throw new Error('Could not load books: ' + res.status);
+            return res.json();
+          }
 
-      // 2. CREATE (POST /api/books) — status 201 + newly created book with id
-      async function createBook(title, author) {
-        const res = await fetch('/api/books', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, author })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Create failed');
-        return data;
-      }
+          // 2. CREATE (POST /api/books) — status 201 + newly created book with id
+          async function createBook(title, author) {
+            const res = await fetch('/api/books', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ title, author })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Create failed');
+            return data;
+          }
 
-      // 3. UPDATE (PUT /api/books/:id) — status 200 + replaced book
-      async function updateBook(id, title, author) {
-        const res = await fetch(`/api/books/${id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, author })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Update failed');
-        return data;
-      }
+          // 3. UPDATE (PUT /api/books/:id) — status 200 + replaced book
+          async function updateBook(id, title, author) {
+            const res = await fetch(`/api/books/${id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ title, author })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Update failed');
+            return data;
+          }
 
-      // 4. DELETE (DELETE /api/books/:id) — status 204 (empty body: do NOT call res.json()!)
-      async function deleteBook(id) {
-        const res = await fetch(`/api/books/${id}`, { method: 'DELETE' });
-        if (!res.ok) throw new Error('Delete failed: ' + res.status);
-      }
-    </script>
+          // 4. DELETE (DELETE /api/books/:id) — status 204 (empty body: do NOT call res.json()!)
+          async function deleteBook(id) {
+            const res = await fetch(`/api/books/${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Delete failed: ' + res.status);
+          }
+        </script>
+      </div>
+    </div>
     <p>Compare the four functions side by side. <code>GET</code> needs no options object at all. <code>POST</code> and <code>PUT</code> both send JSON, so both include <code>headers: { 'Content-Type': 'application/json' }</code> and <code>JSON.stringify(...)</code>, and both read <code>data.error</code> if the server replies <code>400</code> or <code>404</code>. Notice <code>deleteBook</code> stops right after checking <code>res.ok</code> — because <code>rest-api.js</code> replies <code>204 No Content</code> with an empty body, calling <code>res.json()</code> on a 204 response would throw a <code>SyntaxError</code>.</p>
 
     <div class="fill" data-title="Complete the create handler" data-explain="Bad data is refused with 400 before anything is stored. A successful creation answers 201 and returns the new resource — including the id the server assigned, which the client could not have known beforehand.">
@@ -1308,6 +1465,49 @@ Listening on port 3000</div>
     </div>
     <p>Look at how cleanly those two paths connect to the error handler above. On the left, attaching <code>err.status = 400</code> and calling <code>return next(err)</code> causes the 4-argument middleware to send <code>400</code> with <code>{"error":"Book id must be a number"}</code> without logging a server crash. On the right, an unhandled rejection inside an <code>async</code> route has no <code>err.status</code>, so the middleware defaults to <code>500</code>, logs the full stack trace on your server, and sends the calm generic message <code>{"error":"Internal server error"}</code> to the client.</p>
 
+    <p><strong>The client side of standardized JSON errors (HTML, CSS &amp; Browser JS):</strong> because your 404 handler and 4-argument error handler <em>both</em> reply with the exact same <code>{ "error": "..." }</code> shape, one small front-end helper can display every API failure consistently:</p>
+    <div class="tabs wk2-tabs">
+      <div data-tab="1 · Client HTML">
+        <p>One reusable banner element at the top of the page announces both <code>4xx</code> client warnings and <code>5xx</code> server failures.</p>
+        <script type="text/plain" class="code" data-lang="html" data-title="api-notice.html">
+          <div id="api-notice" class="notice" role="alert" hidden></div>
+        </script>
+      </div>
+      <div data-tab="2 · Client CSS">
+        <p>Distinguishes fixable <code>4xx</code> problems (amber) from <code>5xx</code> server errors (red) while keeping crisp contrast and a text prefix.</p>
+        <script type="text/plain" class="code" data-lang="css" data-title="api-notice.css">
+          .notice { padding: 10px 14px; border-radius: 8px; border: 1px solid; font-weight: 700; margin-bottom: 14px; }
+          .notice.warn { background: #fffbeb; border-color: #f59e0b; color: #92400e; }
+          .notice.fail { background: #fef2f2; border-color: #ef4444; color: #991b1b; }
+        </script>
+      </div>
+      <div data-tab="3 · Client JS (shared apiRequest helper)">
+        <p>Wraps <code>fetch()</code> once for the whole front end: parses JSON safely (even if a 500 returned non-JSON), distinguishes <code>4xx</code> vs. <code>5xx</code>, and reads <code>data.error</code>.</p>
+        <script type="text/plain" class="code" data-lang="js" data-title="api-helper.js (browser JS)">
+          const notice = document.getElementById('api-notice');
+
+          function showNotice(text, isServerError) {
+            notice.hidden = false;
+            notice.className = 'notice ' + (isServerError ? 'fail' : 'warn');
+            notice.textContent = (isServerError ? 'Server error: ' : 'Check input: ') + text;
+          }
+
+          async function apiRequest(url, options) {
+            notice.hidden = true;
+            const res = await fetch(url, options);
+            if (res.status === 204) return null; // DELETE succeeded with no body
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              showNotice(data.error || `Request failed (${res.status})`, res.status >= 500);
+              return null;
+            }
+            return data;
+          }
+        </script>
+      </div>
+    </div>
+    <p>That tiny <code>apiRequest()</code> helper pays off immediately: because Express's 404 handler and error handler always send <code>{ "error": "..." }</code>, the browser never has to guess where an error message lives — it simply reads <code>data.error</code>, chooses the right visual state based on <code>res.status &gt;= 500</code>, and keeps your UI responsive.</p>
+
     <aside class="callout tip">
       <strong>Express 5 details that do real work</strong>
       <p>This course teaches Express 5, the current version. Three of its details matter in this section:</p>
@@ -1398,11 +1598,86 @@ Listening on port 3000</div>
         </div>
       </div>
       <ol class="steps">
-        <li><p><strong>The front end asks.</strong> The click handler sends <code>fetch('/api/books', { method: 'POST', ... })</code> with the new book as a JSON body. The page does not reload; the request travels in the background (Section 2.5).</p></li>
-        <li><p><strong>The line processes it.</strong> On the server, the request passes morgan's station first; morgan notes the time and writes its diary line later, when the response is finished — that is how it knows the status and how long the request took. Then <code>express.json()</code> translates the JSON body into <code>req.body</code> and calls <code>next()</code>. Static middleware only serves <code>GET</code> and <code>HEAD</code> requests, so it passes a <code>POST</code> straight on without looking for a file (Sections 2.2 and 2.3).</p></li>
-        <li><p><strong>The router handles it.</strong> The request reaches the books router mounted at <code>/api/books</code>; its <code>POST /</code> handler checks that <code>req.body.title</code> and <code>req.body.author</code> are both present, assigns the next id, and stores the book (Sections 2.4 and 2.6).</p></li>
-        <li><p><strong>The API answers.</strong> The handler replies <code>201 Created</code> with the new book — including its server-assigned id — as JSON. Had the title or the author been missing, the same handler would have answered <code>400</code> with a JSON error and stored nothing.</p></li>
-        <li><p><strong>The screen follows.</strong> Back in the browser, the <code>fetch()</code> promise resolves, the code adds the returned book to its state, and <code>render()</code> redraws the list — now three books, exactly as in the Section 2.5 playground. One click used every idea in the week.</p></li>
+        <li>
+          <p><strong>The front end asks.</strong> The click handler sends <code>fetch('/api/books', { method: 'POST', ... })</code> with the new book as a JSON body. The page does not reload; the request travels in the background (Section 2.5).</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="js" data-title="Client — Browser sends POST JSON">
+              const res = await fetch('/api/books', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: 'The Hobbit', author: 'Tolkien' })
+              });
+            </script>
+            <script type="text/plain" class="code" data-lang="text" data-title="Server — Request arrives on :3000">
+              POST /api/books HTTP/1.1
+              Content-Type: application/json
+
+              {"title":"The Hobbit","author":"Tolkien"}
+            </script>
+          </div>
+        </li>
+        <li>
+          <p><strong>The line processes it.</strong> On the server, the request passes morgan's station first; morgan notes the time and writes its diary line later, when the response is finished — that is how it knows the status and how long the request took. Then <code>express.json()</code> translates the JSON body into <code>req.body</code> and calls <code>next()</code>. Static middleware only serves <code>GET</code> and <code>HEAD</code> requests, so it passes a <code>POST</code> straight on without looking for a file (Sections 2.2 and 2.3).</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="text" data-title="Client — Waiting for fetch() promise">
+              fetch('/api/books', ...) is pending...
+              (Page stays interactive — no reload!)
+            </script>
+            <script type="text/plain" class="code" data-lang="js" data-title="Server — Global middleware runs">
+              app.use(morgan('dev'));          // 1. Starts timer
+              app.use(express.json());         // 2. Populates req.body
+              app.use(express.static('public'));// 3. Skips POST -> next()
+            </script>
+          </div>
+        </li>
+        <li>
+          <p><strong>The router handles it.</strong> The request reaches the books router mounted at <code>/api/books</code>; its <code>POST /</code> handler checks that <code>req.body.title</code> and <code>req.body.author</code> are both present, assigns the next id, and stores the book (Sections 2.4 and 2.6).</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="text" data-title="Client — Still awaiting response">
+              Still awaiting res from /api/books...
+              (Client does not pick the new id — server assigns it.)
+            </script>
+            <script type="text/plain" class="code" data-lang="js" data-title="Server — routes/books.js POST /">
+              router.post('/', (req, res) => {
+                if (!req.body?.title || !req.body?.author)
+                  return res.status(400).json({ error: 'Required' });
+                const book = { id: nextId++, ...req.body };
+                books.push(book);
+              });
+            </script>
+          </div>
+        </li>
+        <li>
+          <p><strong>The API answers.</strong> The handler replies <code>201 Created</code> with the new book — including its server-assigned id — as JSON. Had the title or the author been missing, the same handler would have answered <code>400</code> with a JSON error and stored nothing.</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="json" data-title="Client — Receives 201 Created JSON">
+              {
+                "id": 3,
+                "title": "The Hobbit",
+                "author": "Tolkien"
+              }
+            </script>
+            <script type="text/plain" class="code" data-lang="js" data-title="Server — Sends 201 &amp; morgan logs">
+              res.status(201).json(book);
+              // Server console (morgan):
+              // POST /api/books 201 1.420 ms - 52
+            </script>
+          </div>
+        </li>
+        <li>
+          <p><strong>The screen follows.</strong> Back in the browser, the <code>fetch()</code> promise resolves, the code adds the returned book to its state, and <code>render()</code> redraws the list — now three books, exactly as in the Section 2.5 playground. One click used every idea in the week.</p>
+          <div class="grid-2">
+            <script type="text/plain" class="code" data-lang="js" data-title="Client — Updates state &amp; redraws">
+              const book = await res.json();
+              books.push(book); // State now has 3 books
+              render();         // DOM updates with zero page reload
+            </script>
+            <script type="text/plain" class="code" data-lang="text" data-title="Server — Done, ready for next call">
+              Response complete.
+              Server holds books.length === 3 and waits for next request.
+            </script>
+          </div>
+        </li>
       </ol>
     </div>
 
