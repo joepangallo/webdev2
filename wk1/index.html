@@ -7,6 +7,7 @@
   <meta name="description" content="Week 1: why servers exist, Node and the JavaScript runtime, your first programs with the http module, npm and package.json, and your first Express app with GET and POST routes.">
   <link rel="stylesheet" href="../assets/css/course.css">
   <script src="../assets/js/course.js"></script>
+  <script src="../assets/js/runner.js"></script>
   <style>
     /* ===== Week 1 page styles. Every selector is prefixed wk1- ===== */
     .wk1-flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; margin: 6px 0 4px; }
@@ -148,7 +149,7 @@ Response body: Hello, Grace!</div>
       </div>
       <div data-tab="4 · Dynamic Server JS (greeting-route.js)">
         <p>Runs in Node on your server on every request. It reads <code>req.query.name</code>, updates a shared visit counter in server memory, and builds a response tailored to that exact moment and visitor.</p>
-        <script type="text/plain" class="code" data-lang="js" data-title="greeting-route.js (dynamic server JS)">
+        <script type="text/plain" class="code" data-lang="js" data-title="greeting-route.js (dynamic server JS)" data-run="server" data-presets='[{"label":"GET /greeting?name=Ada","method":"GET","path":"/greeting?name=Ada"},{"label":"GET /greeting?name=Grace","method":"GET","path":"/greeting?name=Grace"},{"label":"GET /greeting","method":"GET","path":"/greeting"}]'>
           const express = require('express');
           const app = express();
 
@@ -251,7 +252,7 @@ About page</div>
           heading.textContent = 'Hello from the browser!';
         });
       </script>
-      <script type="text/plain" class="code" data-lang="js" data-title="Node runtime (node-info.js)">
+      <script type="text/plain" class="code" data-lang="js" data-title="Node runtime (node-info.js)" data-run="node">
         // Works ONLY in Node (there is an operating system, no page)
         const os = require('os');
 
@@ -264,7 +265,7 @@ About page</div>
     <p>Look closely at what stays identical and what changes. Both files use <code>const</code>, arrow functions, template literals, and method calls — that is the core JavaScript language running inside V8. The difference is the global tools each runtime hands you: the browser provides <code>document</code> and DOM events like <code>'click'</code> because it is displaying an HTML page; Node provides <code>require()</code>, <code>process</code> (which exposes <code>process.version</code> and the working folder <code>process.cwd()</code>), and core modules like <code>os</code>, <code>fs</code>, and <code>http</code>. Try to use <code>document</code> inside Node and it immediately throws <code>ReferenceError: document is not defined</code>, because Node has no browser window at all.</p>
 
     <p><strong>Example — Node running one line of JavaScript:</strong></p>
-    <script type="text/plain" class="code" data-lang="text" data-title="Terminal">
+    <script type="text/plain" class="code" data-lang="text" data-title="Terminal" data-run="node">
       node -e "console.log(2 + 2)"
     </script>
     <p class="wk1-caption">Real output — captured by running this exact program (Node 26, Express 5).</p>
@@ -277,7 +278,7 @@ About page</div>
     <p>Think of a coffee shop with one barista. A blocking barista would pour a slow drip coffee and stand watching it drip while the line grows. A non-blocking barista starts the drip, takes the next three orders, and hands the coffee over when it is ready. One worker, many customers, no standing around. The catch: if one order itself takes the barista five full minutes of continuous work — a huge calculation, say — everyone waits, because the worker truly is busy. Node is excellent at waiting-heavy work (which is most web work) and poor at long, continuous calculations.</p>
 
     <p><strong>Example — a callback waits its turn in line:</strong></p>
-    <script type="text/plain" class="code" data-lang="js" data-title="nonblocking-order.js">
+    <script type="text/plain" class="code" data-lang="js" data-title="nonblocking-order.js" data-run="node">
       console.log(1);
       setTimeout(() => console.log(2), 0);
       console.log(3);
@@ -295,7 +296,7 @@ About page</div>
 
     <p><strong>Example — blocking <code>readFileSync</code> vs. non-blocking <code>readFile</code> side by side:</strong> suppose a small file named <code>notes.txt</code> contains the line <code>Welcome to Week 1</code>. Compare what each program prints:</p>
     <div class="grid-2">
-      <script type="text/plain" class="code" data-lang="js" data-title="blocking-read.js (waits on the spot)">
+      <script type="text/plain" class="code" data-lang="js" data-title="blocking-read.js (waits on the spot)" data-run="node" data-harness="notes">
         const fs = require('fs');
 
         console.log('1. Starting file read');
@@ -304,7 +305,7 @@ About page</div>
         console.log('2. File says:', text.trim());
         console.log('3. Ready for next visitor');
       </script>
-      <script type="text/plain" class="code" data-lang="js" data-title="nonblocking-read.js (uses a callback)">
+      <script type="text/plain" class="code" data-lang="js" data-title="nonblocking-read.js (uses a callback)" data-run="node" data-harness="notes">
         const fs = require('fs');
 
         console.log('1. Starting file read');
@@ -407,7 +408,7 @@ About page</div>
       </div>
       <div data-tab="4 · Server JS (Back end)">
         <p>Runs in Node on your server. It holds the list of tips, picks one when a request arrives at <code>/api/tip</code>, and sends it back as JSON.</p>
-        <script type="text/plain" class="code" data-lang="js" data-title="server.js (runs in Node)">
+        <script type="text/plain" class="code" data-lang="js" data-title="server.js (runs in Node)" data-run="server" data-presets='[{"label":"GET /api/tip","method":"GET","path":"/api/tip"}]'>
           const express = require('express');
           const app = express();
 
@@ -571,7 +572,7 @@ About page</div>
 
     <p>Here is your first program. It stores two values, prints a greeting built from them, and does a small calculation. Nothing here is new JavaScript — and that is exactly the point.</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="node-hello.js">
+    <script type="text/plain" class="code" data-lang="js" data-title="node-hello.js" data-run="node">
       const name = 'Ada';
       const role = 'web developer';
 
@@ -592,7 +593,7 @@ Role: web developer
     <p>Node ships with a set of built-in tools called <strong>core modules</strong>: ready-made code, included with Node itself, that your program can load. You load a module with <code>require</code>, which reads the module and hands you the tools it offers. The <code>http</code> module's tools create servers and make requests.</p>
     <p>This program is a complete web server. It is longer than anything in the previous section, so read it slowly — every line gets explained right after.</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="http-server.js">
+    <script type="text/plain" class="code" data-lang="js" data-title="http-server.js" data-run="server" data-presets='[{"label":"/","method":"GET","path":"/"},{"label":"/about","method":"GET","path":"/about"},{"label":"/missing (404)","method":"GET","path":"/missing"}]'>
       const http = require('http');
 
       const server = http.createServer((req, res) => {
@@ -635,7 +636,7 @@ Server listening on http://localhost:3000</div>
     </aside>
 
     <p><strong>Example — pulling the path and query string apart with Node's built-in <code>URL</code> class:</strong></p>
-    <script type="text/plain" class="code" data-lang="js" data-title="http-url-parse.js">
+    <script type="text/plain" class="code" data-lang="js" data-title="http-url-parse.js" data-run="server" data-presets='[{"label":"/about?lang=es","method":"GET","path":"/about?lang=es"},{"label":"/about (default en)","method":"GET","path":"/about"},{"label":"/missing (404)","method":"GET","path":"/missing"}]'>
       const http = require('http');
 
       const server = http.createServer((req, res) => {
@@ -688,7 +689,7 @@ About page (language: en)</div>
     </ul>
     <p>This raw <code>http</code> server delivers <em>both</em> an HTML page (on <code>/</code>) and its CSS stylesheet (on <code>/style.css</code>), stamping the current server time into the HTML on every request:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="http-html-server.js">
+    <script type="text/plain" class="code" data-lang="js" data-title="http-html-server.js" data-run="server" data-presets='[{"label":"/ (HTML + CSS)","method":"GET","path":"/"},{"label":"/style.css","method":"GET","path":"/style.css"},{"label":"/missing (404)","method":"GET","path":"/missing"}]'>
       const http = require('http');
 
       const css = `
@@ -1055,7 +1056,7 @@ server.[[listen]](3000);
         // Export an object so other files can import this function
         module.exports = { formatGreeting };
       </script>
-      <script type="text/plain" class="code" data-lang="js" data-title="app.js (loading all three module kinds)">
+      <script type="text/plain" class="code" data-lang="js" data-title="app.js (loading all three module kinds)" data-run="node" data-harness="wk1-format">
         // 1. Core module — built into Node (no './', no install)
         const http = require('http');
 
@@ -1111,7 +1112,7 @@ server.[[listen]](3000);
       </div>
       <div data-tab="Server JS (Node reads node_modules/)">
         <p>Only Node runs on the server and reads <code>node_modules/express</code> via <code>require('express')</code> — that folder stays privately on the server.</p>
-        <script type="text/plain" class="code" data-lang="js" data-title="server.js (server)">
+        <script type="text/plain" class="code" data-lang="js" data-title="server.js (server)" data-run="server" data-harness="wk1-format" data-presets='[{"label":"/api/hello","method":"GET","path":"/api/hello"}]'>
           // Runs in Node on the server, reading node_modules/express
           const express = require('express');
           const { formatGreeting } = require('./format');
@@ -1160,7 +1161,7 @@ server.[[listen]](3000);
     <p>Recall the raw <code>http</code> server: an <code>if / else</code> chain, a <code>writeHead</code> and an <code>end</code> for every single path, and no help at all with forms, JSON, or errors. Every real project outgrows it within a day. <strong>Express</strong> is a package — the one you installed in the last section — that sits on top of Node's <code>http</code> module and does that plumbing for you. It is the most widely used server framework for Node: a <strong>framework</strong> is a library that provides the skeleton of an application, so you fill in the parts that make your app yours.</p>
     <p>Here is the same two-page server, the Express way. Count the lines as you read:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="express-hello.js">
+    <script type="text/plain" class="code" data-lang="js" data-title="express-hello.js" data-run="server" data-presets='[{"label":"/","method":"GET","path":"/"},{"label":"/about","method":"GET","path":"/about"},{"label":"/missing (404)","method":"GET","path":"/missing"}]'>
       const express = require('express');
       const app = express();
 
@@ -1208,7 +1209,7 @@ Server listening on http://localhost:3000</div>
 
     <h3>Four ways an Express route can answer: text, styled HTML, JSON, and 404</h3>
     <p><code>express-hello.js</code> sent short strings, but real routes return all kinds of content. This Express app demonstrates four everyday response styles in one file — including a dynamic HTML page styled with CSS, a JSON endpoint, and a custom 404 page:</p>
-    <script type="text/plain" class="code" data-lang="js" data-title="express-responses.js">
+    <script type="text/plain" class="code" data-lang="js" data-title="express-responses.js" data-run="server" data-presets='[{"label":"/ (HTML page)","method":"GET","path":"/"},{"label":"/ping (text)","method":"GET","path":"/ping"},{"label":"/api/status (JSON)","method":"GET","path":"/api/status"},{"label":"/missing (Custom 404)","method":"GET","path":"/missing"}]'>
       const express = require('express');
       const app = express();
 
@@ -1485,7 +1486,7 @@ What Express hands your handler as req.query:
       </div>
       <div data-tab="3 · Express Route (search-route.js)">
         <p>Reads <code>req.query.term</code> and <code>req.query.sort</code>, filters the server's catalog, and responds with JSON.</p>
-        <script type="text/plain" class="code" data-lang="js" data-title="search-route.js (Express)">
+        <script type="text/plain" class="code" data-lang="js" data-title="search-route.js (Express)" data-run="server" data-presets='[{"label":"/search?term=express","method":"GET","path":"/search?term=express"},{"label":"/search?term=express&sort=newest","method":"GET","path":"/search?term=express&sort=newest"},{"label":"/search?term=node","method":"GET","path":"/search?term=node"}]'>
           const express = require('express');
           const app = express();
 
@@ -1532,7 +1533,7 @@ What Express hands your handler as req.query:
     </ul>
     <p>How does each translator know which bodies are its job? It reads the request's <code>Content-Type</code> header — the label a client attaches to say what format its body is in — and leaves every other body alone. Either way, the finished object lands in the same place: <code>req.body</code>. Your handler never has to care which format arrived. Here is the whole thing working:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="express-post.js">
+    <script type="text/plain" class="code" data-lang="js" data-title="express-post.js" data-run="server" data-presets='[{"label":"/signup (JSON)","method":"POST","path":"/signup","headers":{"Content-Type":"application/json"},"body":"{\"name\":\"Ada\",\"email\":\"ada@example.com\"}"},{"label":"/signup (Form)","method":"POST","path":"/signup","headers":{"Content-Type":"application/x-www-form-urlencoded"},"body":"name=Grace&email=grace@example.com"}]'>
       const express = require('express');
       const app = express();
 
@@ -1790,7 +1791,7 @@ button[type="submit"] {
     </ol>
 
     <p><strong>Example — a real stack trace, read the section's way:</strong></p>
-    <script type="text/plain" class="code" data-lang="js" data-title="account.js">
+    <script type="text/plain" class="code" data-lang="js" data-title="account.js" data-run="node">
       const account = undefined;
       console.log(account.balance);
     </script>
@@ -1808,7 +1809,7 @@ TypeError: Cannot read properties of undefined (reading 'balance')
     <h3>Rule two: console.log is a flashlight</h3>
     <p>When the error message is not enough, make the program tell you what it is doing. Sprinkle <code>console.log</code> lines at the points you are unsure about — the value of <code>req.url</code> when a request arrives, the contents of <code>req.body</code> inside a POST handler — run it, trigger the problem, and read what prints in the server's terminal. Then <em>remove</em> the logs you no longer need; a server that narrates every request forever buries real errors in noise. Professional loggers exist, and Week 2 mentions one, but the flashlight comes first.</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="Debugging a handler with console.log">
+    <script type="text/plain" class="code" data-lang="js" data-title="Debugging a handler with console.log" data-run="server" data-harness="wk1-app-excerpt" data-presets='[{"label":"/signup (JSON)","method":"POST","path":"/signup","headers":{"Content-Type":"application/json"},"body":"{\"name\":\"Ada\"}"}]'>
       app.post('/signup', (req, res) => {
         console.log('Body received:', req.body);
         res.json({ received: req.body });
@@ -1859,7 +1860,7 @@ Body received: { name: 'Ada', plan: 'free' }</div>
       <summary><span class="wk1-err">Cannot GET /</span> in the browser</summary>
       <p><strong>What it means:</strong> this is Express's built-in 404 page. The server is running fine and received your request — but no route matches a GET for the path <code>/</code>. Notice it names the method as well as the path: <span class="wk1-err">Cannot POST /signup</span> would mean the path exists in your mind but no <em>POST</em> route matches it.</p>
       <div class="grid-2">
-        <script type="text/plain" class="code" data-lang="js" data-title="Causes Cannot GET /">
+        <script type="text/plain" class="code" data-lang="js" data-title="Causes Cannot GET /" data-run="server" data-harness="wk1-app-excerpt" data-presets='[{"label":"/ (Cannot GET /)","method":"GET","path":"/"},{"label":"/home (200 OK)","method":"GET","path":"/home"}]'>
           // Browser asks for '/', but only '/home' is registered
           app.get('/home', (req, res) => {
             res.send('Welcome!');
@@ -1879,7 +1880,7 @@ Body received: { name: 'Ada', plan: 'free' }</div>
       <summary><span class="wk1-err">Error: Cannot find module './sever'</span></summary>
       <p><strong>What it means:</strong> your code asked Node to load a file or package that is not there. In this example the file is named <code>server.js</code> but the code says <code>sever</code> — a one-letter typo. The same message appears when you <code>require('express')</code> in a project where you never ran <code>npm install</code>, or when you forget the leading <code>./</code> for one of your own files.</p>
       <div class="grid-2">
-        <script type="text/plain" class="code" data-lang="js" data-title="Causes Cannot find module">
+        <script type="text/plain" class="code" data-lang="js" data-title="Causes Cannot find module" data-run="node" data-harness="wk1-broken-module">
           const server = require('./sever'); // typo: missing 'r'
           const helper = require('format');  // missing './' for local file
         </script>
@@ -1917,7 +1918,7 @@ ReferenceError: total is not defined
     <p>What happens when <em>nothing</em> catches the error depends on where it was thrown, and the three cases are worth telling apart. In the raw <code>http</code> server from Section 1.2, a throw inside the request handler crashes the whole Node process, taking every other visitor down with it. In an Express route handler, Express catches the throw for you: the stack trace prints in your terminal, that one client gets a <code>500 Internal Server Error</code> response, and the server keeps running. But an error thrown <em>later</em> — inside a timer or another callback that runs after your handler has returned — is beyond Express's reach, and it crashes the process just as it would in the raw server. Week 2 shows how to decide for yourself what a 500 response says.</p>
 
     <p><strong>Example — catching bad visitor input with <code>try / catch</code> inside an Express route:</strong> suppose a route accepts raw JSON text from a form field and parses it with <code>JSON.parse</code>. Without <code>try / catch</code>, broken JSON turns into a generic <code>500</code>; with it, you return a clear <code>400 Bad Request</code>:</p>
-    <script type="text/plain" class="code" data-lang="js" data-title="safe-parse-route.js (Express)">
+    <script type="text/plain" class="code" data-lang="js" data-title="safe-parse-route.js (Express)" data-run="server" data-harness="wk1-app-excerpt" data-presets='[{"label":"Valid JSON (200)","method":"POST","path":"/import","headers":{"Content-Type":"application/json"},"body":"{\"rawJson\":\"{\\\"name\\\":\\\"Ada\\\",\\\"role\\\":\\\"dev\\\"}\"}"},{"label":"Broken JSON (400)","method":"POST","path":"/import","headers":{"Content-Type":"application/json"},"body":"{\"rawJson\":\"{ name: Ada }\"}"}]'>
       app.post('/import', (req, res) => {
         try {
           // Risky: a visitor might type broken JSON like "{ name: Ada }"
@@ -2182,7 +2183,7 @@ console.log('The program kept running.');</textarea>
       </div>
       <div data-tab="Raw Node http Server">
         <p>Zero external packages — parses the URL cleanly, sets status and <code>Content-Type</code>, and always finishes with <code>res.end()</code>.</p>
-        <script type="text/plain" class="code" data-lang="js" data-title="raw-http-starter.js">
+        <script type="text/plain" class="code" data-lang="js" data-title="raw-http-starter.js" data-run="server" data-presets='[{"label":"/","method":"GET","path":"/"},{"label":"/missing (404)","method":"GET","path":"/missing"}]'>
           const http = require('http');
 
           const server = http.createServer((req, res) => {
@@ -2202,7 +2203,7 @@ console.log('The program kept running.');</textarea>
       </div>
       <div data-tab="Express Starter">
         <p>Body translators switched on at the top, GET query route, POST body route, and a checked <code>app.listen</code> callback.</p>
-        <script type="text/plain" class="code" data-lang="js" data-title="express-starter.js">
+        <script type="text/plain" class="code" data-lang="js" data-title="express-starter.js" data-run="server" data-presets='[{"label":"/search?q=express","method":"GET","path":"/search?q=express"},{"label":"/signup (JSON)","method":"POST","path":"/signup","headers":{"Content-Type":"application/json"},"body":"{\"name\":\"Ada\"}"}]'>
           const express = require('express');
           const app = express();
 

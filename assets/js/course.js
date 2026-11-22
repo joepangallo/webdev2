@@ -779,19 +779,25 @@
     const pre = h('pre', null, h('code', { html: WD1.highlight(code, lang) }));
     const copyBtn = iconBtn('copy', 'Copy', 'ghost copy-btn');
     copyBtn.addEventListener('click', () => WD1.copy(code, copyBtn));
-    return h('div', { class: 'code-block' },
+    const el = h('div', { class: 'code-block' },
       lang || title ? h('span', { class: 'code-lang', text: title || lang }) : null,
       pre, copyBtn);
+    el._wdCode = code;
+    el._wdLang = lang || 'text';
+    return el;
   }
   WD1.codeBlock = codeBlock;
 
   // A <script type="text/plain"> cannot contain a literal </script>, so authors write <\/script>.
   const unescapeScript = (t) => t.replace(/<\\\/script/gi, '</script');
+  const RUN_ATTRS = ['run', 'presets', 'harness', 'env'];
 
   function mountCode(root) {
     $$('script[type="text/plain"].code', root).forEach((s) => {
       const code = dedent(unescapeScript(s.textContent));
-      s.replaceWith(codeBlock(code, s.dataset.lang || 'html', s.dataset.title));
+      const block = codeBlock(code, s.dataset.lang || 'html', s.dataset.title);
+      RUN_ATTRS.forEach((k) => { if (s.dataset[k] != null) block.dataset[k] = s.dataset[k]; });
+      s.replaceWith(block);
     });
     $$('pre > code[class*="lang-"]', root).forEach((c) => {
       const pre = c.parentNode;

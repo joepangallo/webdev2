@@ -7,6 +7,7 @@
   <meta name="description" content="Week 4: authentication vs authorization, password hashing and salts, sessions and the login flow, JSON Web Tokens, roles and protected routes, security hygiene, and a full-stack capstone walkthrough.">
   <link rel="stylesheet" href="../assets/css/course.css">
   <script src="../assets/js/course.js"></script>
+  <script src="../assets/js/runner.js"></script>
   <style>
     /* ===== Week 4 page styles. Every selector is prefixed c4- ===== */
     .c4-flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; margin: 14px 0; }
@@ -104,7 +105,7 @@
     <p>A <strong>salt</strong> fixes that. A salt is a random value generated fresh for each user and mixed into the password before hashing. That randomness must come from a cryptographic random source — in the demo below, <code>crypto.randomBytes</code> — never from a counter, a timestamp, or the username, all of which an attacker can predict or guess. You store the salt right next to the hash — the salt is not a secret — and you use it again at login time. Now two users with the same password store completely different values, and precomputed tables are useless because every user’s mixture is unique.</p>
     <p>The program below is the real demo for this week. It uses Node’s built-in <code>crypto</code> module: <code>scryptSync</code> is a deliberately slow hash function designed for passwords (slowness is a feature — it makes guessing expensive), and <code>randomBytes</code> creates the salt.</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="hash-demo.js">
+    <script type="text/plain" class="code" data-lang="js" data-title="hash-demo.js" data-run="node">
       const crypto = require('crypto');
 
       function hashPassword(password) {
@@ -132,7 +133,7 @@ Wrong password accepted: false</div>
     <p>One simplification to notice: the demo uses <code>scryptSync</code>, the synchronous (blocking) form of <code>scrypt</code>, to keep the code short. In a real server you would use the asynchronous form of <code>scrypt</code> (or a library that does the same), because the sync version freezes the event loop — while one password is being checked, every other visitor waits, which is the Week 1 event-loop problem returning in a new place.</p>
     <p>Here is that asynchronous pair, in a file of its own. It is the version the login route in Section 4.2 uses, so treat <code>hash-demo.js</code> as the warm-up and this as the real thing.</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="password.js — the same two functions, asynchronous">
+    <script type="text/plain" class="code" data-lang="js" data-title="password.js — the same two functions, asynchronous" data-run="node" data-harness="wk4-password-async">
       const crypto = require('crypto');
       const { promisify } = require('util');
 
@@ -160,7 +161,7 @@ Wrong password accepted: false</div>
     <p><code>scrypt</code> is slow on purpose, and <code>COST</code> sets how slow. <code>N</code> is the cost parameter: double it and every guess takes twice the time and twice the memory. Leave the options out, as <code>hash-demo.js</code> does, and Node uses <code>N = 16384</code>, <code>r = 8</code>, <code>p = 1</code> — fine for a demo, but below what current guidance asks for. The OWASP Password Storage Cheat Sheet, the standard reference for this decision, sets the bar for scrypt at “a minimum CPU/memory cost parameter of (2^17), a minimum block size of 8 (1024 bytes), and a parallelization parameter of 1” — the first three numbers in <code>COST</code>, where <code>2 ** 17</code> is JavaScript for 2 to the power 17. The fourth, <code>maxmem</code>, is there because Node refuses an <code>N</code> that large until you raise its memory limit: one hash at these settings needs about 128 MiB. (On the machine this code was tested on, one hash took about 20 milliseconds at Node’s default and about 170 at these settings.) Whatever settings you choose, hash and check with the same ones: a stored hash made with one <code>N</code> never matches a check run with another.</p>
 
     <p><strong>Example — two users who both chose <code>hunter2</code>:</strong></p>
-    <script type="text/plain" class="code" data-lang="js" data-title="Same password, two salts">
+    <script type="text/plain" class="code" data-lang="js" data-title="Same password, two salts" data-run="node" data-harness="wk4-hash-salts">
       const first = hashPassword('hunter2');   // user 1 chooses hunter2
       const second = hashPassword('hunter2');  // user 2 chooses hunter2 too
       console.log('User 1 stored:', first);
@@ -200,7 +201,7 @@ stored as : salt + ':' + hash, in a single column</div>
 
     <p><strong>Example — how that <code>users</code> record is defined in SQL vs. stored in MongoDB:</strong></p>
     <div class="grid-2">
-      <script type="text/plain" class="code" data-lang="sql" data-title="MySQL — CREATE TABLE users">
+      <script type="text/plain" class="code" data-lang="sql" data-title="MySQL — CREATE TABLE users" data-run="sql">
         CREATE TABLE users (
           id INT AUTO_INCREMENT PRIMARY KEY,
           username VARCHAR(60) NOT NULL UNIQUE,
@@ -312,7 +313,7 @@ stored as : salt + ':' + hash, in a single column</div>
     <p>In Week 3 you met the problem underneath everything in this section: HTTP is <strong>stateless</strong>, which means each request arrives with no memory of the requests before it. A <strong>session</strong> is the server’s fix — a small record the server keeps about one visitor, identified by a random <strong>session ID</strong>. Your browser carries that ID in a <strong>cookie</strong> (a small name-and-value pair the browser stores and sends back automatically), and the server uses it to look your record up on every request.</p>
     <p>You already ran the smallest possible session demo in Week 3. Here it is again, exactly as it was, because the login flow is this same machine with one extra job: remembering <em>who</em> the session belongs to.</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="session-demo.js (from Week 3)">
+    <script type="text/plain" class="code" data-lang="js" data-title="session-demo.js (from Week 3)" data-run="server" data-presets='[{"label":"/count (Click repeatedly!)","method":"GET","path":"/count"}]'>
       const express = require('express');
       const session = require('express-session');
       const app = express();
@@ -469,7 +470,7 @@ Listening on port 3000</div>
     <h3>A login route, assembled from the pieces</h3>
     <p>Here is the flow as real Express code. It combines three things you have already seen: the <code>express-session</code> setup from <code>session-demo.js</code>, the asynchronous <code>checkPassword</code> from <code>password.js</code> in Section 4.1, and a <code>POST</code> route from Week 1. The <code>findUser</code> helper stands in for the database query you wrote in Week 3. Like every Week 3 lookup it returns a promise, which is why the handler is <code>async</code> and <code>await</code>s it.</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="login route (assembled from the verified patterns)">
+    <script type="text/plain" class="code" data-lang="js" data-title="login route (assembled from the verified patterns)" data-run="server" data-harness="wk4-login" data-presets='[{"label":"Login as ada (302)","method":"POST","path":"/login","headers":{"Content-Type":"application/x-www-form-urlencoded"},"body":"username=ada&password=correct+horse+battery+staple"},{"label":"Wrong password (401)","method":"POST","path":"/login","headers":{"Content-Type":"application/x-www-form-urlencoded"},"body":"username=ada&password=wrong"},{"label":"Visit /dashboard","method":"GET","path":"/dashboard"},{"label":"Logout","method":"POST","path":"/logout"}]'>
       const express = require('express');
       const session = require('express-session');
       const crypto = require('crypto');
@@ -753,7 +754,7 @@ Listening on port 3000</div>
     <div class="c4-token"><span class="h">eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9</span>.<span class="p">eyJzdWIiOiJ1c2VyLTQyIiwibmFtZSI6IkFkYSIsInJvbGUiOiJzdHVkZW50IiwiaWF0IjoxNzk1MDQ3MTExLCJleHAiOjE3OTUwNTA3MTF9</span>.<span class="s">EUEe-kTVH_9DOfOtEtJeOch2gXWoaSqqyk1EpxAhGYU</span></div>
     <p>The first segment is the header, the second is the payload, the third is the signature. The demo that produced it is short:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="jwt-demo.js">
+    <script type="text/plain" class="code" data-lang="js" data-title="jwt-demo.js" data-run="node">
       const jwt = require('jsonwebtoken');
 
       const secret = 'dev-secret-do-not-use-in-production';
@@ -862,7 +863,7 @@ Signature (part 3):        not decoded — it is the HMAC of parts 1 and 2,
     <div class="tabs c4-tabs">
       <div data-tab="1 · Server JS (requireJwt middleware)">
         <p>Extracts the <code>Bearer</code> token from <code>req.headers.authorization</code>, verifies signature + expiry with a pinned algorithm, and attaches the trusted claims to <code>req.user</code>.</p>
-        <script type="text/plain" class="code" data-lang="js" data-title="Server: requireJwt middleware (Express)">
+        <script type="text/plain" class="code" data-lang="js" data-title="Server: requireJwt middleware (Express)" data-run="server" data-harness="wk4-jwt-route">
           const jwt = require('jsonwebtoken');
 
           function requireJwt(req, res, next) {
@@ -1032,7 +1033,7 @@ Content-Type: application/json
     <h3>Guards: authorization as middleware</h3>
     <p>Week 2 taught you that middleware is a function that runs before your route handler and can stop the request. That makes middleware the natural home for authorization checks. A small guard function that protects routes is often called a <strong>guard</strong>. You need two:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="Guard middleware: requireLogin and requireRole">
+    <script type="text/plain" class="code" data-lang="js" data-title="Guard middleware: requireLogin and requireRole" data-run="server" data-harness="wk4-guards" data-presets='[{"label":"/my-grades","method":"GET","path":"/my-grades"},{"label":"/grades (instructor+)","method":"POST","path":"/grades"},{"label":"/courses/1 (admin)","method":"DELETE","path":"/courses/1"},{"label":"Act as student","method":"POST","path":"/demo-login/student"},{"label":"Act as instructor","method":"POST","path":"/demo-login/instructor"},{"label":"Act as admin","method":"POST","path":"/demo-login/admin"},{"label":"Sign out","method":"POST","path":"/demo-logout"}]'>
       // Guard 1: you must be signed in. (Authentication)
       function requireLogin(req, res, next) {
         if (!req.session.userId) {
@@ -1160,7 +1161,7 @@ console.log('guest, view grades:       ', can('guest', 'view grades'));</textare
     <div class="tabs c4-tabs">
       <div data-tab="1 · Server JS (ownership check)">
         <p>Even after <code>requireLogin</code> passes, the route loads the book and verifies that the signed-in user either owns it or holds the <code>admin</code> role before updating anything.</p>
-        <script type="text/plain" class="code" data-lang="js" data-title="PUT /api/books/:id — ownership + role override">
+        <script type="text/plain" class="code" data-lang="js" data-title="PUT /api/books/:id — ownership + role override" data-run="server" data-harness="wk4-ownership" data-presets='[{"label":"Edit Book #1","method":"PUT","path":"/api/books/1","headers":{"Content-Type":"application/json"},"body":"{\"title\":\"Dune (edited)\"}"},{"label":"Act as user-1 (owner)","method":"POST","path":"/demo-login/user-1/student"},{"label":"Act as user-2 (other)","method":"POST","path":"/demo-login/user-2/student"},{"label":"Act as admin","method":"POST","path":"/demo-login/admin-9/admin"}]'>
           app.put('/api/books/:id', requireLogin, async (req, res) => {
             const book = await findBookById(req.params.id);
             if (!book) {
@@ -1305,7 +1306,7 @@ eb2b48df232a7b2a5cdcf0f9ba69e33f9dffd2c08e92e378cb7fed0281a95b02
     </script>
     <p>Why the fuss? Code gets copied: into Git, onto teammates’ laptops, into error reports. A secret committed once stays in the repository’s history even after you delete the line. Environment variables keep the secret in exactly one place — the server’s configuration — and let every developer use a different throwaway value on their own machine. If a real secret ever does leak, the fix is to <em>rotate</em> it: generate a new one, deploy it, and the leaked value becomes worthless.</p>
     <p>A secret also has to be long and random — not a word, a phrase, or anything else a person made up. Anyone who captures a single JWT can test guesses against its signature on their own machine, as fast as their hardware allows, without ever touching your server; if the secret is guessable, they can then sign any token they like. Let Node make one, and paste the result into your <code>.env</code> file:</p>
-    <script type="text/plain" class="code" data-lang="text" data-title="Make a secret: 32 random bytes, printed as 64 hex characters">
+    <script type="text/plain" class="code" data-lang="text" data-title="Make a secret: 32 random bytes, printed as 64 hex characters" data-run="node">
       node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
     </script>
 
@@ -1313,7 +1314,7 @@ eb2b48df232a7b2a5cdcf0f9ba69e33f9dffd2c08e92e378cb7fed0281a95b02
 
     <h3>3 · SQL injection — and why Week 3’s placeholders stop it</h3>
     <p><strong>SQL injection</strong> is an attack where a visitor types database commands into an ordinary form field and a careless server runs them. It happens when code builds a query by gluing strings together:</p>
-    <script type="text/plain" class="code" data-lang="js" data-title="Vulnerable vs safe: building a query">
+    <script type="text/plain" class="code" data-lang="js" data-title="Vulnerable vs safe: building a query" data-run="node" data-harness="wk4-sqli">
       // VULNERABLE: the input becomes part of the SQL itself.
       // If username is  ' OR '1'='1  the query matches every row.
       const badSql = "SELECT * FROM users WHERE name = '" + username + "'";
@@ -1431,7 +1432,7 @@ To address all issues, run:
 
     <p><strong>Example — two concrete hygiene patterns in Express (throttling logins &amp; stripping sensitive fields):</strong></p>
     <div class="grid-2">
-      <script type="text/plain" class="code" data-lang="js" data-title="Throttling POST /login (express-rate-limit)">
+      <script type="text/plain" class="code" data-lang="js" data-title="Throttling POST /login (express-rate-limit)" data-run="server" data-harness="wk4-ratelimit" data-presets='[{"label":"/login (Try clicking 11x or edit limit: 3)","method":"POST","path":"/login","headers":{"Content-Type":"application/json"},"body":"{\"username\":\"ada\",\"password\":\"guess\"}"}]'>
         const rateLimit = require('express-rate-limit');
 
         // At most 10 login attempts per IP every 15 minutes

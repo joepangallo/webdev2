@@ -1196,3 +1196,232 @@ test('glossary: search, letter filter and flashcard mode', async () => {
   assert.deepEqual(r.study, { cards: true, label: 'Hide flashcards' });
   assert.ok(r.closed);
 });
+
+/* ---------- in-browser live runner & SQLite WASM ---------- */
+
+test('live runner: Node scripts, Express servers, cookies/sessions, MongoDB, SQLite WASM SQL, JWT and SQLi demo', async () => {
+  const waitMs = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // 1. Week 1: nonblocking-order.js, node -e, and http-html-server with sandboxed HTML preview
+  await fresh('wk1/index.html');
+  const wk1 = await page.eval(`(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const findBlock = (title) => Array.from(document.querySelectorAll('.code-block[data-run]'))
+      .find((b) => (b.querySelector('.code-lang')?.textContent || '').includes(title));
+
+    const nb = findBlock('nonblocking-order.js');
+    nb.querySelector('.run-trigger').click();
+    await wait(120);
+    const nbLogs = Array.from(nb.querySelectorAll('.runner-console .log-line')).map((l) => l.textContent);
+
+    const oneLiner = Array.from(document.querySelectorAll('.code-block[data-run="node"]'))
+      .find((b) => b._wdCode && b._wdCode.includes('node -e'));
+    oneLiner.querySelector('.run-trigger').click();
+    await wait(80);
+    const oneLineLogs = Array.from(oneLiner.querySelectorAll('.runner-console .log-line')).map((l) => l.textContent);
+
+    const srv = findBlock('http-html-server.js');
+    srv.querySelector('.run-trigger').click();
+    await wait(80);
+    srv.querySelector('.runner-preset').click();
+    await wait(80);
+    const previewBtn = Array.from(srv.querySelectorAll('.runner-resp-head button')).find((b) => b.textContent.includes('Preview'));
+    previewBtn.click();
+    await wait(120);
+    const frame = srv.querySelector('.runner-preview-wrap iframe');
+    return {
+      nbLogs,
+      oneLineLogs,
+      srvStatus: srv.querySelector('.runner-resp-head .pill').textContent,
+      sandbox: frame ? frame.getAttribute('sandbox') : null,
+      inlinedCss: frame ? frame.srcdoc.includes('<style>') : false
+    };
+  })()`);
+  assert.deepEqual(wk1.nbLogs, ['1', '3', '2']);
+  assert.deepEqual(wk1.oneLineLogs, ['4']);
+  assert.equal(wk1.srvStatus, '200 OK');
+  assert.equal(wk1.sandbox, 'allow-scripts allow-forms allow-modals');
+  assert.equal(wk1.inlinedCss, true);
+
+  // 2. Week 2: rest-api.js full CRUD + hang detection on broken middleware
+  await fresh('wk2/index.html');
+  const wk2 = await page.eval(`(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const findBlock = (title) => Array.from(document.querySelectorAll('.code-block[data-run]'))
+      .find((b) => (b.querySelector('.code-lang')?.textContent || '').includes(title));
+
+    const api = findBlock('rest-api.js');
+    api.querySelector('.run-trigger').click();
+    await wait(80);
+    const clickPreset = async (label) => {
+      Array.from(api.querySelectorAll('.runner-preset')).find((b) => b.textContent.includes(label)).click();
+      await wait(80);
+      return {
+        status: api.querySelector('.runner-resp-head .pill').textContent,
+        body: api.querySelector('.runner-resp-body').textContent
+      };
+    };
+    const rList = await clickPreset('List books');
+    const rAdd = await clickPreset('Add book (201)');
+    const rMiss = await clickPreset('Book #99');
+    const rAfter = await clickPreset('List books');
+
+    const hang = findBlock('Broken: hangs forever');
+    hang.querySelector('.run-trigger').click();
+    await wait(60);
+    hang.querySelector('.runner-preset').click();
+    await wait(2200);
+    return {
+      rList: JSON.parse(rList.body).length,
+      rAddStatus: rAdd.status,
+      rAddId: JSON.parse(rAdd.body).id,
+      rMissStatus: rMiss.status,
+      rAfter: JSON.parse(rAfter.body).length,
+      hangStatus: hang.querySelector('.runner-resp-head .pill').textContent
+    };
+  })()`);
+  assert.equal(wk2.rList, 2);
+  assert.equal(wk2.rAddStatus, '201 Created');
+  assert.equal(wk2.rAddId, 3);
+  assert.equal(wk2.rMissStatus, '404 Not Found');
+  assert.equal(wk2.rAfter, 3);
+  assert.match(wk2.hangStatus, /Hung/);
+
+  // 3. Week 3: session cookie jar, real SQLite WASM SQL + FK error, mysql2/promise, MongoDB ObjectId 400/404/200
+  await fresh('wk3/index.html');
+  const wk3 = await page.eval(`(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const findBlock = (title) => Array.from(document.querySelectorAll('.code-block[data-run]'))
+      .find((b) => (b.querySelector('.code-lang')?.textContent || '').includes(title));
+
+    // Session visits + cookie jar clear
+    const sess = findBlock('session-demo.js');
+    sess.querySelector('.run-trigger').click();
+    await wait(60);
+    sess.querySelector('.runner-preset').click(); await wait(60);
+    const v1 = sess.querySelector('.runner-resp-body').textContent;
+    const cookiesCount = sess.querySelectorAll('.runner-cookie-chip').length;
+    sess.querySelector('.runner-preset').click(); await wait(60);
+    const v2 = sess.querySelector('.runner-resp-body').textContent;
+    Array.from(sess.querySelectorAll('.runner-cookies button')).find((b) => b.textContent === 'Clear cookies').click();
+    sess.querySelector('.runner-preset').click(); await wait(60);
+    const v3 = sess.querySelector('.runner-resp-body').textContent;
+
+    // Real SQLite WASM SELECT
+    const sqlSel = findBlock('SQL — SELECT');
+    sqlSel.querySelector('.run-trigger').click();
+    for (let i = 0; i < 40 && !sqlSel.querySelectorAll('.runner-sql-out table').length; i++) await wait(100);
+    const tables = sqlSel.querySelectorAll('.runner-sql-out table').length;
+    const firstTableText = sqlSel.querySelector('.runner-sql-out table')?.textContent || '';
+
+    // Real SQLite WASM FOREIGN KEY constraint error
+    const sqlFk = findBlock('linking authors and books');
+    sqlFk.querySelector('.run-trigger').click();
+    await wait(250);
+    Array.from(sqlFk.querySelectorAll('.runner-preset')).find((b) => b.textContent.includes('broken FOREIGN KEY')).click();
+    await wait(250);
+    const fkErr = sqlFk.querySelector('.runner-sql-out .feedback.bad')?.textContent || '';
+
+    // mysql2/promise backed by real SQLite WASM
+    const my = findBlock('MySQL CRUD from Node');
+    my.querySelector('.run-trigger').click();
+    for (let i = 0; i < 30 && !my.querySelector('.runner-console').textContent.includes('Rows deleted'); i++) await wait(100);
+    const myOut = my.querySelector('.runner-console').textContent;
+
+    // MongoDB ObjectId route (200 / 404 / 400)
+    const mg = findBlock('GET /api/books/:id — bad id');
+    mg.querySelector('.run-trigger').click();
+    await wait(80);
+    const mgPres = Array.from(mg.querySelectorAll('.runner-preset'));
+    mgPres[0].click(); await wait(60); const mg200 = mg.querySelector('.runner-resp-head .pill').textContent;
+    mgPres[1].click(); await wait(60); const mg404 = mg.querySelector('.runner-resp-head .pill').textContent;
+    mgPres[2].click(); await wait(60); const mg400 = mg.querySelector('.runner-resp-head .pill').textContent;
+
+    return { v1, v2, v3, cookiesCount, tables, firstTableText, fkErr, myOut, mg200, mg404, mg400 };
+  })()`);
+  assert.equal(wk3.v1, 'Visit number 1');
+  assert.equal(wk3.v2, 'Visit number 2');
+  assert.equal(wk3.v3, 'Visit number 1');
+  assert.equal(wk3.cookiesCount, 1);
+  assert.equal(wk3.tables, 3);
+  assert.match(wk3.firstTableText, /Frank Herbert/);
+  assert.match(wk3.fkErr, /FOREIGN KEY constraint failed/i);
+  assert.match(wk3.myOut, /New book id: 4/);
+  assert.match(wk3.myOut, /Rows deleted: 1/);
+  assert.equal(wk3.mg200, '200 OK');
+  assert.equal(wk3.mg404, '404 Not Found');
+  assert.equal(wk3.mg400, '400 Bad Request');
+  // Confirm sql.js WASM loaded strictly from this site, zero third-party hosts or console errors!
+  assert.deepEqual(page.problems(), [], 'wk3 WASM SQL + runners produced zero console/network errors');
+  assert.deepEqual(page.hosts(), [new URL(server.url).host], 'wk3 WASM SQL loaded from this site only');
+
+  // 4. Week 4: hash-demo, full session login/logout flow, jwt-demo, SQL injection WASM demo + 390px phone overflow check
+  await fresh('wk4/index.html');
+  const wk4 = await page.eval(`(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const findBlock = (title) => Array.from(document.querySelectorAll('.code-block[data-run]'))
+      .find((b) => (b.querySelector('.code-lang')?.textContent || '').includes(title));
+
+    const hash = findBlock('hash-demo.js');
+    hash.querySelector('.run-trigger').click();
+    await wait(120);
+    const hashOut = hash.querySelector('.runner-console').textContent;
+
+    const jwtB = findBlock('jwt-demo.js');
+    jwtB.querySelector('.run-trigger').click();
+    await wait(120);
+    const jwtOut = jwtB.querySelector('.runner-console').textContent;
+
+    const login = findBlock('login route');
+    login.querySelector('.run-trigger').click();
+    await wait(200);
+    const press = async (label) => {
+      Array.from(login.querySelectorAll('.runner-preset')).find((b) => b.textContent.includes(label)).click();
+      await wait(140);
+      return { status: login.querySelector('.runner-resp-head .pill').textContent, body: login.querySelector('.runner-resp-body').textContent };
+    };
+    const dashBefore = await press('Visit /dashboard');
+    const badLogin = await press('Wrong password');
+    const goodLogin = await press('Login as ada');
+    const dashAfter = await press('Visit /dashboard');
+    const logout = await press('Logout');
+    const dashFinal = await press('Visit /dashboard');
+
+    const sqli = findBlock('Vulnerable vs safe');
+    sqli.querySelector('.run-trigger').click();
+    for (let i = 0; i < 30 && !sqli.querySelector('.runner-console').textContent.includes('Rows returned'); i++) await wait(100);
+    const sqliOut = sqli.querySelector('.runner-console').textContent;
+
+    return { hashOut, jwtOut, dashBefore, badLogin, goodLogin, dashAfter, logout, dashFinal, sqliOut };
+  })()`);
+  assert.match(wk4.hashOut, /161 chars total/);
+  assert.match(wk4.hashOut, /Right password accepted: true/);
+  assert.match(wk4.hashOut, /Wrong password accepted: false/);
+  assert.match(wk4.jwtOut, /Subject: user-42 \| Role: student/);
+  assert.match(wk4.jwtOut, /Wrong secret rejected: invalid signature/);
+  assert.equal(wk4.dashBefore.status, '401 Unauthorized');
+  assert.equal(wk4.badLogin.status, '401 Unauthorized');
+  assert.equal(wk4.goodLogin.status, '302 Found');
+  assert.equal(wk4.dashAfter.status, '200 OK');
+  assert.match(wk4.dashAfter.body, /"userId": 42/);
+  assert.equal(wk4.logout.status, '302 Found');
+  assert.equal(wk4.dashFinal.status, '401 Unauthorized');
+  assert.match(wk4.sqliOut, /Rows leaked \(3\)/);
+  assert.match(wk4.sqliOut, /Rows returned \(0\)/);
+  assert.deepEqual(page.problems(), [], 'wk4 runners produced zero console/network errors');
+  assert.deepEqual(page.hosts(), [new URL(server.url).host], 'wk4 runners contacted this site only');
+
+  // 5. Phone 390px viewport with open server + SQL runner panels must have 0px horizontal overflow
+  await fresh('wk4/index.html', { ...PHONE, settle: 400 });
+  const phoneOverflow = await page.eval(`(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const login = Array.from(document.querySelectorAll('.code-block[data-run="server"]'))
+      .find((b) => (b.querySelector('.code-lang')?.textContent || '').includes('login route'));
+    login.querySelector('.run-trigger').click();
+    await wait(200);
+    login.querySelector('.runner-preset').click();
+    await wait(150);
+    return document.documentElement.scrollWidth - document.documentElement.clientWidth;
+  })()`);
+  assert.equal(phoneOverflow, 0, 'open server runner panel does not cause horizontal overflow on a 390px phone');
+});

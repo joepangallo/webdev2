@@ -7,6 +7,7 @@
   <meta name="description" content="Week 3: how websites remember things — cookies, sessions, the file system, and real databases, with the full create, read, update, delete cycle in both MongoDB and MySQL.">
   <link rel="stylesheet" href="../assets/css/course.css">
   <script src="../assets/js/course.js"></script>
+  <script src="../assets/js/runner.js"></script>
   <style>
     /* ===== Week 3 page styles. Every selector is prefixed wk3- ===== */
     .wk3-flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0; }
@@ -62,7 +63,7 @@
     </ul>
     <p>Here is a complete, working example. The server checks each request for a <code>visited</code> cookie. If it is not there, the server sends a friendly first-visit message and sets the cookie. If it is there, the server knows you have been here before:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="cookies.js — remembering a visitor">
+    <script type="text/plain" class="code" data-lang="js" data-title="cookies.js — remembering a visitor" data-run="server" data-presets='[{"label":"/visit (Click twice!)","method":"GET","path":"/visit"}]'>
       const express = require('express');
       const app = express();
 
@@ -194,7 +195,7 @@ Max-Age=3600  keep it for 3600 seconds (one hour), then discard it</div>
       </div>
       <div data-tab="3 · Express JS (set, read &amp; clear cookie)">
         <p>Validates the submitted choice against an allowlist (<code>'dark'</code> or <code>'light'</code>), saves it in a cookie for 30 days, and reads it on future visits.</p>
-        <script type="text/plain" class="code" data-lang="js" data-title="theme-cookie-route.js (Express)">
+        <script type="text/plain" class="code" data-lang="js" data-title="theme-cookie-route.js (Express)" data-run="server" data-harness="wk3-theme-cookie" data-presets='[{"label":"/ (Check theme)","method":"GET","path":"/"},{"label":"Set dark","method":"POST","path":"/theme","headers":{"Content-Type":"application/x-www-form-urlencoded"},"body":"theme=dark"},{"label":"Set light","method":"POST","path":"/theme","headers":{"Content-Type":"application/x-www-form-urlencoded"},"body":"theme=light"},{"label":"Reset cookie","method":"POST","path":"/theme/reset"}]'>
           app.use(express.urlencoded({ extended: false }));
 
           app.post('/theme', (req, res) => {
@@ -303,7 +304,7 @@ console.log(Object.keys(parseCookies('a=1; oops; b=2')).join(', ')); // want a, 
     <p>A <strong>session</strong> is a chunk of data the server keeps about one visitor, stored under a random ID. The browser's cookie holds nothing but that ID — a long random string that means nothing on its own, like the number on a coat-check ticket. On every request, the server reads the ID from the cookie, looks up the matching data, and now it "knows" you: your name, your cart, your visit count.</p>
     <p>The most common Express tool for this is the <code>express-session</code> package. Install it with <code>npm install express-session</code>, plug it in as middleware, and every request gains a <code>req.session</code> object you can read and write. Whatever you put there is remembered for that visitor:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="session-demo.js — counting visits with express-session">
+    <script type="text/plain" class="code" data-lang="js" data-title="session-demo.js — counting visits with express-session" data-run="server" data-presets='[{"label":"/count (Click repeatedly!)","method":"GET","path":"/count"}]'>
       const express = require('express');
       const session = require('express-session');
       const app = express();
@@ -455,7 +456,7 @@ sessions["k9f2x"] = { "visits": 3, "cart": ["Dune", "Emma"] }</div>
     <p>Node's built-in <code>fs</code> module (short for <em>file system</em> — the part of the operating system that organizes files) reads and writes files. Three functions cover the basics. The <code>Sync</code> versions work step by step, waiting for each write or read to finish before the next line runs, which keeps small examples easy to follow. That waiting has a cost: while a <code>Sync</code> call runs, Node can do nothing else, so inside a route handler it would hold up every other visitor's request. <code>Sync</code> calls are fine at startup and in small scripts like this one; inside a route, use the promise versions from <code>fs/promises</code> with <code>await</code>.</p>
     <p>Here is the small script:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="fs-demo.js — writing and reading a file">
+    <script type="text/plain" class="code" data-lang="js" data-title="fs-demo.js — writing and reading a file" data-run="node">
       const fs = require('fs');
 
       // CREATE: writeFileSync writes a file, replacing it if it exists.
@@ -483,7 +484,7 @@ Lines: 2</div>
 
     <p><strong>Example — two real Express route patterns: a session cart, and non-blocking <code>fs/promises</code> with <code>__dirname</code>:</strong></p>
     <div class="grid-2">
-      <script type="text/plain" class="code" data-lang="js" data-title="Session shopping cart (Express)">
+      <script type="text/plain" class="code" data-lang="js" data-title="Session shopping cart (Express)" data-run="server" data-harness="wk3-session-cart" data-presets='[{"label":"View cart","method":"GET","path":"/api/cart"},{"label":"Add Dune","method":"POST","path":"/api/cart","headers":{"Content-Type":"application/json"},"body":"{\"title\":\"Dune\"}"},{"label":"Add Emma","method":"POST","path":"/api/cart","headers":{"Content-Type":"application/json"},"body":"{\"title\":\"Emma\"}"}]'>
         // Stores each visitor's cart on the server in req.session
         app.post('/api/cart', (req, res) => {
           const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
@@ -500,7 +501,7 @@ Lines: 2</div>
           res.json({ cart: req.session.cart || [] });
         });
       </script>
-      <script type="text/plain" class="code" data-lang="js" data-title="Async file read/write inside routes (fs/promises)">
+      <script type="text/plain" class="code" data-lang="js" data-title="Async file read/write inside routes (fs/promises)" data-run="server" data-harness="wk3-async-notes" data-presets='[{"label":"Read notes","method":"GET","path":"/api/notes"},{"label":"Append note","method":"POST","path":"/api/notes","headers":{"Content-Type":"application/json"},"body":"{\"note\":\"Practice SQL joins\"}"}]'>
         const fs = require('fs/promises');
         const path = require('path');
         const NOTES_FILE = path.join(__dirname, 'notes.txt');
@@ -661,7 +662,7 @@ Lines: 2</div>
     <p>That <code>author_id</code> is the link in action: to find who wrote <em>Emma</em>, read its <code>author_id</code> — 2 — then look up row 2 in <code>authors</code>. The name itself is stored exactly once, in the <code>authors</code> table, and every book points at it.</p>
 
     <p><strong>Example — how SQL declares that link (<code>FOREIGN KEY</code>) and reads both tables together (<code>JOIN</code>):</strong></p>
-    <script type="text/plain" class="code" data-lang="sql" data-title="SQL — linking authors and books with a foreign key">
+    <script type="text/plain" class="code" data-lang="sql" data-title="SQL — linking authors and books with a foreign key" data-run="sql" data-harness="wk3-sql-authors">
       CREATE TABLE authors (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(120) NOT NULL
@@ -887,7 +888,7 @@ Lines: 2</div>
     <h3>Create: <code>insertOne</code></h3>
     <p>Hand <code>insertOne</code> a plain object and it becomes a document. You do not create the collection first — MongoDB creates it the moment the first document lands:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="CREATE — insertOne">
+    <script type="text/plain" class="code" data-lang="js" data-title="CREATE — insertOne" data-run="node" data-harness="wk3-mongo-crud">
       const result = await books.insertOne({
         title: 'The Hobbit',
         author: 'J.R.R. Tolkien'
@@ -901,7 +902,7 @@ Lines: 2</div>
     <h3>Read: <code>find</code> and <code>findOne</code></h3>
     <p>Reading is a <strong>query</strong>: a description of the documents you want. The simplest query is an object naming fields and the values they must match — <code>{ author: 'Jane Austen' }</code> means "documents whose author is Jane Austen," and <code>{}</code> (empty) means "all of them." <code>find</code> returns a <em>cursor</em> — a handle you walk through to get the documents — and calling <code>.toArray()</code> on it collects them into an ordinary array:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="READ — find and findOne">
+    <script type="text/plain" class="code" data-lang="js" data-title="READ — find and findOne" data-run="node" data-harness="wk3-mongo-read">
       // Every document in the collection:
       const all = await books.find().toArray();
 
@@ -927,7 +928,7 @@ Lines: 2</div>
     <h3>Update: <code>updateOne</code> with <code>$set</code></h3>
     <p>Updating takes two arguments: a query that picks the document, and a description of the change. The change uses <code>$set</code>, which names the fields to change and leaves every other field alone:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="UPDATE — updateOne with $set">
+    <script type="text/plain" class="code" data-lang="js" data-title="UPDATE — updateOne with $set" data-run="node" data-harness="wk3-mongo-crud">
       await books.updateOne(
         { title: 'Dune' },                        // which document
         { $set: { title: 'Dune (revised)' } }     // what to change
@@ -939,7 +940,7 @@ Lines: 2</div>
 
     <h3>Delete: <code>deleteOne</code></h3>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="DELETE — deleteOne">
+    <script type="text/plain" class="code" data-lang="js" data-title="DELETE — deleteOne" data-run="node" data-harness="wk3-mongo-crud">
       await books.deleteOne({ title: 'Emma' });
     </script>
     <p>What comes back:</p>
@@ -1010,7 +1011,7 @@ Lines: 2</div>
 
     <p>With that in place, the list route is the direct swap — run <code>find().toArray()</code>, then answer with the documents as JSON using <code>res.json(...)</code>, which sends a value back as a JSON response:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="GET /api/books — the driver call inside a route">
+    <script type="text/plain" class="code" data-lang="js" data-title="GET /api/books — the driver call inside a route" data-run="server" data-harness="wk3-mongo-routes-list" data-presets='[{"label":"/api/books","method":"GET","path":"/api/books"}]'>
       const { ObjectId } = require('mongodb'); // alongside MongoClient, at the top
 
       app.get('/api/books', async (req, res, next) => {
@@ -1025,7 +1026,7 @@ Lines: 2</div>
 
     <p>Reading one book adds a translation step. An id arrives in the URL as a <em>string</em> — every URL is text — but MongoDB stores <code>_id</code> values in its own type, <code>ObjectId</code>, so you convert the string with <code>new ObjectId(id)</code> before you search. That conversion sits in its own <code>try/catch</code> (code that tries a step and catches an error it throws, instead of crashing) because an invalid id string makes <code>new ObjectId(...)</code> throw — and a bad id is the visitor's mistake, not the database's:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="GET /api/books/:id — bad id, not found, and database failure">
+    <script type="text/plain" class="code" data-lang="js" data-title="GET /api/books/:id — bad id, not found, and database failure" data-run="server" data-harness="wk3-mongo-routes" data-presets='[{"label":"Valid id (200 Dune)","method":"GET","path":"/api/books/65f000000000000000000001"},{"label":"Unknown ObjectId (404)","method":"GET","path":"/api/books/65f000000000000000000099"},{"label":"Malformed id (400)","method":"GET","path":"/api/books/not-an-id"}]'>
       app.get('/api/books/:id', async (req, res, next) => {
         let id;
         try {
@@ -1050,7 +1051,7 @@ Lines: 2</div>
     <p>Notice that one route gives three different failure answers, because three different things went wrong. "Bad id" is <code>400</code> — the request itself was malformed. "Not found" is <code>404</code> — the request was fine, but no such book exists, which is why the handler checks for the <code>null</code> that <code>findOne</code> returns. "Database down" is <code>500</code> — your server failed — and the handler does not answer that one itself: passing the error on with <code>next(err)</code> hands it to the error-handling middleware from Week 2, which sends the 500. Keeping those three apart is what makes an API's answers mean something to whoever called it.</p>
 
     <p><strong>Completing CRUD in Express — <code>POST</code>, <code>PUT</code>, and <code>DELETE</code> with MongoDB:</strong> here are the three write routes that sit right beside the two <code>GET</code> routes above (pattern sketch):</p>
-    <script type="text/plain" class="code" data-lang="js" data-title="MongoDB POST, PUT &amp; DELETE routes (pattern)">
+    <script type="text/plain" class="code" data-lang="js" data-title="MongoDB POST, PUT &amp; DELETE routes (pattern)" data-run="server" data-harness="wk3-mongo-routes" data-presets='[{"label":"List books","method":"GET","path":"/api/books"},{"label":"Add book (201)","method":"POST","path":"/api/books","headers":{"Content-Type":"application/json"},"body":"{\"title\":\"Beloved\",\"author\":\"Toni Morrison\"}"},{"label":"Update Dune (200)","method":"PUT","path":"/api/books/65f000000000000000000001","headers":{"Content-Type":"application/json"},"body":"{\"title\":\"Dune (revised)\",\"author\":\"Frank Herbert\"}"},{"label":"Delete Emma (204)","method":"DELETE","path":"/api/books/65f000000000000000000002"}]'>
       // CREATE — POST /api/books (returns 201 + the new document with _id)
       app.post('/api/books', async (req, res, next) => {
         const { title, author } = req.body || {};
@@ -1193,7 +1194,7 @@ Lines: 2</div>
     <h3>SQL: the four statements are CRUD</h3>
     <p>Start with the schema. This statement creates the <code>books</code> table from Section 3.3, declaring every column and its type. <code>INT</code> is a whole number, <code>VARCHAR(200)</code> is text up to 200 characters, <code>NOT NULL</code> means "a value is required," and <code>AUTO_INCREMENT PRIMARY KEY</code> makes <code>id</code> the unique row identifier, filled in by the database with the next number each time:</p>
 
-    <script type="text/plain" class="code" data-lang="sql" data-title="SQL — create the table">
+    <script type="text/plain" class="code" data-lang="sql" data-title="SQL — create the table" data-run="sql">
       CREATE TABLE books (
         id INT AUTO_INCREMENT PRIMARY KEY,
         title VARCHAR(200) NOT NULL,
@@ -1203,21 +1204,21 @@ Lines: 2</div>
 
     <p>With the table in place, the four CRUD operations are four SQL verbs. <strong>Create</strong> is <code>INSERT</code> — name the columns, then the values that fill them:</p>
 
-    <script type="text/plain" class="code" data-lang="sql" data-title="SQL — INSERT (Create)">
+    <script type="text/plain" class="code" data-lang="sql" data-title="SQL — INSERT (Create)" data-run="sql" data-harness="wk3-sql-books-empty">
       INSERT INTO books (title, author) VALUES ('Dune', 'Frank Herbert');
       INSERT INTO books (title, author) VALUES ('Emma', 'Jane Austen');
       INSERT INTO books (title, author) VALUES ('The Hobbit', 'J.R.R. Tolkien');
     </script>
     <p>Notice there is no <code>id</code> in those statements: <code>AUTO_INCREMENT</code> assigns 1, 2 and 3 itself. <strong>Read</strong> is <code>SELECT</code> — name the columns you want, the table to take them from, and optionally a <code>WHERE</code> clause, a condition that filters which rows come back:</p>
 
-    <script type="text/plain" class="code" data-lang="sql" data-title="SQL — SELECT (Read)">
+    <script type="text/plain" class="code" data-lang="sql" data-title="SQL — SELECT (Read)" data-run="sql" data-harness="wk3-sql-books">
       SELECT * FROM books;
       SELECT * FROM books WHERE id = 2;
       SELECT title, author FROM books WHERE author = 'Jane Austen';
     </script>
     <p>The <code>*</code> means "every column." <strong>Update</strong> is <code>UPDATE</code> with a <code>SET</code> clause — and a <code>WHERE</code>, always a <code>WHERE</code>:</p>
 
-    <script type="text/plain" class="code" data-lang="sql" data-title="SQL — UPDATE (Update)">
+    <script type="text/plain" class="code" data-lang="sql" data-title="SQL — UPDATE (Update)" data-run="sql" data-harness="wk3-sql-books">
       UPDATE books SET title = 'Dune (revised)' WHERE id = 1;
     </script>
 
@@ -1228,7 +1229,7 @@ Lines: 2</div>
 
     <p><strong>Delete</strong> is <code>DELETE</code> — the same shape, the same warning:</p>
 
-    <script type="text/plain" class="code" data-lang="sql" data-title="SQL — DELETE (Delete)">
+    <script type="text/plain" class="code" data-lang="sql" data-title="SQL — DELETE (Delete)" data-run="sql" data-harness="wk3-sql-books">
       DELETE FROM books WHERE id = 2;
     </script>
 
@@ -1272,7 +1273,7 @@ Lines: 2</div>
     <h3>Sending SQL from Node: mysql2 and placeholders</h3>
     <p>From Node, the package is <code>mysql2</code> — install it with <code>npm install mysql2</code> — and its <code>/promise</code> version lets you <code>await</code> each query. Here is the full CRUD cycle, run against the table as the three <code>INSERT</code> statements above left it: Dune, Emma and The Hobbit, ids 1 to 3. It adds a fourth book, reads, then makes the same update and delete you just wrote by hand. Read the queries closely: none of them glue values into the SQL text. Wherever a value belongs, the SQL has a <code>?</code> instead, and the value travels separately, in an array:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="MySQL CRUD from Node — mysql2/promise">
+    <script type="text/plain" class="code" data-lang="js" data-title="MySQL CRUD from Node — mysql2/promise" data-run="node" data-harness="wk3-sql-books">
       const mysql = require('mysql2/promise');
 
       async function main() {
@@ -1349,7 +1350,7 @@ Rows deleted: 1</div>
 
     <h3>Wiring a MySQL pool into Express routes</h3>
     <p>Just like MongoDB's single shared <code>MongoClient</code>, an Express server using MySQL creates <strong>one connection pool</strong> with <code>mysql.createPool(...)</code> at startup and reuses it across every route (pattern sketch):</p>
-    <script type="text/plain" class="code" data-lang="js" data-title="mysql-book-routes.js — pool + parameterized Express CRUD (pattern)">
+    <script type="text/plain" class="code" data-lang="js" data-title="mysql-book-routes.js — pool + parameterized Express CRUD (pattern)" data-run="server" data-harness="wk3-sql-books-server" data-presets='[{"label":"List books","method":"GET","path":"/api/books"},{"label":"Book #1","method":"GET","path":"/api/books/1"},{"label":"Bad id abc (400)","method":"GET","path":"/api/books/abc"},{"label":"Add book (201)","method":"POST","path":"/api/books","headers":{"Content-Type":"application/json"},"body":"{\"title\":\"Beloved\",\"author\":\"Toni Morrison\"}"},{"label":"Delete #2 (204)","method":"DELETE","path":"/api/books/2"}]'>
       const express = require('express');
       const mysql = require('mysql2/promise');
 
@@ -1504,7 +1505,7 @@ Rows deleted: 1</div>
     <p>But browser checks are a courtesy, not a guard. Your server does not only hear from your tidy web page. Anyone can send your API a hand-made request with <code>curl</code>, skipping your form — and its JavaScript — entirely. Worse, everything arriving in a request was assembled on someone else's machine: bodies can be edited, cookies rewritten, fields deleted. So the rule is absolute: <strong>every rule that matters is checked again on the server</strong>, at the moment the data arrives, before it touches your database. The browser check is for the visitor's convenience. The server check is for your data's survival.</p>
     <p>Here is a small server-style validator for the course's book. It takes the object from a request body and returns a list of problems — an empty list means the book is acceptable:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="validateBook — checking a book before it is stored">
+    <script type="text/plain" class="code" data-lang="js" data-title="validateBook — checking a book before it is stored" data-run="node" data-harness="wk3-validate-fn">
       function validateBook(book) {
         const errors = [];
         if (!book || typeof book !== 'object') return ['Send a book object.'];
@@ -1611,7 +1612,7 @@ Rows deleted: 1</div>
       </div>
       <div data-tab="4 · Express JS (the real guard)">
         <p>Calls <code>validateBook(req.body)</code> before touching the database; if any error came back, stops with <code>400 Bad Request</code> and returns the whole <code>errors</code> array as JSON.</p>
-        <script type="text/plain" class="code" data-lang="js" data-title="validate-in-route.js (Express)">
+        <script type="text/plain" class="code" data-lang="js" data-title="validate-in-route.js (Express)" data-run="server" data-harness="wk3-validate-route" data-presets='[{"label":"Valid book (201)","method":"POST","path":"/api/books","headers":{"Content-Type":"application/json"},"body":"{\"title\":\"  Dune  \",\"author\":\"Frank Herbert\",\"year\":1965}"},{"label":"Invalid book (400)","method":"POST","path":"/api/books","headers":{"Content-Type":"application/json"},"body":"{\"title\":\"   \",\"author\":\"\"}"}]'>
           app.post('/api/books', async (req, res, next) => {
             const errors = validateBook(req.body);
             if (errors.length > 0) {
