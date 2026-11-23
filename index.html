@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Web Development II · Course Hub</title>
   <meta name="description" content="An interactive companion for Web Development II: server-side JavaScript with Node and Express, routing and middleware, REST APIs, state and databases, and authentication and authorization.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=JetBrains+Mono:wght@400;700&display=swap">
   <link rel="stylesheet" href="assets/css/course.css">
   <script src="assets/js/course.js"></script>
   <style>
@@ -163,7 +166,7 @@
         <h1 id="hub-title">Web Development&nbsp;II <span class="lt">{ }</span></h1>
         <p class="lede">JavaScript leaves the browser. Build the server side of the web: Node and Express, routing and middleware, REST APIs, cookies, sessions and real databases, and login systems with roles — then put it all together in a full-stack final project. Every section has something to click, drag, type or break on purpose.</p>
         <div class="hub-cta">
-          <a class="btn primary wrap" id="hub-continue" href="wk1/index.html">Start with Week 1</a>
+          <a class="btn primary" id="hub-continue" href="wk1/index.html">Start with Week 1</a>
           <a class="btn" href="project/index.html">Open the final project</a>
         </div>
         <span class="hub-continue-meta" id="hub-continue-meta">Your progress saves in this browser automatically.</span>
@@ -235,8 +238,8 @@
       <p>Progress, quiz scores and your playground code are stored only in this browser. Export a file to move them to another computer, or to show your work.</p>
       <div class="btn-row">
         <button type="button" class="btn small" id="hub-export">Export progress</button>
-        <button type="button" class="btn small" id="hub-import">Import progress</button>
-        <input type="file" id="hub-import-file" accept="application/json,.json" hidden tabindex="-1" aria-hidden="true">
+        <label class="btn small" for="hub-import-file" style="cursor:pointer">Import progress</label>
+        <input type="file" id="hub-import-file" accept="application/json,.json" hidden>
         <span class="hub-confirm" id="hub-reset-wrap"><button type="button" class="btn small ghost" id="hub-reset">Reset all progress</button></span>
       </div>
     </section>
@@ -251,24 +254,24 @@ WD1.ready(() => {
 
   /* Hero editor */
   const tryBox = $('#hub-try');
-  const frame = WD1.previewFrame('Live preview');
+  const frame = h('iframe', { title: 'Live preview' });
   const start = '<h1>Course books</h1>\n<p>Rendered by JavaScript from data shaped like our API:</p>\n<ul id="list"></ul>\n<p><em>Edit this HTML — the list below is rebuilt by script.</em></p>';
   let saved = WD1.store.get('custom', 'hub-try');
-  const initialHtml = typeof saved === 'string' ? saved : start;
   const draw = (html) => {
     frame.srcdoc = WD1.buildPreviewDoc({ html, css: 'body{font-family:system-ui,sans-serif;margin:16px;line-height:1.5}', js: "const books = [{id:1,title:'Dune',author:'Frank Herbert'},{id:2,title:'Emma',author:'Jane Austen'}]; const el = document.getElementById('list'); if (el) books.forEach(b => { const li = document.createElement('li'); const st = document.createElement('strong'); st.textContent = b.title; li.append(st, ' by ' + b.author); el.append(li); });" }, 'hub');
   };
   let t;
-  const tryEd = WD1.editor(tryBox, { value: initialHtml, lang: 'html', height: 170, label: 'HTML editor', onInput: (v) => {
+  WD1.editor(tryBox, { value: saved || start, lang: 'html', height: 170, label: 'HTML editor', onInput: (v) => {
     clearTimeout(t); t = setTimeout(() => { draw(v); WD1.store.set('custom', 'hub-try', v); }, 250);
   } });
   tryBox.appendChild(frame);
-  draw(initialHtml);
+  draw(saved || start);
 
   /* Modules */
   const modWrap = $('#hub-modules');
   WD1.MODULES.forEach((m) => {
     const card = h('article', { class: 'hub-mod', style: { '--c': COLORS[m.id] } });
+    card.style.setProperty('--c', COLORS[m.id]);
     card.append(
       h('div', { class: 'hub-mod-top' },
         h('span', { class: 'hub-mod-num', style: { background: SWATCH[m.id] }, text: m.num }),
@@ -305,6 +308,7 @@ WD1.ready(() => {
       WD1.MODULES.map((m) => {
         const secs = m.sections.filter((s) => s.obj.includes(n) && s.num !== 'R');
         const cell = h('span', { class: 'hub-cell', style: { '--c': COLORS[m.id] } });
+        cell.style.setProperty('--c', COLORS[m.id]);
         secs.forEach((s) => cell.appendChild(h('i', { title: s.num + ' ' + s.title, dataset: { sec: s.id } })));
         return h('td', { 'aria-label': secs.length ? secs.length + ' section' + (secs.length > 1 ? 's' : '') + ' in ' + m.title : 'none' }, cell);
       }));
@@ -341,7 +345,7 @@ WD1.ready(() => {
     $('#hub-sections').textContent = all.done + ' of ' + all.total + ' sections complete';
     $('#hub-ring').style.strokeDashoffset = String(169.65 * (1 - all.pct / 100));
     const quiz = WD1.store.all().quiz || {};
-    const qs = Object.values(quiz).filter((q) => q && typeof q.best === 'number' && Number.isFinite(q.best) && typeof q.total === 'number' && Number.isFinite(q.total) && q.total > 0);
+    const qs = Object.values(quiz);
     $('#hub-quizzes').textContent = qs.length;
     $('#hub-avg').textContent = qs.length ? Math.round(qs.reduce((a, q) => a + q.best / q.total, 0) / qs.length * 100) + '%' : '–';
     $('#hub-challenges').textContent = Object.keys(WD1.store.all().challenge || {}).length;
@@ -357,19 +361,7 @@ WD1.ready(() => {
       meta.textContent = 'You were last reading ' + s.module.label + ', ' + s.module.title + '.';
     } else if (all.done) {
       const next = WD1.MODULES.flatMap((m) => m.sections.map((x) => Object.assign({ m }, x))).find((x) => !WD1.progress.isDone(x.id));
-      if (next) {
-        cont.textContent = 'Next up: ' + (next.num === 'R' ? next.title : next.num + ' ' + next.title);
-        cont.href = next.m.href + '#' + next.id;
-        meta.textContent = 'You have finished ' + all.done + ' of ' + all.total + ' sections.';
-      } else {
-        cont.textContent = 'Open the final project';
-        cont.href = 'project/index.html';
-        meta.textContent = 'You have completed every section.';
-      }
-    } else {
-      cont.textContent = 'Start with Week 1';
-      cont.href = 'wk1/index.html';
-      meta.textContent = 'Your progress saves in this browser automatically.';
+      if (next) { cont.textContent = 'Next up: ' + next.num + ' ' + next.title; cont.href = next.m.href + '#' + next.id; }
     }
     select(selected);
   }
@@ -384,8 +376,6 @@ WD1.ready(() => {
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     WD1.toast('Progress exported');
   });
-  // A real button opens the file picker, so the control works from the keyboard.
-  $('#hub-import').addEventListener('click', () => $('#hub-import-file').click());
   $('#hub-import-file').addEventListener('change', (e) => {
     const f = e.target.files[0];
     if (!f) return;
@@ -406,14 +396,7 @@ WD1.ready(() => {
     resetWrap.innerHTML = '';
     resetWrap.append(
       h('span', { text: 'Erase all progress, scores and saved code in this browser?' }),
-      h('button', { type: 'button', class: 'btn small', style: { color: 'var(--bad)', borderColor: 'var(--bad)' }, text: 'Yes, erase', onclick: () => {
-        clearTimeout(t);
-        WD1.store.reset();
-        tryEd.set(start, true);
-        draw(start);
-        WD1.toast('Progress reset');
-        showReset();
-      } }),
+      h('button', { type: 'button', class: 'btn small', style: { color: 'var(--bad)', borderColor: 'var(--bad)' }, text: 'Yes, erase', onclick: () => { WD1.store.reset(); WD1.toast('Progress reset'); showReset(); } }),
       h('button', { type: 'button', class: 'btn small ghost', text: 'Cancel', onclick: showReset }));
   }
   $('#hub-reset').addEventListener('click', askReset);

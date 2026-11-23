@@ -4,7 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Code Playground · Web Dev II</title>
-  <meta name="description" content="A full-page HTML, CSS and JavaScript playground with live preview, console, templates, download and share links.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=JetBrains+Mono:wght@400;700&display=swap">
   <link rel="stylesheet" href="../assets/css/course.css">
   <script src="../assets/js/course.js"></script>
   <style>
@@ -77,7 +79,7 @@
     </div>
     <div class="tp-right">
       <div class="pg-label"><span>Preview</span><span id="tp-size" class="num"></span></div>
-      <div class="tp-stage" id="tp-stage"><iframe id="tp-frame" title="Preview" sandbox="allow-scripts allow-forms allow-modals"></iframe></div>
+      <div class="tp-stage" id="tp-stage"><iframe id="tp-frame" title="Preview"></iframe></div>
       <div class="pg-label" id="tp-console-label"><span>Console</span><button type="button" class="btn small ghost" id="tp-clear">Clear</button></div>
       <div class="tp-console" id="tp-console" aria-live="polite" aria-label="Console output"></div>
     </div>
@@ -96,24 +98,6 @@ WD1.ready(() => {
 
   const TEMPLATES = {
     blank: { label: 'Blank page', html: '<h1>Hello!</h1>\n<p>Start building.</p>', css: 'body {\n  font-family: system-ui, sans-serif;\n  margin: 2rem;\n}', js: '' },
-    spaApi: {
-      label: 'SPA book list (mock REST API)',
-      html: '<h1>Book list</h1>\n<form id="add-form">\n  <label>Title <input id="title" required placeholder="The Hobbit"></label>\n  <label>Author <input id="author" required placeholder="J.R.R. Tolkien"></label>\n  <button type="submit">POST /api/books</button>\n</form>\n<p id="msg" role="status"></p>\n<ul id="list"></ul>',
-      css: 'body { font-family: system-ui, sans-serif; margin: 1.5rem; max-width: 38rem; line-height: 1.5; }\nform { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-bottom: 1rem; }\nlabel { display: grid; gap: 4px; font-size: .85rem; font-weight: 600; }\ninput, button { font: inherit; padding: .45rem .65rem; border: 1px solid #cbd5e1; border-radius: 6px; }\nbutton { background: #1f4fd1; color: #fff; border-color: #1f4fd1; cursor: pointer; }\n#msg { font-family: ui-monospace, monospace; font-size: .85rem; color: #475569; min-height: 1.3em; }\nul { list-style: none; padding: 0; display: grid; gap: 6px; }\nli { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: .5rem .75rem; border: 1px solid #e2e8f0; border-radius: 8px; }\nli button { background: #fff; color: #b9322a; border-color: #e2e8f0; font-size: .8rem; padding: .25rem .6rem; }',
-      js: "// Simulated REST API (same contract as Week 2's rest-api.js)\nlet nextId = 3;\nconst db = [\n  { id: 1, title: 'Dune', author: 'Frank Herbert' },\n  { id: 2, title: 'Emma', author: 'Jane Austen' }\n];\n\nfunction api(method, path, body) {\n  if (method === 'GET' && path === '/api/books') return { status: 200, body: db.map((b) => ({ ...b })) };\n  if (method === 'POST' && path === '/api/books') {\n    const title = typeof body?.title === 'string' ? body.title.trim() : '';\n    const author = typeof body?.author === 'string' ? body.author.trim() : '';\n    if (!title || !author) return { status: 400, body: { error: 'title and author are required' } };\n    const book = { id: nextId++, title, author };\n    db.push(book);\n    return { status: 201, body: book };\n  }\n  const m = path.match(/^\\/api\\/books\\/(\\d+)$/);\n  if (method === 'DELETE' && m) {\n    const i = db.findIndex((b) => b.id === Number(m[1]));\n    if (i === -1) return { status: 404, body: { error: 'Book not found' } };\n    db.splice(i, 1);\n    return { status: 204, body: null };\n  }\n  return { status: 404, body: { error: 'Not found' } };\n}\n\nlet books = [];\nconst list = document.querySelector('#list');\nconst msg = document.querySelector('#msg');\n\nfunction render() {\n  list.replaceChildren();\n  books.forEach((b) => {\n    const li = document.createElement('li');\n    const text = document.createElement('span');\n    const strong = document.createElement('strong');\n    strong.textContent = b.title;\n    text.append(strong, ' by ' + b.author);\n    const del = document.createElement('button');\n    del.type = 'button';\n    del.textContent = 'Delete';\n    del.addEventListener('click', () => {\n      const res = api('DELETE', '/api/books/' + b.id);\n      console.log('DELETE /api/books/' + b.id + ' ->', res.status);\n      if (res.status === 204) { books = books.filter((x) => x.id !== b.id); msg.textContent = '204 No Content'; render(); }\n    });\n    li.append(text, del);\n    list.append(li);\n  });\n}\n\ndocument.querySelector('#add-form').addEventListener('submit', (e) => {\n  e.preventDefault();\n  const titleEl = document.querySelector('#title');\n  const authorEl = document.querySelector('#author');\n  const res = api('POST', '/api/books', { title: titleEl.value, author: authorEl.value });\n  console.log('POST /api/books ->', res.status, res.body);\n  if (res.status === 201) {\n    books.push(res.body);\n    titleEl.value = ''; authorEl.value = '';\n    msg.textContent = '201 Created (id ' + res.body.id + ')';\n    render();\n  } else {\n    msg.textContent = res.status + ' ' + res.body.error;\n  }\n});\n\nconst initial = api('GET', '/api/books');\nconsole.log('GET /api/books ->', initial.status, initial.body);\nbooks = initial.body;\nrender();"
-    },
-    restValidator: {
-      label: 'JSON validator & API payload',
-      html: '<h1>Server-style validation</h1>\n<p>Test how a route validates JSON before touching a database.</p>\n<textarea id="json" rows="5">{\n  "title": "Kindred",\n  "author": "Octavia Butler",\n  "year": 1979\n}</textarea>\n<button id="check" type="button">Validate JSON</button>\n<pre id="out"></pre>',
-      css: 'body { font-family: system-ui, sans-serif; margin: 1.5rem; max-width: 36rem; }\ntextarea, pre { width: 100%; box-sizing: border-box; font: 13px/1.5 ui-monospace, Menlo, monospace; padding: .75rem; border: 1px solid #cbd5e1; border-radius: 8px; }\nbutton { margin: .75rem 0; font: inherit; padding: .45rem .9rem; border-radius: 6px; border: 0; background: #1f4fd1; color: #fff; cursor: pointer; }\npre { background: #f8fafc; white-space: pre-wrap; }',
-      js: "function validateBook(book) {\n  const errors = [];\n  if (!book || typeof book !== 'object' || Array.isArray(book)) return ['Send a JSON object.'];\n  if (typeof book.title !== 'string' || !book.title.trim()) errors.push('Title is required.');\n  if (typeof book.author !== 'string' || !book.author.trim()) errors.push('Author is required.');\n  if (!Number.isInteger(book.year) || book.year < 1000 || book.year > 2100) errors.push('Year must be an integer from 1000 to 2100.');\n  return errors;\n}\n\nconst input = document.querySelector('#json');\nconst out = document.querySelector('#out');\nfunction runCheck() {\n  let parsed;\n  try { parsed = JSON.parse(input.value); }\n  catch (err) { out.textContent = '400 Bad Request\\n' + JSON.stringify({ error: 'Invalid JSON: ' + err.message }, null, 2); return; }\n  const errors = validateBook(parsed);\n  const response = errors.length\n    ? { status: 400, body: { errors } }\n    : { status: 201, body: { title: parsed.title.trim(), author: parsed.author.trim(), year: parsed.year } };\n  out.textContent = response.status + '\\n' + JSON.stringify(response.body, null, 2);\n  console.log(response.status, response.body);\n}\ndocument.querySelector('#check').addEventListener('click', runCheck);\nrunCheck();"
-    },
-    jwtCookie: {
-      label: 'JWT & Cookie inspector',
-      html: '<h1>JWT &amp; Cookie inspector</h1>\n<label>JWT (header.payload.signature)\n  <textarea id="jwt" rows="3">eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLTQyIiwibmFtZSI6IkFkYSIsInJvbGUiOiJzdHVkZW50IiwiaWF0IjoxNzk1MDQ3MTExLCJleHAiOjE3OTUwNTA3MTF9.EUEe-kTVH_9DOfOtEtJeOch2gXWoaSqqyk1EpxAhGYU</textarea>\n</label>\n<pre id="jwt-out"></pre>\n<label>Cookie header\n  <input id="cookie" value="visited=yes; theme=dark; token=abc=def">\n</label>\n<pre id="cookie-out"></pre>',
-      css: 'body { font-family: system-ui, sans-serif; margin: 1.5rem; max-width: 40rem; }\nlabel { display: block; font-weight: 600; font-size: .88rem; margin-top: .75rem; }\ntextarea, input, pre { width: 100%; box-sizing: border-box; font: 12.5px/1.5 ui-monospace, Menlo, monospace; padding: .6rem; border: 1px solid #cbd5e1; border-radius: 8px; margin-top: 4px; }\npre { background: #f8fafc; white-space: pre-wrap; }',
-      js: "function decodePart(part) {\n  const b64 = part.replace(/-/g, '+').replace(/_/g, '/');\n  return JSON.parse(atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4)));\n}\n\nfunction parseCookies(header) {\n  const out = {};\n  for (const part of String(header).split(';')) {\n    const eq = part.indexOf('=');\n    if (eq === -1) continue;\n    out[part.slice(0, eq).trim()] = part.slice(eq + 1).trim();\n  }\n  return out;\n}\n\nconst jwtEl = document.querySelector('#jwt'), jwtOut = document.querySelector('#jwt-out');\nconst cookieEl = document.querySelector('#cookie'), cookieOut = document.querySelector('#cookie-out');\n\nfunction showJwt() {\n  const parts = jwtEl.value.trim().split('.');\n  if (parts.length !== 3) { jwtOut.textContent = 'A JWT has exactly 3 dot-separated parts.'; return; }\n  try { jwtOut.textContent = JSON.stringify({ header: decodePart(parts[0]), payload: decodePart(parts[1]) }, null, 2); }\n  catch (e) { jwtOut.textContent = 'Could not decode: ' + e.message; }\n}\nfunction showCookies() { cookieOut.textContent = JSON.stringify(parseCookies(cookieEl.value), null, 2); }\n\njwtEl.addEventListener('input', showJwt);\ncookieEl.addEventListener('input', showCookies);\nshowJwt(); showCookies();"
-    },
     skeleton: { label: 'Full HTML document', html: '<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="utf-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1">\n  <title>My Page</title>\n</head>\n<body>\n  <h1>My Page</h1>\n  <p>A complete document, from the DOCTYPE down.</p>\n</body>\n</html>', css: '', js: '' },
     semantic: { label: 'Semantic layout', html: '<header>\n  <h1>Trail Notes</h1>\n  <nav>\n    <ul>\n      <li><a href="#">Home</a></li>\n      <li><a href="#">Hikes</a></li>\n      <li><a href="#">Gear</a></li>\n    </ul>\n  </nav>\n</header>\n<main>\n  <article>\n    <h2>Sunrise on Ridge Loop</h2>\n    <p>Published <time datetime="2026-09-12">September 12, 2026</time></p>\n    <figure>\n      <img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22600%22 height=%22240%22%3E%3Crect width=%22600%22 height=%22240%22 fill=%22%23f4b183%22/%3E%3Cpath d=%22M0 240 L180 90 L300 170 L420 60 L600 240Z%22 fill=%22%236b4f3a%22/%3E%3C/svg%3E" alt="A rocky ridge line against an orange sunrise sky">\n      <figcaption>The ridge, 6:40 a.m.</figcaption>\n    </figure>\n    <p>We started in the dark and reached the top as the sun came up.</p>\n  </article>\n  <aside>\n    <h2>Trail stats</h2>\n    <p>4.2 miles · 900 ft gain</p>\n  </aside>\n</main>\n<footer>\n  <p>&copy; 2026 Trail Notes</p>\n</footer>', css: 'body { font-family: system-ui, sans-serif; margin: 0; line-height: 1.5; }\nheader, main, footer { padding: 1rem 1.5rem; }\nnav ul { list-style: none; display: flex; gap: 1rem; padding: 0; }\nimg { max-width: 100%; height: auto; }', js: '' },
     table: { label: 'Data table', html: '<table>\n  <caption>Food truck menu</caption>\n  <thead>\n    <tr><th scope="col">Item</th><th scope="col">Size</th><th scope="col">Price</th></tr>\n  </thead>\n  <tbody>\n    <tr><th scope="row">Tacos</th><td>3 pcs</td><td>$9.50</td></tr>\n    <tr><th scope="row">Elote</th><td>1 ear</td><td>$4.00</td></tr>\n    <tr><th scope="row">Horchata</th><td>16 oz</td><td>$3.75</td></tr>\n  </tbody>\n</table>', css: 'body { font-family: system-ui, sans-serif; margin: 2rem; }\ntable { border-collapse: collapse; min-width: 320px; }\ncaption { font-weight: 700; text-align: left; padding-bottom: .5rem; }\nth, td { padding: .5rem .75rem; border-bottom: 1px solid #ddd; text-align: left; }\ntbody tr:nth-child(even) { background: #f5f7fa; }\ntd:last-child { text-align: right; font-variant-numeric: tabular-nums; }', js: '' },
@@ -126,79 +110,43 @@ WD1.ready(() => {
   const sel = $('#tp-template');
   Object.entries(TEMPLATES).forEach(([k, t]) => sel.appendChild(h('option', { value: k, text: t.label })));
 
-  function b64Encode(str) {
-    const bytes = new TextEncoder().encode(str);
-    let bin = '';
-    bytes.forEach((b) => { bin += String.fromCharCode(b); });
-    return btoa(bin);
-  }
-  function b64Decode(b64) {
-    const bin = atob(b64);
-    const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
-    return new TextDecoder().decode(bytes);
-  }
-
-  /* Load: share link > handoff from a lesson > saved > default.
-     Shared code is somebody else's code. It only ever runs inside the sandboxed preview frame,
-     which cannot reach this site's storage or the page around it. */
-  const isCode = (d) => !!d && typeof d === 'object' && !Array.isArray(d);
+  /* Load: share link > handoff from a lesson > saved > default */
   let code = null, source = '';
   if (location.hash.startsWith('#code=')) {
     try {
       const b64 = location.hash.slice(6);
-      const d = JSON.parse(b64Decode(decodeURIComponent(b64)));
-      if (isCode(d)) { code = d; source = 'Loaded from a share link'; }
+      code = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(b64)))));
+      source = 'Loaded from a share link';
     } catch (e) { code = null; }
   }
   if (!code && location.hash === '#handoff') {
     try {
-      // Written by the "Open in playground" button on a lesson (course.js); used once.
-      const raw = localStorage.getItem('wd2:handoff');
-      localStorage.removeItem('wd2:handoff');
-      const d = raw ? JSON.parse(raw) : null;
-      if (isCode(d)) { code = d; source = 'Opened from “' + (typeof d.title === 'string' && d.title ? d.title : 'a lesson') + '”'; }
+      const raw = localStorage.getItem('wd1:handoff');
+      if (raw) { const d = JSON.parse(raw); code = { html: d.html, css: d.css, js: d.js }; source = 'Opened from “' + (d.title || 'a lesson') + '”'; }
     } catch (e) { code = null; }
   }
-  if (!code) { const saved = WD1.store.get('custom', 'playground'); if (isCode(saved)) code = saved; }
+  if (!code) code = WD1.store.get('custom', 'playground');
   if (!code) { const t = TEMPLATES.events; code = { html: t.html, css: t.css, js: t.js }; source = 'Example: JavaScript events'; }
-  const text = (v) => (typeof v === 'string' ? v : '');
-  code = { html: text(code.html), css: text(code.css), js: text(code.js) };
+  code = { html: code.html || '', css: code.css || '', js: code.js || '' };
   if (source) $('#tp-status').textContent = source;
   if (location.hash) history.replaceState(null, '', location.pathname + location.search);
-  // A share or handoff link opened while this page is already showing only changes the hash.
-  window.addEventListener('hashchange', () => { if (location.hash.startsWith('#code=') || location.hash === '#handoff') location.reload(); });
 
   /* Editors */
   const tabs = $('#tp-tabs'), edWrap = $('#tp-editors');
   const editors = {};
-  const langs = ['html', 'css', 'js'];
   let active = 'html';
-  langs.forEach((l, idx) => {
-    const tabId = 'tp-t-' + l, paneId = 'tp-p-' + l;
-    const tab = h('button', {
-      type: 'button', class: 'pg-tab', role: 'tab', id: tabId, 'aria-controls': paneId,
-      'aria-selected': String(l === active), tabindex: l === active ? '0' : '-1', text: l.toUpperCase(),
-      onclick: () => select(l, false)
-    });
-    tab.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowRight') { e.preventDefault(); select(langs[(idx + 1) % langs.length], true); }
-      if (e.key === 'ArrowLeft') { e.preventDefault(); select(langs[(idx - 1 + langs.length) % langs.length], true); }
-    });
+  ['html', 'css', 'js'].forEach((l) => {
+    const tab = h('button', { type: 'button', class: 'pg-tab', role: 'tab', 'aria-selected': String(l === active), text: l.toUpperCase(), onclick: () => select(l) });
     tabs.appendChild(tab);
-    const pane = h('div', { class: 'tp-pane', id: paneId, role: 'tabpanel', 'aria-labelledby': tabId, hidden: l !== active });
+    const pane = h('div', { class: 'tp-pane', hidden: l !== active });
     edWrap.appendChild(pane);
     editors[l] = WD1.editor(pane, { value: code[l], lang: l, onInput: (v) => { code[l] = v; schedule(); } });
     editors[l].tab = tab; editors[l].pane = pane;
   });
-  function select(l, focusTab) {
+  function select(l) {
     active = l;
-    Object.entries(editors).forEach(([k, ed]) => {
-      const on = k === l;
-      ed.pane.hidden = !on;
-      ed.tab.setAttribute('aria-selected', String(on));
-      ed.tab.tabIndex = on ? 0 : -1;
-    });
-    if (focusTab) editors[l].tab.focus(); else editors[l].focus();
+    Object.entries(editors).forEach(([k, ed]) => { ed.pane.hidden = k !== l; ed.tab.setAttribute('aria-selected', String(k === l)); });
+    editors[l].focus();
   }
 
   /* Preview + console */
@@ -209,13 +157,11 @@ WD1.ready(() => {
   }
   window.addEventListener('message', (e) => {
     const d = e.data;
-    if (!d || d.wd1pg !== ID || e.source !== frame.contentWindow) return;
-    if (!['log', 'info', 'warn', 'error'].includes(d.type)) return;
+    if (!d || d.wd1pg !== ID) return;
     const empty = $('.empty', consoleEl);
     if (empty) empty.remove();
     const pre = { error: '✖ ', warn: '⚠ ', info: '› ' }[d.type] || '';
-    consoleEl.appendChild(h('div', { class: 'log-line ' + (d.type === 'log' ? '' : d.type), text: pre + (Array.isArray(d.args) ? d.args.map(String) : []).join(' ') }));
-    while (consoleEl.childElementCount > WD1.MAX_CONSOLE_LINES) consoleEl.firstElementChild.remove();
+    consoleEl.appendChild(h('div', { class: 'log-line ' + (d.type === 'log' ? '' : d.type), text: pre + (d.args || []).join(' ') }));
     consoleEl.scrollTop = consoleEl.scrollHeight;
   });
   let timer = null, saveTimer = null;
@@ -232,9 +178,7 @@ WD1.ready(() => {
   sel.addEventListener('change', () => {
     const t = TEMPLATES[sel.value];
     if (!t) return;
-    clearTimeout(timer); clearTimeout(saveTimer);
-    ['html', 'css', 'js'].forEach((l) => { code[l] = t[l]; editors[l].set(t[l], true); });
-    WD1.store.set('custom', 'playground', code);
+    ['html', 'css', 'js'].forEach((l) => editors[l].set(t[l]));
     sel.value = '';
     $('#tp-status').textContent = 'Loaded template: ' + t.label;
     run();
@@ -284,7 +228,7 @@ WD1.ready(() => {
     WD1.toast('Downloaded index.html');
   });
   $('#tp-share').addEventListener('click', (e) => {
-    const b64 = b64Encode(JSON.stringify(code));
+    const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(code))));
     const url = location.href.split('#')[0] + '#code=' + encodeURIComponent(b64);
     WD1.copy(url, e.currentTarget);
   });

@@ -1,6 +1,2 @@
 # Course source document kept in the workspace, not part of the site
 syllabus-*.md
-
-# OS and local tooling
-.DS_Store
-node_modules/
