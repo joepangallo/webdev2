@@ -256,7 +256,14 @@ app.use((req, res, [[next]]) => {
       </script>
     </div>
 
-    <div class="quiz" data-title="Check your understanding: middleware">
+    <aside class="callout listen">
+  <strong>Hear it explained: Middleware</strong>
+  <p>About four minutes on the assembly line, the two exits every station has, and why a spinning page usually means a missing next.</p>
+  <audio controls preload="metadata" src="../audio/wk2-middleware.mp3" style="width:100%"></audio>
+  <p class="small"><a href="../audio/wk2-middleware-transcript.txt">Read the transcript</a> (text file).</p>
+</aside>
+
+  <div class="quiz" data-title="Check your understanding: middleware">
       <script type="application/json">
       [
         {"q": "What are the three arguments every middleware function receives, in order?", "shuffle": true, "choices": ["`req`, `res`, `next`", "`app`, `req`, `res`", "`request`, `response`, `route`", "`err`, `req`, `done`"], "answer": 0, "explain": "Middleware is a function `(req, res, next)`. You read from `req`, answer with `res`, and call `next()` to hand the request on."},
@@ -819,7 +826,14 @@ render();</textarea>
     </div>
     <p>Same page, same API, same state idea — the framework simply takes over the “keep the screen matched to the data” bookkeeping you did by hand. That trade is why frameworks exist, and why learning the vanilla version first was not wasted time: when a framework page misbehaves, the state underneath is still where you look.</p>
 
-    <div class="quiz" data-title="Check your understanding: single-page apps">
+    <aside class="callout listen">
+  <strong>Hear it explained: SPAs and Fetch</strong>
+  <p>About four and a half minutes on why the page cannot reach into the server’s memory — and what crosses the counter instead.</p>
+  <audio controls preload="metadata" src="../audio/wk2-spa-fetch.mp3" style="width:100%"></audio>
+  <p class="small"><a href="../audio/wk2-spa-fetch-transcript.txt">Read the transcript</a> (text file).</p>
+</aside>
+
+  <div class="quiz" data-title="Check your understanding: single-page apps">
       <script type="application/json">
       [
         {"q": "What makes an app a *single-page* application?", "shuffle": true, "choices": ["It has only one feature", "One HTML page loads once; JavaScript re-renders parts of it and gets data from an API", "It is served by a single server file", "It only works on one browser"], "answer": 1, "explain": "No full-page reloads. Navigation and updates are redraws driven by JavaScript, fed with JSON from API calls."},

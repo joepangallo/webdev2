@@ -193,7 +193,14 @@ About page</div>
       </script>
     </div>
 
-    <div class="quiz" data-title="Check your understanding: why servers?">
+    <aside class="callout listen">
+  <strong>Hear it explained: Why Servers — the Node Runtime</strong>
+  <p>About four and a half minutes on the one idea this section lives by: why the output prints 1, 3, 2 — the single thread that never waits.</p>
+  <audio controls preload="metadata" src="../audio/wk1-why-servers.mp3" style="width:100%"></audio>
+  <p class="small"><a href="../audio/wk1-why-servers-transcript.txt">Read the transcript</a> (text file).</p>
+</aside>
+
+  <div class="quiz" data-title="Check your understanding: why servers?">
       <script type="application/json">
       [
         {"q": "What makes a page **dynamic** rather than static?", "shuffle": true, "choices": ["It contains JavaScript in the browser", "A program builds the response when each request arrives, so it can differ per visitor", "It is stored on a server instead of a laptop", "It uses a database-shaped file name"], "answer": 1, "explain": "Dynamic means the answer is computed at request time. A static file was finished before anyone asked and is identical for every visitor."},
@@ -784,7 +791,14 @@ request this form would send to the server in express-post.js.</p></textarea>
       </script>
     </div>
 
-    <div class="quiz" data-title="Check your understanding: GET and POST">
+    <aside class="callout listen">
+  <strong>Hear it explained: GET and POST Handling</strong>
+  <p>About four minutes on where submitted data actually rides, and the missing-translator bug that leaves the body undefined.</p>
+  <audio controls preload="metadata" src="../audio/wk1-get-post.mp3" style="width:100%"></audio>
+  <p class="small"><a href="../audio/wk1-get-post-transcript.txt">Read the transcript</a> (text file).</p>
+</aside>
+
+  <div class="quiz" data-title="Check your understanding: GET and POST">
       <script type="application/json">
       [
         {"q": "Which request is the right tool for submitting a new password?", "shuffle": true, "choices": ["GET, with the password in the query string", "POST, with the password in the request body", "GET, because forms always use GET", "Either — they are identical"], "answer": 1, "explain": "Query strings are visible in the address bar, history and logs. Secrets travel in a POST body, never in a URL."},

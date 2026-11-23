@@ -190,7 +190,14 @@ stored as : salt + ':' + hash, in a single column</div>
       <script type="text/plain">Proving who a user is is called [[authentication]]. Deciding what that user may do is called [[authorization]]. You store a one-way fingerprint of the password called a [[hash]], mixed with a random per-user value called a [[salt]].</script>
     </div>
 
-    <div class="quiz" data-title="Check your understanding: authentication, authorization and hashing">
+    <aside class="callout listen">
+  <strong>Hear it explained: Hashing and Passwords</strong>
+  <p>Under four minutes on a fingerprint, not a locked box — what really happens to a password.</p>
+  <audio controls preload="metadata" src="../audio/wk4-hashing.mp3" style="width:100%"></audio>
+  <p class="small"><a href="../audio/wk4-hashing-transcript.txt">Read the transcript</a> (text file).</p>
+</aside>
+
+  <div class="quiz" data-title="Check your understanding: authentication, authorization and hashing">
       <script type="application/json">
       [
         {"q": "A signed-in student opens the grade-entry page and the server replies 403 Forbidden. Which question did the server just answer?", "shuffle": true, "choices": ["Authentication — who are you?", "Authorization — what may you do?"], "answer": 1, "explain": "The student was already identified, so authentication had succeeded. Blocking one action for a known user is authorization."},
@@ -540,7 +547,14 @@ Content-Type: application/json
 {"error":"Missing or invalid token"}</div>
     <p>Same route, same server — the only difference is whether a verifiable token arrived with the request. A 200 means the signature checked out and the claims could be trusted; a 401 means identity was never proven, exactly as it did for sessions in Section 4.2.</p>
 
-    <div class="quiz" data-title="Check your understanding: tokens and JWTs">
+    <aside class="callout listen">
+  <strong>Hear it explained: JSON Web Tokens</strong>
+  <p>About four minutes on signed, not secret: anyone can read a token; only verification earns trust.</p>
+  <audio controls preload="metadata" src="../audio/wk4-jwt.mp3" style="width:100%"></audio>
+  <p class="small"><a href="../audio/wk4-jwt-transcript.txt">Read the transcript</a> (text file).</p>
+</aside>
+
+  <div class="quiz" data-title="Check your understanding: tokens and JWTs">
       <script type="application/json">
       [
         {"q": "What are the three parts of a JWT, in order?", "shuffle": true, "choices": ["Header, payload, signature", "Username, password, session ID", "Cookie, session, token", "Header, body, footer"], "answer": 0, "explain": "A JWT is `header.payload.signature`, joined by dots. The first two parts are Base64URL-encoded JSON; the third is computed from them plus the secret."},

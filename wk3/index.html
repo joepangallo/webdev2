@@ -344,7 +344,14 @@ Lines: 2</div>
 
     <p>You need a program whose whole job is storing data well: keeping it safe, finding any piece of it quickly, and serving many programs at once. That program is a database, and it is where this week goes next.</p>
 
-    <div class="quiz" data-title="Check your understanding: sessions and files">
+    <aside class="callout listen">
+  <strong>Hear it explained: Sessions</strong>
+  <p>About four minutes on the coat check: your cookie carries a ticket number, never your data.</p>
+  <audio controls preload="metadata" src="../audio/wk3-sessions.mp3" style="width:100%"></audio>
+  <p class="small"><a href="../audio/wk3-sessions-transcript.txt">Read the transcript</a> (text file).</p>
+</aside>
+
+  <div class="quiz" data-title="Check your understanding: sessions and files">
       <script type="application/json">
       [
         {"q": "In a session-based app, what does the visitor's cookie actually contain?", "shuffle": true, "choices": ["Only a random session ID — the real data stays on the server", "The visitor's full profile and cart", "A copy of the server's database", "The visitor's password, encrypted"], "answer": 0, "explain": "The cookie is just a ticket. The data lives server-side under that ID, so there is nothing worth stealing or editing in the cookie itself."},
@@ -511,7 +518,14 @@ Lines: 2</div>
       </script>
     </div>
 
-    <div class="quiz" data-title="Check your understanding: two families of database">
+    <aside class="callout listen">
+  <strong>Hear it explained: Relational vs Non-Relational</strong>
+  <p>About four minutes on where a fact lives, and why that decides what it costs to change it.</p>
+  <audio controls preload="metadata" src="../audio/wk3-relational.mp3" style="width:100%"></audio>
+  <p class="small"><a href="../audio/wk3-relational-transcript.txt">Read the transcript</a> (text file).</p>
+</aside>
+
+  <div class="quiz" data-title="Check your understanding: two families of database">
       <script type="application/json">
       [
         {"q": "What is a schema?", "shuffle": true, "choices": ["The plan declared in advance that says what columns a table has and what kind of value each holds", "A backup copy of the database", "The password for the database server", "A report the database prints each night"], "answer": 0, "explain": "A schema is the structure declared up front. A relational database enforces it: data that does not fit the plan is rejected."},
