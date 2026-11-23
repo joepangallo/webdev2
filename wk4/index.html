@@ -743,7 +743,14 @@ function requireRole(role) {
       </script>
     </div>
 
-    <div class="quiz" data-title="Check your understanding: roles and protected routes">
+    <aside class="callout listen">
+  <strong>Hear it explained: Authorization — Roles and Protected Routes</strong>
+  <p>About four and a half minutes on the two questions every protected route asks — who are you, and may you do this — and why a 401 and a 403 are different kinds of no.</p>
+  <audio controls preload="metadata" src="../audio/wk4-authorization.mp3" style="width:100%"></audio>
+  <p class="small"><a href="../audio/wk4-authorization-transcript.txt">Read the transcript</a> (text file).</p>
+</aside>
+
+  <div class="quiz" data-title="Check your understanding: roles and protected routes">
       <script type="application/json">
       [
         {"q": "A signed-in student sends a request to a route guarded by `requireRole('instructor')`. What comes back?", "shuffle": true, "choices": ["`200`, because the student is logged in", "`401`, because the role is wrong", "`403`, because the student is known but not allowed", "`404`, because the route is hidden"], "answer": 2, "explain": "Authentication already succeeded — the server knows this is a student. Failing the permission check for a known user is 403 Forbidden."},
