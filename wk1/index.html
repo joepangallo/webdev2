@@ -301,7 +301,7 @@ Server listening on http://localhost:3000</div>
     <p>Look at the shape of the handler once more. It is a chain of <code>if / else if / else</code> tests on <code>req.url</code> — that chain <em>is</em> routing, done by hand. Every path needs its own branch, its own <code>writeHead</code>, its own <code>end</code>. Two pages took twenty lines. Imagine forty pages, plus forms, plus JSON. Hold that thought until Section 1.4.</p>
 
     <h3>Ports: the numbered doors</h3>
-    <p>One computer runs many programs that use the network, so an address alone is not enough — the request also names a <strong>port</strong>, a number from 0 to 65535 that identifies which listening program should receive it. You met ports in Web Dev I with addresses like <code>localhost:5500</code>. Three ports matter this week:</p>
+    <p>One computer runs many programs that use the network, so an address alone is not enough — the request also names a <strong>port</strong>, a number from 0 to 65535 that identifies which listening program should receive it. You met ports in Web Dev I with addresses like <code>localhost:5500</code>. Three ports matter this week, and three more join the course later:</p>
     <div class="table-wrap">
       <table class="data-table">
         <thead><tr><th scope="col">Port</th><th scope="col">Used for</th><th scope="col">Why you care</th></tr></thead>
@@ -309,6 +309,9 @@ Server listening on http://localhost:3000</div>
           <tr><th scope="row"><code>80</code></th><td>Plain HTTP on the public web</td><td>The default: <code>http://</code> addresses quietly mean port 80, so it is never written out.</td></tr>
           <tr><th scope="row"><code>443</code></th><td>HTTPS — HTTP with encryption</td><td>The default for <code>https://</code>. Real sites live here.</td></tr>
           <tr><th scope="row"><code>3000</code></th><td>Nothing official — a common development choice</td><td>High enough to avoid the reserved low ports, easy to type and remember. Every example in this course uses it, so <code>http://localhost:3000</code> will become muscle memory.</td></tr>
+          <tr><th scope="row"><code>5173</code></th><td>The Vite dev server — your Vue front end in Week 2</td><td>Your page and your API will live on different ports, which is exactly why Week 2 needs CORS.</td></tr>
+          <tr><th scope="row"><code>3306</code></th><td>MySQL</td><td>Week 3: your Node app connects here when it talks to a MySQL database.</td></tr>
+          <tr><th scope="row"><code>27017</code></th><td>MongoDB</td><td>Week 3: the MongoDB server listens here — a connection error naming this port almost always means the database is not running.</td></tr>
         </tbody>
       </table>
     </div>
@@ -718,7 +721,7 @@ $ curl -X POST http://localhost:3000/signup -H "Content-Type: application/json" 
 --- server console ---
 Listening on port 3000</div>
 
-    <p>Two different body formats went in; the same shape of answer came out, because <code>req.body</code> held <code>{ name: 'Ada', plan: 'free' }</code> the first time and <code>{ name: 'Ada', plan: 'pro' }</code> the second. Forget both translators and <code>req.body</code> is empty — the single most common beginner bug with POST, and now you know its cause before you ever meet it.</p>
+    <p>Two different body formats went in; the same shape of answer came out, because <code>req.body</code> held <code>{ name: 'Ada', plan: 'free' }</code> the first time and <code>{ name: 'Ada', plan: 'pro' }</code> the second. Forget both translators and <code>req.body</code> is undefined in Express 5 — the single most common beginner bug with POST, and now you know its cause before you ever meet it.</p>
 
     <p><strong>Example — one book, from body text to req.body:</strong></p>
     <div class="output">Body as it arrives (form encoding, exactly as the raw POST above sent it):
