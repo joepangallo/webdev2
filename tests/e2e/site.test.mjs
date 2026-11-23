@@ -1425,3 +1425,62 @@ test('live runner: Node scripts, Express servers, cookies/sessions, MongoDB, SQL
   })()`);
   assert.equal(phoneOverflow, 0, 'open server runner panel does not cause horizontal overflow on a 390px phone');
 });
+
+test('line-by-line code inspector: numbered lines, Who/What/Where/When/Why, glossary chips and phone fit', async () => {
+  await fresh('wk2/index.html');
+  const r = await page.eval(`(() => {
+    const blocks = Array.from(document.querySelectorAll('.code-block.has-inspector'));
+    const rest = blocks.find((b) => (b.querySelector('.code-lang')?.textContent || '').includes('rest-api.js'));
+    const rows = rest.querySelectorAll('.code-ln-row');
+    // Click line 1 (require('express'))
+    rows[0].click();
+    const open = !rest.querySelector('.line-inspector').hidden;
+    const labels = Array.from(rest.querySelectorAll('.five dt')).map((d) => d.textContent);
+    const what1 = rest.querySelector('.five-what dd').textContent;
+    // Click Next button to advance to line 2
+    rest.querySelector('.insp-next').click();
+    const head2 = rest.querySelector('.insp-line').textContent;
+    // Click a glossary term chip on line 2 (express)
+    const termBtn = rest.querySelector('.insp-term');
+    if (termBtn) termBtn.click();
+    const defText = rest.querySelector('.insp-term-def')?.textContent || '';
+    // Click a closing brace line to verify opener pairing
+    const closerRow = Array.from(rows).find((r) => r.querySelector('.code-ln-src').textContent.trim() === '});');
+    closerRow.click();
+    const closerWhat = rest.querySelector('.five-what dd').textContent;
+    // Hide inspector
+    rest.querySelector('.insp-close').click();
+    const closed = rest.querySelector('.line-inspector').hidden;
+    // Verify SQL block on wk3 later, and verify button sizes while open on a block
+    rows[0].click();
+    const smallBtns = Array.from(rest.querySelectorAll('.line-inspector button')).filter((b) => {
+      const box = b.getBoundingClientRect();
+      return box.width < 24 || box.height < 24;
+    }).length;
+    return { count: blocks.length, rows: rows.length, open, labels, what1, head2, defText, closerWhat, closed, smallBtns };
+  })()`);
+  assert.ok(r.count >= 60, 'every code block on wk2 mounts the line inspector');
+  assert.ok(r.rows > 20);
+  assert.equal(r.open, true);
+  assert.deepEqual(r.labels, ['Who', 'What', 'Where', 'When', 'Why']);
+  assert.match(r.what1, /express/i);
+  assert.match(r.head2, /^Line 2 of /);
+  assert.ok(r.defText.length > 20, 'clicking a glossary chip shows its definition');
+  assert.match(r.closerWhat, /Closes what line \d+ opened/);
+  assert.equal(r.closed, true);
+  assert.equal(r.smallBtns, 0, 'all inspector buttons meet >= 24px tap target size');
+
+  // Verify open inspector on a 390px phone has 0px horizontal overflow
+  await fresh('wk3/index.html', { ...PHONE, settle: 400 });
+  const over = await page.eval(`(() => {
+    const sql = Array.from(document.querySelectorAll('.code-block.has-inspector'))
+      .find((b) => (b.querySelector('.code-lang')?.textContent || '').includes('linking authors and books'));
+    sql.querySelector('.insp-trigger').click();
+    return {
+      over: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      what: sql.querySelector('.five-what dd').textContent
+    };
+  })()`);
+  assert.equal(over.over, 0, 'open line inspector does not overflow a 390px phone');
+  assert.match(over.what, /authors/i);
+});

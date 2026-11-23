@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="../assets/css/course.css">
   <script src="../assets/js/course.js"></script>
   <script src="../assets/js/runner.js"></script>
+  <script src="../assets/js/inspector.js"></script>
   <style>
     /* ===== Week 2 page styles. Every selector is prefixed wk2- ===== */
     .wk2-cap { font-size: .85rem; color: var(--ink-3); margin: 14px 0 6px; }
@@ -53,19 +54,19 @@
     <h3>One program, both mechanisms</h3>
     <p>This short program uses both. Read it before you look at the output, and predict what each request will return:</p>
     <script type="text/plain" class="code" data-lang="js" data-title="express-query.js" data-run="server" data-presets='[{"label":"/greet?name=Ada","method":"GET","path":"/greet?name=Ada"},{"label":"/greet","method":"GET","path":"/greet"},{"label":"/users/42","method":"GET","path":"/users/42"}]'>
-      const express = require('express');
-      const app = express();
+      const express = require('express'); // Loads the Express framework package.
+      const app = express(); // Creates the Express application instance.
 
-      app.get('/greet', (req, res) => {
-        const name = req.query.name || 'stranger';
-        res.json({ message: `Hello, ${name}!` });
+      app.get('/greet', (req, res) => { // Handles GET /greet with any optional query string.
+        const name = req.query.name || 'stranger'; // Reads ?name=... or falls back to 'stranger' when omitted.
+        res.json({ message: `Hello, ${name}!` }); // Sends the greeting back as a JSON object.
       });
 
-      app.get('/users/:id', (req, res) => {
-        res.json({ userId: req.params.id });
+      app.get('/users/:id', (req, res) => { // Matches /users/<anything> and captures it as req.params.id.
+        res.json({ userId: req.params.id }); // Returns the captured route parameter (always a string).
       });
 
-      app.listen(3000, () => console.log('Listening on port 3000'));
+      app.listen(3000, () => console.log('Listening on port 3000')); // Starts the HTTP server on port 3000.
     </script>
     <p>Two objects do all the work. <code>req.query</code> is an object Express builds from the query string: for <code>?name=Ada</code> it is <code>{ name: 'Ada' }</code>, and when there is no query string it is an empty object, which is why the code falls back to <code>'stranger'</code>. <code>req.params</code> holds the route parameters: for the path <code>/users/42</code> matched against <code>/users/:id</code>, it is <code>{ id: '42' }</code>. Notice the value is the <em>string</em> <code>'42'</code>, not the number 42 — everything that arrives in a URL is text, and converting it is your job when it matters.</p>
     <p class="wk2-cap"><strong>Real output</strong> — captured by running this exact program (Node 26, Express 5):</p>
@@ -103,70 +104,70 @@ Listening on port 3000</div>
       <div data-tab="1 · HTML (links &amp; filter form)">
         <p>The links choose <em>which</em> user via path segments (<code>/users/42</code>), while the GET form appends filter options as a query string (<code>/users/42/books?sort=title&amp;limit=5</code>).</p>
         <script type="text/plain" class="code" data-lang="html" data-title="catalog-nav.html">
-          <nav class="user-pills" aria-label="Pick a reader">
-            <a href="/users/42/books">Ada's shelf</a>
-            <a href="/users/7/books">Grace's shelf</a>
+          <nav class="user-pills" aria-label="Pick a reader"> <!-- Groups reader shelf links into a landmark navigation bar. -->
+            <a href="/users/42/books">Ada's shelf</a> <!-- Links to user 42 using a route parameter in the path. -->
+            <a href="/users/7/books">Grace's shelf</a> <!-- Links to user 7 on the same parameterized route. -->
           </nav>
 
-          <form class="filter-bar" method="get" action="/users/42/books">
-            <label for="sort-by">Sort by</label>
-            <select id="sort-by" name="sort">
-              <option value="title">Title (A–Z)</option>
-              <option value="year">Newest first</option>
+          <form class="filter-bar" method="get" action="/users/42/books"> <!-- GET form appends its controls as a ?key=value query string. -->
+            <label for="sort-by">Sort by</label> <!-- Pairs the visible label with the select control below. -->
+            <select id="sort-by" name="sort"> <!-- Sends its chosen option as the sort=... query parameter. -->
+              <option value="title">Title (A–Z)</option> <!-- Submits ?sort=title when selected. -->
+              <option value="year">Newest first</option> <!-- Submits ?sort=year when selected. -->
             </select>
 
-            <label for="max-items">Show</label>
-            <input id="max-items" type="number" name="limit" value="5" min="1" max="50">
+            <label for="max-items">Show</label> <!-- Pairs the visible label with the numeric limit field. -->
+            <input id="max-items" type="number" name="limit" value="5" min="1" max="50"> <!-- Sends limit=... bounded between 1 and 50. -->
 
-            <button type="submit">Apply</button>
+            <button type="submit">Apply</button> <!-- Submits the form to /users/42/books?sort=...&limit=... -->
           </form>
         </script>
       </div>
       <div data-tab="2 · CSS (pill nav &amp; filter bar)">
         <p>Flexbox lays out the reader links as rounded pills and keeps the filter controls aligned on one wrapping toolbar.</p>
         <script type="text/plain" class="code" data-lang="css" data-title="catalog-nav.css">
-          .user-pills {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-bottom: 14px;
+          .user-pills { /* Styles the horizontal row of reader shelf links. */
+            display: flex; /* Places links side by side in a flex row. */
+            flex-wrap: wrap; /* Wraps pills onto a new line on narrow screens. */
+            gap: 8px; /* Adds consistent spacing between pills. */
+            margin-bottom: 14px; /* Separates the pill bar from the filter form below. */
           }
-          .user-pills a {
-            padding: 6px 14px;
-            border-radius: 99px;
-            background: #eef4ff;
-            color: #1f4fd1;
-            font-weight: 700;
-            text-decoration: none;
+          .user-pills a { /* Turns each nav link into a rounded pill button. */
+            padding: 6px 14px; /* Gives each pill comfortable click space. */
+            border-radius: 99px; /* Rounds the ends into a full capsule shape. */
+            background: #eef4ff; /* Soft blue background tint for the pill. */
+            color: #1f4fd1; /* High-contrast blue text color. */
+            font-weight: 700; /* Bold label so links are easy to scan. */
+            text-decoration: none; /* Removes the default browser underline. */
           }
-          .filter-bar {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 10px;
-            padding: 12px;
-            background: #f8fafc;
-            border: 1px solid #cbd5e1;
-            border-radius: 8px;
+          .filter-bar { /* Styles the GET filter toolbar container. */
+            display: flex; /* Lines up labels, inputs, and button horizontally. */
+            flex-wrap: wrap; /* Lets controls wrap cleanly on narrow viewports. */
+            align-items: center; /* Vertically centers labels beside form inputs. */
+            gap: 10px; /* Keeps breathing room between every control. */
+            padding: 12px; /* Adds inner cushion around the toolbar controls. */
+            background: #f8fafc; /* Light slate surface to frame the toolbar. */
+            border: 1px solid #cbd5e1; /* Subtle border defining the toolbar edge. */
+            border-radius: 8px; /* Softens the toolbar corners. */
           }
-          .filter-bar input,
-          .filter-bar select {
-            padding: 6px 8px;
-            border: 1px solid #94a3b8;
-            border-radius: 6px;
-            font: inherit;
+          .filter-bar input, /* Shares consistent control styling across number inputs... */
+          .filter-bar select { /* ...and select dropdowns inside the filter bar. */
+            padding: 6px 8px; /* Adds inner padding so text doesn't touch the border. */
+            border: 1px solid #94a3b8; /* Crisp outline around each form control. */
+            border-radius: 6px; /* Slightly rounded input corners. */
+            font: inherit; /* Matches the page's font family and size. */
           }
         </script>
       </div>
       <div data-tab="3 · Browser JS (building URLs safely)">
         <p>When browser JavaScript calls the same endpoint dynamically, build the query string with <code>URLSearchParams</code> so spaces and punctuation are encoded safely.</p>
         <script type="text/plain" class="code" data-lang="js" data-title="catalog-client.js (browser JS)">
-          async function fetchUserBooks(userId, sort, limit) {
+          async function fetchUserBooks(userId, sort, limit) { // Fetches one reader's shelf with sort and limit options.
             // Route parameter goes in the path; options go in URLSearchParams
-            const params = new URLSearchParams({ sort, limit: String(limit) });
-            const url = `/users/${encodeURIComponent(userId)}/books?${params}`;
-            const res = await fetch(url);
-            return res.json();
+            const params = new URLSearchParams({ sort, limit: String(limit) }); // Safely encodes key=value pairs into a query string.
+            const url = `/users/${encodeURIComponent(userId)}/books?${params}`; // Combines an escaped path parameter with the query string.
+            const res = await fetch(url); // Sends the GET request and waits for the server's response.
+            return res.json(); // Parses the JSON response body into a JavaScript value.
           }
           // Produces: /users/42/books?sort=title&limit=5
         </script>
@@ -175,24 +176,24 @@ Listening on port 3000</div>
         <p>Notice the order: the specific route <code>/users/featured</code> sits <em>above</em> <code>/users/:userId/books</code>, and the handler reads both <code>req.params</code> and <code>req.query</code> while converting numeric strings safely.</p>
         <script type="text/plain" class="code" data-lang="js" data-title="multi-param-route.js (Express)" data-run="server" data-harness="wk2-app-excerpt" data-presets='[{"label":"/users/featured","method":"GET","path":"/users/featured"},{"label":"/users/42/books?sort=year&limit=5","method":"GET","path":"/users/42/books?sort=year&limit=5"},{"label":"/users/42/books/7","method":"GET","path":"/users/42/books/7"}]'>
           // Specific route FIRST so ':userId' never swallows the word 'featured'
-          app.get('/users/featured', (req, res) => {
-            res.json({ featured: ['Ada', 'Grace'] });
+          app.get('/users/featured', (req, res) => { // Handles the literal /users/featured path before dynamic routes.
+            res.json({ featured: ['Ada', 'Grace'] }); // Returns the featured reader list as JSON.
           });
 
           // Route with a parameter (:userId) AND optional query options (?sort=&limit=)
-          app.get('/users/:userId/books', (req, res) => {
-            const userId = Number(req.params.userId);
-            const sort = req.query.sort || 'title';
-            const limit = Number(req.query.limit) || 10;
+          app.get('/users/:userId/books', (req, res) => { // Captures :userId from the path and reads query options.
+            const userId = Number(req.params.userId); // Converts the URL parameter string into a number.
+            const sort = req.query.sort || 'title'; // Reads ?sort=... or defaults to 'title' when omitted.
+            const limit = Number(req.query.limit) || 10; // Converts ?limit=... to a number, falling back to 10 if missing/invalid.
 
-            res.json({ userId, sort, limit });
+            res.json({ userId, sort, limit }); // Echoes the parsed parameter and query options as JSON.
           });
 
           // Route with TWO parameters in one path
-          app.get('/users/:userId/books/:bookId', (req, res) => {
-            res.json({
-              userId: Number(req.params.userId),
-              bookId: Number(req.params.bookId)
+          app.get('/users/:userId/books/:bookId', (req, res) => { // Captures both :userId and :bookId from the URL path.
+            res.json({ // Sends both numeric IDs back in one JSON object.
+              userId: Number(req.params.userId), // Converts the captured user ID from string to number.
+              bookId: Number(req.params.bookId) // Converts the captured book ID from string to number.
             });
           });
         </script>
@@ -292,25 +293,25 @@ console.log(parseUrl('/search?tag=node&amp;tag=express'));</textarea>
     <h3>Watch the order happen</h3>
     <p>This program is deliberately tiny so the order is the whole lesson. Two middleware functions log a line and call <code>next()</code>; then the route handler logs its line and sends the response:</p>
     <script type="text/plain" class="code" data-lang="js" data-title="middleware-order.js" data-run="server" data-presets='[{"label":"/ (Watch console order)","method":"GET","path":"/"}]'>
-      const express = require('express');
-      const app = express();
+      const express = require('express'); // Loads the Express framework package.
+      const app = express(); // Creates the Express application instance.
 
-      app.use((req, res, next) => {
-        console.log('Middleware 1: request received');
-        next();
+      app.use((req, res, next) => { // Registers Station 1: runs first for every incoming request.
+        console.log('Middleware 1: request received'); // Logs the arrival in the server console.
+        next(); // Hands the request off to the next middleware in line.
       });
 
-      app.use((req, res, next) => {
-        console.log('Middleware 2: checking the request');
-        next();
+      app.use((req, res, next) => { // Registers Station 2: runs after Station 1 calls next().
+        console.log('Middleware 2: checking the request'); // Logs the second station in the server console.
+        next(); // Hands the request off to the matching route handler.
       });
 
-      app.get('/', (req, res) => {
-        console.log('Route handler: sending the response');
-        res.send('Done');
+      app.get('/', (req, res) => { // Final station: handles GET requests to the home path.
+        console.log('Route handler: sending the response'); // Logs that the request reached the route handler.
+        res.send('Done'); // Sends the response body and ends the request cycle.
       });
 
-      app.listen(3000, () => console.log('Listening on port 3000'));
+      app.listen(3000, () => console.log('Listening on port 3000')); // Starts the HTTP server on port 3000.
     </script>
     <p class="wk2-cap"><strong>Real output</strong> — captured by running this exact program (Node 26, Express 5). The client — here <code>curl</code> — receives one word; the server console tells the real story:</p>
     <div class="output wk2-output">$ curl http://localhost:3000/
@@ -358,9 +359,9 @@ Route handler: sending the response</div>
               (The client never sees server console.log output.)
             </script>
             <script type="text/plain" class="code" data-lang="js" data-title="Server — Station 1: Logger">
-              app.use((req, res, next) => {
-                console.log('Middleware 1: request received');
-                next(); // Pass req + res to Station 2
+              app.use((req, res, next) => { // Registers the first middleware station for all requests.
+                console.log('Middleware 1: request received'); // Records the visit on the server console.
+                next(); // Passes req and res forward to Station 2.
               });
             </script>
           </div>
@@ -373,9 +374,9 @@ Route handler: sending the response</div>
               (If the checker rejected here, client would get 401 now.)
             </script>
             <script type="text/plain" class="code" data-lang="js" data-title="Server — Station 2: Checker">
-              app.use((req, res, next) => {
-                console.log('Middleware 2: checking the request');
-                next(); // Request passed — move to the route handler
+              app.use((req, res, next) => { // Registers the second middleware station in the chain.
+                console.log('Middleware 2: checking the request'); // Logs that the request reached the checker station.
+                next(); // Request passed — moves control on to the route handler.
               });
             </script>
           </div>
@@ -390,9 +391,9 @@ Route handler: sending the response</div>
               Done
             </script>
             <script type="text/plain" class="code" data-lang="js" data-title="Server — Final Station: Route handler">
-              app.get('/', (req, res) => {
-                console.log('Route handler: sending the response');
-                res.send('Done'); // Ends the line — no next()
+              app.get('/', (req, res) => { // Matches GET / after every earlier middleware calls next().
+                console.log('Route handler: sending the response'); // Logs that the final handler is answering.
+                res.send('Done'); // Sends the response and ends the line — no next() call.
               });
             </script>
           </div>
@@ -403,15 +404,15 @@ Route handler: sending the response</div>
     <h3>A gatekeeper: middleware that says no</h3>
     <p>Most middleware passes requests along, but the pattern matters most when one refuses. Here is the checker from the stepper grown into a real gatekeeper: it looks for a header and turns the request away with a 401 — the status for “you have not shown a valid credential” — if the header is missing or wrong. This is a pattern sample — the shape to copy — not a captured run:</p>
     <script type="text/plain" class="code" data-lang="js" data-title="A gatekeeper middleware (pattern)" data-run="server" data-harness="wk2-gatekeeper" data-presets='[{"label":"/api/secret (No token 401)","method":"GET","path":"/api/secret"},{"label":"/api/secret (With x-token 200)","method":"GET","path":"/api/secret","headers":{"x-token":"let-me-in"}},{"label":"/public (200)","method":"GET","path":"/public"}]'>
-      function requireToken(req, res, next) {
-        if (req.headers['x-token'] === 'let-me-in') {
-          next(); // token is good: move down the line
-        } else {
-          res.status(401).json({ error: 'Unauthorized' }); // no next(): the line stops here
+      function requireToken(req, res, next) { // Custom gatekeeper middleware that checks an access header.
+        if (req.headers['x-token'] === 'let-me-in') { // Express lowercases header names, so check 'x-token'.
+          next(); // Token is valid: let the request continue down the line.
+        } else { // Runs whenever the token header is missing or wrong.
+          res.status(401).json({ error: 'Unauthorized' }); // Replies 401 and omits next() so the line stops here.
         }
       }
 
-      app.use('/api', requireToken);
+      app.use('/api', requireToken); // Mounts the gatekeeper only on paths starting with /api.
     </script>
     <p>Read the two exits carefully, because every middleware you ever write has exactly these two: <strong>call <code>next()</code></strong> (the request continues) or <strong>send a response</strong> (the request ends here). The bug in the callout below is simply a middleware that takes neither exit. In Week 4 this exact shape — mounted on <code>/api</code>, checking a credential, answering or passing — becomes real login protection.</p>
 
@@ -420,48 +421,48 @@ Route handler: sending the response</div>
       <div data-tab="1 · Client HTML">
         <p>Collects the token value and displays the server's allow/deny verdict inside an accessible status box.</p>
         <script type="text/plain" class="code" data-lang="html" data-title="gatekeeper-client.html">
-          <form id="gate-form" class="gate-box">
-            <label for="api-token">Access token</label>
-            <input id="api-token" name="token" type="text" placeholder="Enter token">
-            <button type="submit">Request /api/secret</button>
-            <p id="gate-result" class="gate-status" role="status" hidden></p>
+          <form id="gate-form" class="gate-box"> <!-- Collects the token and submits via JS fetch instead of reloading. -->
+            <label for="api-token">Access token</label> <!-- Connects the visible label to the token input below. -->
+            <input id="api-token" name="token" type="text" placeholder="Enter token"> <!-- Lets the user type a token to send in the x-token header. -->
+            <button type="submit">Request /api/secret</button> <!-- Triggers the form's submit event handler. -->
+            <p id="gate-result" class="gate-status" role="status" hidden></p> <!-- Shows the 200 or 401 verdict once a reply arrives; hidden initially. -->
           </form>
         </script>
       </div>
       <div data-tab="2 · Client CSS">
         <p>Distinct visual badges for an allowed response (<code>.is-ok</code>) vs. a 401 rejection (<code>.is-denied</code>).</p>
         <script type="text/plain" class="code" data-lang="css" data-title="gatekeeper-client.css">
-          .gate-box { max-width: 400px; display: grid; gap: 10px; padding: 16px; border: 1px solid #cbd5e1; border-radius: 10px; font-family: system-ui, sans-serif; }
-          .gate-box input { padding: 8px 10px; border: 1px solid #94a3b8; border-radius: 6px; font: inherit; }
-          .gate-box button { padding: 9px 14px; border: 0; border-radius: 6px; background: #1f4fd1; color: #ffffff; font-weight: 700; cursor: pointer; }
-          .gate-status { margin: 0; padding: 8px 12px; border-radius: 6px; font-weight: 700; }
-          .gate-status.is-ok { background: #ecfdf5; color: #065f46; border: 1px solid #10b981; }
-          .gate-status.is-denied { background: #fef2f2; color: #991b1b; border: 1px solid #ef4444; }
+          .gate-box { max-width: 400px; display: grid; gap: 10px; padding: 16px; border: 1px solid #cbd5e1; border-radius: 10px; font-family: system-ui, sans-serif; } /* Stacks the form controls inside a bordered card. */
+          .gate-box input { padding: 8px 10px; border: 1px solid #94a3b8; border-radius: 6px; font: inherit; } /* Styles the token text box with clear borders and matching font. */
+          .gate-box button { padding: 9px 14px; border: 0; border-radius: 6px; background: #1f4fd1; color: #ffffff; font-weight: 700; cursor: pointer; } /* High-contrast primary submit button. */
+          .gate-status { margin: 0; padding: 8px 12px; border-radius: 6px; font-weight: 700; } /* Shared padding and bold weight for the status badge. */
+          .gate-status.is-ok { background: #ecfdf5; color: #065f46; border: 1px solid #10b981; } /* Green badge when the gatekeeper allows a 200 response. */
+          .gate-status.is-denied { background: #fef2f2; color: #991b1b; border: 1px solid #ef4444; } /* Red badge when the gatekeeper rejects with 401. */
         </script>
       </div>
       <div data-tab="3 · Client JS (attaching custom header)">
         <p>Attaches the custom <code>x-token</code> request header inside <code>fetch()</code> and reads the status code to tell whether the gatekeeper let the request reach the route.</p>
         <script type="text/plain" class="code" data-lang="js" data-title="gatekeeper-client.js (browser JS)">
-          const form = document.getElementById('gate-form');
-          const out = document.getElementById('gate-result');
+          const form = document.getElementById('gate-form'); // Grabs the form element so we can listen for submits.
+          const out = document.getElementById('gate-result'); // Grabs the status paragraph where the verdict appears.
 
-          form.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const token = form.elements.token.value.trim();
+          form.addEventListener('submit', async (event) => { // Runs asynchronously when the user submits the form.
+            event.preventDefault(); // Prevents the browser from reloading the page on submit.
+            const token = form.elements.token.value.trim(); // Reads the typed token and trims extra spaces.
 
-            const res = await fetch('/api/secret', {
-              headers: { 'x-token': token }
+            const res = await fetch('/api/secret', { // Calls the protected endpoint with a custom header.
+              headers: { 'x-token': token } // Attaches x-token so requireToken on the server can check it.
             });
-            const data = await res.json();
+            const data = await res.json(); // Parses the JSON response body (message or error).
 
-            out.hidden = false;
-            if (res.status === 401) {
-              out.className = 'gate-status is-denied';
-              out.textContent = `Denied (401): ${data.error}`;
-              return;
+            out.hidden = false; // Reveals the status badge now that a server reply arrived.
+            if (res.status === 401) { // Checks whether the gatekeeper turned the request away.
+              out.className = 'gate-status is-denied'; // Applies the red denied badge styling.
+              out.textContent = `Denied (401): ${data.error}`; // Displays the server's error message as plain text.
+              return; // Exits early so the success branch below does not run.
             }
-            out.className = 'gate-status is-ok';
-            out.textContent = `Allowed (200): ${data.message}`;
+            out.className = 'gate-status is-ok'; // Applies the green allowed styling for 200 OK.
+            out.textContent = `Allowed (200): ${data.message}`; // Displays the protected response message safely.
           });
         </script>
       </div>
@@ -479,23 +480,23 @@ Route handler: sending the response</div>
     <p><strong>Example — broken middleware (missing <code>next()</code>) vs. working request-stamping middleware:</strong></p>
     <div class="grid-2">
       <script type="text/plain" class="code" data-lang="js" data-title="Broken: hangs forever (no next, no response)" data-run="server" data-harness="wk2-hang" data-presets='[{"label":"/ (Watch 2s hang!)","method":"GET","path":"/"}]'>
-        app.use((req, res, next) => {
+        app.use((req, res, next) => { // Registers a global middleware station.
           // Stamps the request, logs it... and forgets next()!
-          req.requestTime = new Date().toISOString();
-          console.log(req.method, req.url);
+          req.requestTime = new Date().toISOString(); // Attaches an ISO timestamp to the shared req object.
+          console.log(req.method, req.url); // Logs the HTTP method and path on the server console.
           // Request stops dead here — the browser spins forever.
         });
       </script>
       <script type="text/plain" class="code" data-lang="js" data-title="Fixed: carries data down the line and calls next()" data-run="server" data-harness="wk2-app-excerpt" data-presets='[{"label":"/whoami","method":"GET","path":"/whoami"}]'>
-        app.use((req, res, next) => {
-          req.requestTime = new Date().toISOString();
-          console.log(req.method, req.url, 'at', req.requestTime);
-          next(); // Hand the stamped req to the next station
+        app.use((req, res, next) => { // Registers a global middleware that stamps every request.
+          req.requestTime = new Date().toISOString(); // Attaches a timestamp property directly onto req.
+          console.log(req.method, req.url, 'at', req.requestTime); // Logs the visit and its timestamp in the terminal.
+          next(); // Hands the stamped req object forward to the next station.
         });
 
-        app.get('/whoami', (req, res) => {
+        app.get('/whoami', (req, res) => { // Handles GET /whoami using the exact same req object.
           // Reads the property attached by the earlier station:
-          res.json({ arrivedAt: req.requestTime });
+          res.json({ arrivedAt: req.requestTime }); // Sends back the timestamp attached by middleware above.
         });
       </script>
     </div>
@@ -531,12 +532,12 @@ app.use((req, res, [[next]]) => {
     <h3><code>express.static</code>: let Express serve your files</h3>
     <p>Most apps have files that never change per request: images, CSS, client-side JavaScript, plain text files. Writing a route for each one would be silly. <strong><code>express.static</code></strong> is built-in middleware that maps a folder on disk to the web: a request for <code>/hello.txt</code> returns the file <code>public/hello.txt</code>, and a request for <code>/</code> returns <code>public/index.html</code> if it exists. If no file matches, static politely calls <code>next()</code> and the request continues down your line.</p>
     <script type="text/plain" class="code" data-lang="js" data-title="static-server.js" data-run="server" data-harness="wk2-static" data-presets='[{"label":"/ (index.html)","method":"GET","path":"/"},{"label":"/hello.txt","method":"GET","path":"/hello.txt"},{"label":"/styles.css","method":"GET","path":"/styles.css"},{"label":"/missing.txt (404)","method":"GET","path":"/missing.txt"}]'>
-      const express = require('express');
-      const app = express();
+      const express = require('express'); // Loads the Express framework package.
+      const app = express(); // Creates the Express application instance.
 
-      app.use(express.static('public'));
+      app.use(express.static('public')); // Serves files from public/ directly at matching URLs.
 
-      app.listen(3000, () => console.log('Listening on port 3000'));
+      app.listen(3000, () => console.log('Listening on port 3000')); // Starts the HTTP server on port 3000.
     </script>
     <p>The whole server is five lines because the middleware does the work. It serves these two files from the <code>public</code> folder:</p>
     <div class="grid-2">
@@ -544,7 +545,7 @@ app.use((req, res, [[next]]) => {
         Hello from the public folder!
       </script>
       <script type="text/plain" class="code" data-lang="html" data-title="public/index.html">
-        <h1>Static home page</h1>
+        <h1>Static home page</h1> <!-- Served automatically by express.static when a visitor requests /. -->
       </script>
     </div>
     <p class="wk2-cap"><strong>Real output</strong> — captured by running this exact program (Node 26, Express 5):</p>
@@ -561,19 +562,19 @@ Listening on port 3000</div>
       <div data-tab="public/index.html (URL: /)">
         <p>Notice the paths are <code>/style.css</code> and <code>/app.js</code> — <strong>never</strong> <code>/public/style.css</code>, because the folder name <code>public</code> is stripped from the URL.</p>
         <script type="text/plain" class="code" data-lang="html" data-title="public/index.html">
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-            <meta charset="utf-8">
-            <title>Static Assets Demo</title>
-            <link rel="stylesheet" href="/style.css">
+          <!DOCTYPE html> <!-- Declares HTML5 so the browser renders in standards mode. -->
+          <html lang="en"> <!-- Root element with English set for accessibility. -->
+          <head> <!-- Holds page metadata and external stylesheets. -->
+            <meta charset="utf-8"> <!-- Uses UTF-8 so all characters display properly. -->
+            <title>Static Assets Demo</title> <!-- Sets the browser tab title. -->
+            <link rel="stylesheet" href="/style.css"> <!-- Requests public/style.css (never include /public in the URL). -->
           </head>
-          <body>
-            <main class="box">
-              <h1>Served by express.static</h1>
-              <p id="status">Waiting for browser JavaScript...</p>
+          <body> <!-- Visible content rendered in the browser window. -->
+            <main class="box"> <!-- Landmark wrapper styled as a centered card. -->
+              <h1>Served by express.static</h1> <!-- Main heading delivered straight from disk. -->
+              <p id="status">Waiting for browser JavaScript...</p> <!-- Placeholder text replaced once /app.js runs. -->
             </main>
-            <script src="/app.js" defer><\/script>
+            <script src="/app.js" defer><\/script> <!-- Loads public/app.js and runs it after HTML parsing finishes. -->
           </body>
           </html>
         </script>
@@ -581,16 +582,16 @@ Listening on port 3000</div>
       <div data-tab="public/style.css (URL: /style.css)">
         <p>Express spots the <code>.css</code> extension and automatically attaches <code>Content-Type: text/css; charset=utf-8</code>.</p>
         <script type="text/plain" class="code" data-lang="css" data-title="public/style.css">
-          body { font-family: system-ui, sans-serif; margin: 32px auto; max-width: 560px; padding: 0 16px; }
-          .box { padding: 20px; border: 1px solid #cbd5e1; border-radius: 10px; background: #f8fafc; }
-          .box h1 { margin-top: 0; color: #1f4fd1; }
+          body { font-family: system-ui, sans-serif; margin: 32px auto; max-width: 560px; padding: 0 16px; } /* Centers a readable page column using the system font. */
+          .box { padding: 20px; border: 1px solid #cbd5e1; border-radius: 10px; background: #f8fafc; } /* Frames the main content inside a light bordered card. */
+          .box h1 { margin-top: 0; color: #1f4fd1; } /* Removes extra top gap and highlights the card heading in blue. */
         </script>
       </div>
       <div data-tab="public/app.js (URL: /app.js)">
         <p>Express spots the <code>.js</code> extension and sends it as browser JavaScript; the <code>defer</code> attribute waits until the HTML is parsed before running it.</p>
         <script type="text/plain" class="code" data-lang="js" data-title="public/app.js (runs in browser)">
-          document.getElementById('status').textContent =
-            'Loaded /app.js cleanly from the public folder!';
+          document.getElementById('status').textContent = // Finds the #status paragraph and sets its plain text.
+            'Loaded /app.js cleanly from the public folder!'; // Confirms the static JS file downloaded and ran.
         </script>
       </div>
     </div>
@@ -612,13 +613,13 @@ Listening on port 3000</div>
     <h3><code>morgan</code>: a logger that writes your server's diary</h3>
     <p><strong>morgan</strong> is a third-party middleware package (<code>npm install morgan</code>) that logs one line per request: the method, the path, the status code your server answered with, how long it took, and the size of the response. During development it is the fastest way to see what your server is actually being asked for. Its <code>'dev'</code> format is the one used in most tutorials:</p>
     <script type="text/plain" class="code" data-lang="js" data-title="morgan-demo.js" data-run="server" data-presets='[{"label":"/ (200)","method":"GET","path":"/"},{"label":"/missing-test (404)","method":"GET","path":"/missing-test"}]'>
-      const express = require('express');
-      const morgan = require('morgan');
-      const app = express();
-      app.use(morgan('dev'));
-      app.get('/', (req, res) => res.send('Home'));
-      app.get('/missing-test', (req, res) => res.status(404).json({ error: 'Book not found' }));
-      app.listen(3000, () => console.log('Listening on port 3000'));
+      const express = require('express'); // Loads the Express framework package.
+      const morgan = require('morgan'); // Loads the third-party morgan request logger.
+      const app = express(); // Creates the Express application instance.
+      app.use(morgan('dev')); // Logs method, path, status, response time, and size for every request.
+      app.get('/', (req, res) => res.send('Home')); // Answers GET / with 200 OK and a 4-byte body.
+      app.get('/missing-test', (req, res) => res.status(404).json({ error: 'Book not found' })); // Answers with 404 and a 26-byte JSON error body.
+      app.listen(3000, () => console.log('Listening on port 3000')); // Starts the HTTP server on port 3000.
     </script>
     <p class="wk2-cap"><strong>Real output</strong> — captured by running this exact program (Node 26, Express 5, morgan 'dev'). One request was made to <code>/</code> and one to <code>/missing-test</code>, both with <code>curl</code>. Response times differ on every run — the format is the lesson:</p>
     <div class="output wk2-output">Listening on port 3000
@@ -644,18 +645,18 @@ GET /missing-test 404 1.073 ms - 26</div>
     <h3>All three shelves in one file</h3>
     <p>A realistic Week 2 server start combines all of it. Notice the order — logger first so nothing escapes the diary, translators next so bodies are ready, static files, and only then the routes and APIs from the rest of the week:</p>
     <script type="text/plain" class="code" data-lang="js" data-title="A typical Week 2 app skeleton">
-      const express = require('express');
-      const morgan = require('morgan');
-      const app = express();
+      const express = require('express'); // Loads the Express framework package.
+      const morgan = require('morgan'); // Loads the third-party request logger package.
+      const app = express(); // Creates the Express application instance.
 
-      app.use(morgan('dev'));              // third-party: the diary
-      app.use(express.json());             // built-in: JSON bodies -> req.body
-      app.use(express.urlencoded({ extended: true })); // built-in: form bodies -> req.body
-      app.use(express.static('public'));   // built-in: the front end and its files
+      app.use(morgan('dev')); // Third-party: logs every request near the top of the line.
+      app.use(express.json()); // Built-in: parses JSON request bodies into req.body.
+      app.use(express.urlencoded({ extended: true })); // Built-in: parses HTML form bodies into req.body.
+      app.use(express.static('public')); // Built-in: serves the front end and its static files.
 
       // ...your routes and routers go here (Sections 2.4 and 2.6)...
 
-      app.listen(3000, () => console.log('Listening on port 3000'));
+      app.listen(3000, () => console.log('Listening on port 3000')); // Starts the HTTP server on port 3000.
     </script>
     <p>Four lines of setup, and every request that ever arrives is logged, translated and offered the static files before your own handlers see it. Most Express apps you will ever read start with some version of this block — recognizing it is like recognizing the first chord of a song.</p>
 
@@ -784,11 +785,12 @@ GET /missing-test 404 1.073 ms - 26</div>
     </div>
     <p>The difference is one character: the comma after the last pair in the broken sample. JavaScript object literals forgive a trailing comma; JSON does not. Hand the broken text to <code>JSON.parse</code> — the function <code>express.json()</code> uses to translate request bodies — and it refuses the whole document:</p>
     <script type="text/plain" class="code" data-lang="js" data-title="parse-book.js" data-run="node">
+      // Broken JSON text: the trailing comma after Tolkien's name is illegal in strict JSON.
       const text = `{
         "title": "The Hobbit",
         "author": "J.R.R. Tolkien",
-      }`;
-      const book = JSON.parse(text);
+      }`; // Ends the raw JSON text (kept broken on purpose to trigger SyntaxError).
+      const book = JSON.parse(text); // Throws SyntaxError when JSON.parse reaches the closing brace after the comma.
     </script>
     <p class="wk2-cap"><strong>Real output</strong> — captured by running this exact program (Node 26):</p>
     <div class="output wk2-output">$ node parse-book.js
@@ -799,55 +801,55 @@ SyntaxError: Expected double-quoted property name in JSON at position 57 (line 4
     <h3>The complete API</h3>
     <p>Here is the whole thing: a book collection API with all five operations. The data lives in an ordinary array in memory — no database yet (that is Week 3), so restarting the server resets the collection to the two starter books. One line near the top is not for the API at all: <code>app.use(express.static('public'))</code> serves whatever is in a folder named <code>public</code> next to this file. That folder can be missing for now; Section 2.5 puts a front-end page in it.</p>
     <script type="text/plain" class="code" data-lang="js" data-title="rest-api.js" data-run="server" data-harness="wk2-static" data-presets='[{"label":"List books","method":"GET","path":"/api/books"},{"label":"Book #1","method":"GET","path":"/api/books/1"},{"label":"Book #99 (404)","method":"GET","path":"/api/books/99"},{"label":"Add book (201)","method":"POST","path":"/api/books","headers":{"Content-Type":"application/json"},"body":"{\"title\":\"The Hobbit\",\"author\":\"J.R.R. Tolkien\"}"},{"label":"Bad body (400)","method":"POST","path":"/api/books","headers":{"Content-Type":"application/json"},"body":"{\"title\":\"Only a title\"}"},{"label":"Update #1 (200)","method":"PUT","path":"/api/books/1","headers":{"Content-Type":"application/json"},"body":"{\"title\":\"Dune (revised)\",\"author\":\"Frank Herbert\"}"},{"label":"Delete #2 (204)","method":"DELETE","path":"/api/books/2"}]'>
-      const express = require('express');
-      const app = express();
-      app.use(express.json());
-      app.use(express.static('public'));
+      const express = require('express'); // Loads the Express framework package.
+      const app = express(); // Creates the Express application instance.
+      app.use(express.json()); // Parses incoming JSON request bodies into req.body.
+      app.use(express.static('public')); // Serves front-end files from public/ if present.
 
-      let books = [
-        { id: 1, title: 'Dune', author: 'Frank Herbert' },
-        { id: 2, title: 'Emma', author: 'Jane Austen' }
+      let books = [ // In-memory starter collection (resets whenever the server restarts).
+        { id: 1, title: 'Dune', author: 'Frank Herbert' }, // Starter book #1.
+        { id: 2, title: 'Emma', author: 'Jane Austen' } // Starter book #2.
       ];
-      let nextId = 3;
+      let nextId = 3; // Counter used to assign unique numeric IDs to new books.
 
-      app.get('/api/books', (req, res) => {
-        res.json(books);
+      app.get('/api/books', (req, res) => { // READ all: returns the full array of books.
+        res.json(books); // Sends 200 OK with the books array serialized as JSON.
       });
 
-      app.get('/api/books/:id', (req, res) => {
-        const book = books.find((b) => b.id === Number(req.params.id));
-        if (!book) return res.status(404).json({ error: 'Book not found' });
-        res.json(book);
+      app.get('/api/books/:id', (req, res) => { // READ one: looks up a single book by its URL :id.
+        const book = books.find((b) => b.id === Number(req.params.id)); // Converts string :id to a number before comparing.
+        if (!book) return res.status(404).json({ error: 'Book not found' }); // Stops early with 404 JSON if no book matches.
+        res.json(book); // Sends 200 OK with the matching book object.
       });
 
-      app.post('/api/books', (req, res) => {
-        if (!req.body || !req.body.title || !req.body.author) {
-          return res.status(400).json({ error: 'title and author are required' });
+      app.post('/api/books', (req, res) => { // CREATE: adds a new book from the JSON request body.
+        if (!req.body || !req.body.title || !req.body.author) { // Validates that both required fields arrived.
+          return res.status(400).json({ error: 'title and author are required' }); // Rejects invalid input with 400 Bad Request.
         }
-        const book = { id: nextId++, title: req.body.title, author: req.body.author };
-        books.push(book);
-        res.status(201).json(book);
+        const book = { id: nextId++, title: req.body.title, author: req.body.author }; // Builds the new record with the next server-assigned ID.
+        books.push(book); // Appends the new book to the in-memory collection.
+        res.status(201).json(book); // Sends 201 Created along with the saved book (including its ID).
       });
 
-      app.put('/api/books/:id', (req, res) => {
-        const book = books.find((b) => b.id === Number(req.params.id));
-        if (!book) return res.status(404).json({ error: 'Book not found' });
-        if (!req.body || !req.body.title || !req.body.author) {
-          return res.status(400).json({ error: 'title and author are required' });
+      app.put('/api/books/:id', (req, res) => { // UPDATE: replaces an existing book's title and author.
+        const book = books.find((b) => b.id === Number(req.params.id)); // Finds the target book by numeric ID.
+        if (!book) return res.status(404).json({ error: 'Book not found' }); // Replies 404 if the book does not exist.
+        if (!req.body || !req.body.title || !req.body.author) { // Ensures replacement fields are present before modifying.
+          return res.status(400).json({ error: 'title and author are required' }); // Replies 400 if either required field is missing.
         }
-        book.title = req.body.title;
-        book.author = req.body.author;
-        res.json(book);
+        book.title = req.body.title; // Overwrites the book's title with the new value.
+        book.author = req.body.author; // Overwrites the book's author with the new value.
+        res.json(book); // Sends 200 OK with the updated book JSON.
       });
 
-      app.delete('/api/books/:id', (req, res) => {
-        const i = books.findIndex((b) => b.id === Number(req.params.id));
-        if (i === -1) return res.status(404).json({ error: 'Book not found' });
-        books.splice(i, 1);
-        res.status(204).send();
+      app.delete('/api/books/:id', (req, res) => { // DELETE: removes one book by its :id.
+        const i = books.findIndex((b) => b.id === Number(req.params.id)); // Finds the book's array index (or -1 if absent).
+        if (i === -1) return res.status(404).json({ error: 'Book not found' }); // Replies 404 if no book had that ID.
+        books.splice(i, 1); // Removes that one item from the array in place.
+        res.status(204).send(); // Replies 204 No Content with an empty body.
       });
 
-      app.listen(3000, () => console.log('Listening on port 3000'));
+      app.listen(3000, () => console.log('Listening on port 3000')); // Starts the HTTP server on port 3000.
     </script>
     <p>Four details to carry away. First, <code>Number(req.params.id)</code>: parameters arrive as strings (Section 2.1), and the stored <code>id</code> is a number, so the comparison converts first — skip that and no book would ever be found. Second, the <code>404</code> answers are JSON too: <code>{"error":"Book not found"}</code>. An API client is a program, not a person, so even errors arrive in the format it can parse. Third, the <code>DELETE</code> handler answers <code>204</code> with no body at all — success, nothing to say. Fourth, the guard at the top of the <code>POST</code> and <code>PUT</code> handlers: if the body is missing, or has no title or no author, the handler answers <code>400</code> with a JSON error and returns before it touches the collection. That is validation in its smallest form — check what the client sent before you store it — and the <code>!req.body</code> test also covers the case from Section 2.3 where no body was translated at all, so the handler answers 400 instead of crashing.</p>
     <p class="wk2-cap"><strong>Real output</strong> — the full captured session, running this exact program (Node 26, Express 5) and driving it with <code>curl</code>, a command-line tool for making HTTP requests. The requests run in order against one running server, so you can watch the collection change:</p>
@@ -877,69 +879,69 @@ Listening on port 3000</div>
       <div data-tab="1 · Client HTML (REST controls)">
         <p>Provides a form for <code>POST /api/books</code>, a status indicator showing HTTP response codes, and a list where each item can trigger <code>PUT</code> or <code>DELETE</code>.</p>
         <script type="text/plain" class="code" data-lang="html" data-title="rest-client.html">
-          <section class="api-panel">
-            <h2>Book API Client</h2>
-            <p id="api-status" class="status-pill" aria-live="polite">Ready</p>
-            <form id="create-form" class="create-row">
-              <input name="title" placeholder="Title" required>
-              <input name="author" placeholder="Author" required>
-              <button type="submit">POST book</button>
+          <section class="api-panel"> <!-- Groups the REST API controls and live book list. -->
+            <h2>Book API Client</h2> <!-- Section heading for the front-end panel. -->
+            <p id="api-status" class="status-pill" aria-live="polite">Ready</p> <!-- Announces HTTP status outcomes to users and screen readers. -->
+            <form id="create-form" class="create-row"> <!-- Collects title and author for POST /api/books. -->
+              <input name="title" placeholder="Title" required> <!-- Required title input sent in the JSON body. -->
+              <input name="author" placeholder="Author" required> <!-- Required author input sent in the JSON body. -->
+              <button type="submit">POST book</button> <!-- Triggers the JS submit handler to create a book. -->
             </form>
-            <ul id="api-books" class="api-list"></ul>
+            <ul id="api-books" class="api-list"></ul> <!-- Empty list that JS populates with items from GET /api/books. -->
           </section>
         </script>
       </div>
       <div data-tab="2 · Client CSS (status pills &amp; list)">
         <p>Styles the toolbar and visually separates 2xx success pills from 4xx error pills while keeping readable text contrast.</p>
         <script type="text/plain" class="code" data-lang="css" data-title="rest-client.css">
-          .api-panel { max-width: 560px; font-family: system-ui, sans-serif; }
-          .status-pill { display: inline-block; padding: 3px 10px; border-radius: 99px; font-size: 0.82rem; font-weight: 700; background: #e2e8f0; color: #1f2937; }
-          .status-pill.ok { background: #dcfce7; color: #166534; }
-          .status-pill.err { background: #fee2e2; color: #991b1b; }
-          .create-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
-          .create-row input { flex: 1 1 140px; padding: 7px 10px; border: 1px solid #94a3b8; border-radius: 6px; font: inherit; }
-          .api-list { list-style: none; padding: 0; display: grid; gap: 8px; }
-          .api-list li { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; background: #ffffff; }
+          .api-panel { max-width: 560px; font-family: system-ui, sans-serif; } /* Caps panel width and uses the OS font. */
+          .status-pill { display: inline-block; padding: 3px 10px; border-radius: 99px; font-size: 0.82rem; font-weight: 700; background: #e2e8f0; color: #1f2937; } /* Neutral rounded pill for default HTTP status feedback. */
+          .status-pill.ok { background: #dcfce7; color: #166534; } /* Green pill variant for 2xx success responses. */
+          .status-pill.err { background: #fee2e2; color: #991b1b; } /* Red pill variant for 4xx/5xx error responses. */
+          .create-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; } /* Lays out the POST inputs and button in a wrapping row. */
+          .create-row input { flex: 1 1 140px; padding: 7px 10px; border: 1px solid #94a3b8; border-radius: 6px; font: inherit; } /* Lets inputs grow evenly while keeping clean borders. */
+          .api-list { list-style: none; padding: 0; display: grid; gap: 8px; } /* Removes default bullets and stacks rows with a gap. */
+          .api-list li { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; background: #ffffff; } /* Turns each book row into a card with actions aligned right. */
         </script>
       </div>
       <div data-tab="3 · Client JS (GET, POST, PUT, DELETE)">
         <p>Each function maps one CRUD verb to its exact REST route, headers, and expected status code.</p>
         <script type="text/plain" class="code" data-lang="js" data-title="crud-fetch-examples.js (browser JS)">
           // 1. READ (GET /api/books) — status 200 + JSON array
-          async function getBooks() {
-            const res = await fetch('/api/books');
-            if (!res.ok) throw new Error('Could not load books: ' + res.status);
-            return res.json();
+          async function getBooks() { // Requests the full list of books from the API.
+            const res = await fetch('/api/books'); // Sends a GET request (fetch's default HTTP method).
+            if (!res.ok) throw new Error('Could not load books: ' + res.status); // Turns non-2xx responses into a thrown error.
+            return res.json(); // Parses the JSON response array into JavaScript objects.
           }
 
           // 2. CREATE (POST /api/books) — status 201 + newly created book with id
-          async function createBook(title, author) {
-            const res = await fetch('/api/books', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ title, author })
+          async function createBook(title, author) { // Sends a new book to the server to be stored.
+            const res = await fetch('/api/books', { // Calls the collection endpoint with POST options.
+              method: 'POST', // Tells Express to run the app.post('/api/books') handler.
+              headers: { 'Content-Type': 'application/json' }, // Required so express.json() parses the body.
+              body: JSON.stringify({ title, author }) // Serializes the JS object into JSON text for the wire.
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Create failed');
-            return data;
+            const data = await res.json(); // Reads either the created book or the server's JSON error.
+            if (!res.ok) throw new Error(data.error || 'Create failed'); // Surfaces a 400 validation error to the caller.
+            return data; // Returns the saved book (including its server-assigned ID).
           }
 
           // 3. UPDATE (PUT /api/books/:id) — status 200 + replaced book
-          async function updateBook(id, title, author) {
-            const res = await fetch(`/api/books/${id}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ title, author })
+          async function updateBook(id, title, author) { // Replaces an existing book by its ID.
+            const res = await fetch(`/api/books/${id}`, { // Targets the single-item URL with the book's ID.
+              method: 'PUT', // Tells Express to run the app.put('/api/books/:id') handler.
+              headers: { 'Content-Type': 'application/json' }, // Marks the payload as JSON for express.json().
+              body: JSON.stringify({ title, author }) // Sends the full replacement title and author as JSON text.
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Update failed');
-            return data;
+            const data = await res.json(); // Parses the updated book or the JSON error message.
+            if (!res.ok) throw new Error(data.error || 'Update failed'); // Rejects on 400/404 using the API's error text.
+            return data; // Returns the updated book object.
           }
 
           // 4. DELETE (DELETE /api/books/:id) — status 204 (empty body: do NOT call res.json()!)
-          async function deleteBook(id) {
-            const res = await fetch(`/api/books/${id}`, { method: 'DELETE' });
-            if (!res.ok) throw new Error('Delete failed: ' + res.status);
+          async function deleteBook(id) { // Removes a single book from the server collection.
+            const res = await fetch(`/api/books/${id}`, { method: 'DELETE' }); // Sends DELETE to the item URL with no body.
+            if (!res.ok) throw new Error('Delete failed: ' + res.status); // Checks status without calling res.json() on the empty 204 reply.
           }
         </script>
       </div>
@@ -994,38 +996,38 @@ app.post('/api/books', (req, res) => {
     </aside>
     <script type="text/plain" class="code" data-lang="js" data-title="Two styles, one fetch">
       // Style 1: the .then() chain
-      fetch('/api/books')
-        .then((response) => response.json())
-        .then((books) => console.log(books));
+      fetch('/api/books') // Starts a GET request and returns a Promise for the response.
+        .then((response) => response.json()) // Runs when headers arrive; parses the JSON body into a new Promise.
+        .then((books) => console.log(books)); // Runs once the JSON array is ready and logs it.
 
       // Style 2: async and await, inside an async function
-      async function loadBooks() {
-        const response = await fetch('/api/books');
-        const books = await response.json();
-        console.log(books);
+      async function loadBooks() { // Marks the function async so await can pause inside it.
+        const response = await fetch('/api/books'); // Waits for the HTTP response without freezing the browser.
+        const books = await response.json(); // Waits for the JSON body to finish parsing into an array.
+        console.log(books); // Logs the parsed array of book objects.
       }
     </script>
 
     <h3>The <code>fetch()</code> pattern</h3>
     <p>The browser's built-in way to call an API is <code>fetch()</code>: you give it a URL, it asks the server, and it hands you back the response so your code can read the JSON and render it. This is the pattern you will run against your own Week 2 server — the same <code>rest-api.js</code> from Section 2.4. Its <code>app.use(express.static('public'))</code> line is what makes that possible: create a folder named <code>public</code> next to <code>rest-api.js</code>, put the page and its script inside, and one server delivers both the front end and the API — from the same origin:</p>
     <script type="text/plain" class="code" data-lang="js" data-title="app.js (browser) — fetch the list and render it">
-      fetch('/api/books')
-        .then((response) => {
-          if (!response.ok) throw new Error('Request failed: ' + response.status);
-          return response.json();
+      fetch('/api/books') // Requests the book collection from the same-origin Express API.
+        .then((response) => { // Runs once the server replies with status and headers.
+          if (!response.ok) throw new Error('Request failed: ' + response.status); // Guards against 404/500 since fetch only rejects on network failure.
+          return response.json(); // Parses the JSON response body into an array of books.
         })
-        .then((books) => {
-          const list = document.getElementById('book-list');
-          list.replaceChildren();
-          books.forEach((b) => {
-            const li = document.createElement('li');
-            const strong = document.createElement('strong');
-            strong.textContent = b.title;
-            li.append(strong, ' by ' + b.author);
-            list.append(li);
+        .then((books) => { // Receives the parsed book array and redraws the DOM list.
+          const list = document.getElementById('book-list'); // Grabs the target <ul> element on the page.
+          list.replaceChildren(); // Clears any previous list items before rendering fresh ones.
+          books.forEach((b) => { // Loops through every book object returned by the API.
+            const li = document.createElement('li'); // Creates a new list item node for this book.
+            const strong = document.createElement('strong'); // Creates a bold element for the book title.
+            strong.textContent = b.title; // Inserts the title as plain text (safe from HTML injection).
+            li.append(strong, ' by ' + b.author); // Combines the bold title with the author text inside the <li>.
+            list.append(li); // Inserts the finished row into the visible <ul>.
           });
         })
-        .catch((err) => console.error(err));
+        .catch((err) => console.error(err)); // Logs any network or non-2xx error so failures are never silent.
     </script>
     <p>Read it as a pipeline. <code>fetch('/api/books')</code> sends <code>GET /api/books</code> to your server. The first <code>.then</code> runs when the response arrives and converts its body from JSON text into a JavaScript array with <code>response.json()</code>. The second <code>.then</code> receives that array — the exact JSON from Section 2.4 — and turns each book into an <code>&lt;li&gt;</code>. The <code>.catch</code> at the end runs if any step above it failed and prints the reason in the browser's console, so a broken request is never silent. Adding a book is the same shape: <code>fetch</code> with <code>method: 'POST'</code> and a JSON body, then re-render from the updated state.</p>
     <p>One name to keep straight: on the server, Express's <code>res.json(value)</code> turns a JavaScript value into JSON and <em>sends</em> it; in the browser, <code>response.json()</code> <em>reads</em> the JSON that arrived and turns it back into a JavaScript value. They are different objects in different programs whose methods happen to share a name. Many tutorials call both of them <code>res</code>, which is why this page names the browser one <code>response</code>.</p>
@@ -1167,12 +1169,12 @@ loadBooks();</textarea>
     <h3>Components and state, in the small</h3>
     <p>The playground's render code is a component in embryo. Written as a named function that takes data and returns a piece of interface — here, a real element built node by node — it is exactly what a framework component does; the frameworks add tooling around the same idea:</p>
     <script type="text/plain" class="code" data-lang="js" data-title="A book component (pattern)">
-      function bookItem(book) {
-        const li = document.createElement('li');
-        const strong = document.createElement('strong');
-        strong.textContent = book.title;
-        li.append(strong, ' by ' + book.author);
-        return li;
+      function bookItem(book) { // Reusable mini-component: turns one book object into a DOM element.
+        const li = document.createElement('li'); // Creates the outer list-item container.
+        const strong = document.createElement('strong'); // Creates a bold element for the title.
+        strong.textContent = book.title; // Sets the title safely as plain text.
+        li.append(strong, ' by ' + book.author); // Appends the bold title and plain-text author suffix.
+        return li; // Hands back the finished element so callers can insert it anywhere.
       }
       // Rendering the list = applying the component to every item in the state:
       // books.forEach((b) => list.appendChild(bookItem(b)));
@@ -1200,71 +1202,72 @@ loadBooks();</textarea>
     <h3>The same page, built with a framework: Vue</h3>
     <p>Everything above was <strong>vanilla</strong> JavaScript — plain JavaScript with no library, which is the right way to learn what a framework actually does for you. Now meet one: <strong>Vue</strong> is a front-end framework, and below is the playground's book page rebuilt with it. <strong>This code runs in your own project</strong>, saved as <code>public/index.html</code>: <code>public</code> is the folder that sits next to <code>rest-api.js</code>, and <code>rest-api.js</code> serves it with its <code>express.static('public')</code> line. Start the server, open <code>http://localhost:3000/</code>, and this page is what arrives. This course site itself loads no third-party scripts, which is why this is a code sample to copy, not a live playground. It uses Vue 3's <strong>global build</strong>: a single script file, loaded from a CDN (content delivery network — a public server that hosts library files), that gives the page a global <code>Vue</code> object. No build step, no install — one script tag. The URL names one exact release, <code>3.5.45</code>, so the library cannot change underneath your project halfway through the term.</p>
     <script type="text/plain" class="code" data-lang="html" data-title="public/index.html — the book page in Vue (your project)">
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="utf-8">
-        <title>Book list — Vue version</title>
-        <script src="https://unpkg.com/vue@3.5.45/dist/vue.global.prod.js"><\/script>
+      <!DOCTYPE html> <!-- Declares HTML5 so the browser renders in standards mode. -->
+      <html lang="en"> <!-- Root HTML document set to English. -->
+      <head> <!-- Page metadata and external script imports. -->
+        <meta charset="utf-8"> <!-- Uses UTF-8 character encoding. -->
+        <title>Book list — Vue version</title> <!-- Sets the browser tab title. -->
+        <script src="https://unpkg.com/vue@3.5.45/dist/vue.global.prod.js"><\/script> <!-- Loads pinned Vue 3 global build from CDN (exposes window.Vue). -->
       </head>
-      <body>
-        <div id="app">
-          <h1>Book list</h1>
-          <ul>
-            <li v-for="book in books" :key="book.id">
-              <strong>{{ book.title }}</strong> by {{ book.author }}
+      <body> <!-- Visible page body mounted by Vue below. -->
+        <div id="app"> <!-- Root container controlled by Vue's template compiler. -->
+          <h1>Book list</h1> <!-- Static page heading inside the Vue app. -->
+          <ul> <!-- Unordered list populated reactively from the books array. -->
+            <li v-for="book in books" :key="book.id"> <!-- Repeats one <li> per book, keyed by its unique server ID. -->
+              <strong>{{ book.title }}</strong> by {{ book.author }} <!-- Interpolates title and author safely as text. -->
             </li>
           </ul>
-          <div>
-            <label>Title <input v-model="newTitle" type="text" placeholder="The Hobbit"></label>
-            <label>Author <input v-model="newAuthor" type="text" placeholder="J.R.R. Tolkien"></label>
-            <button type="button" @click="addBook">Add book</button>
+          <div> <!-- Holds the inputs and button for adding a new book. -->
+            <label>Title <input v-model="newTitle" type="text" placeholder="The Hobbit"></label> <!-- Two-way binds this input to the newTitle state property. -->
+            <label>Author <input v-model="newAuthor" type="text" placeholder="J.R.R. Tolkien"></label> <!-- Two-way binds this input to the newAuthor state property. -->
+            <button type="button" @click="addBook">Add book</button> <!-- Calls the addBook method on click without reloading the page. -->
           </div>
         </div>
 
+        <!-- Inline script that creates and mounts the Vue application. -->
         <script>
-          const { createApp } = Vue;
+          const { createApp } = Vue; // Pulls createApp out of the global Vue object loaded above.
 
-          createApp({
-            data() {
-              return {
-                books: [],
-                newTitle: '',
-                newAuthor: ''
+          createApp({ // Defines the Vue app's reactive state, lifecycle hooks, and methods.
+            data() { // Returns the reactive state object that Vue watches for changes.
+              return { // Every property here triggers automatic re-renders when updated.
+                books: [], // Starts empty until mounted() loads books from the API.
+                newTitle: '', // Bound to the Title input via v-model.
+                newAuthor: '' // Bound to the Author input via v-model.
               };
             },
-            mounted() {
-              fetch('/api/books')
-                .then((response) => {
-                  if (!response.ok) throw new Error('Request failed: ' + response.status);
-                  return response.json();
+            mounted() { // Lifecycle hook: runs once right after Vue mounts #app on screen.
+              fetch('/api/books') // Requests the starter book list from your Express API.
+                .then((response) => { // Checks the HTTP status before parsing JSON.
+                  if (!response.ok) throw new Error('Request failed: ' + response.status); // Turns 4xx/5xx responses into a catchable error.
+                  return response.json(); // Parses the JSON response body into an array.
                 })
-                .then((books) => { this.books = books; })
-                .catch((err) => console.error(err));
+                .then((books) => { this.books = books; }) // Stores the books; Vue automatically renders the <li> rows.
+                .catch((err) => console.error(err)); // Logs network or status failures in DevTools.
             },
-            methods: {
-              addBook() {
-                const title = this.newTitle.trim();
-                const author = this.newAuthor.trim();
-                if (!title || !author) return;
-                fetch('/api/books', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ title: title, author: author })
+            methods: { // Actions that template directives like @click can invoke.
+              addBook() { // Validates inputs, POSTs to the API, and appends the saved book.
+                const title = this.newTitle.trim(); // Reads and trims the bound Title input value.
+                const author = this.newAuthor.trim(); // Reads and trims the bound Author input value.
+                if (!title || !author) return; // Stops early if either field is blank.
+                fetch('/api/books', { // Sends the new book to POST /api/books.
+                  method: 'POST', // Uses POST to create a new resource on the server.
+                  headers: { 'Content-Type': 'application/json' }, // Tells express.json() to parse the JSON body.
+                  body: JSON.stringify({ title: title, author: author }) // Serializes the fields to JSON text.
                 })
-                  .then((response) => {
-                    if (!response.ok) throw new Error('Request failed: ' + response.status);
-                    return response.json();
+                  .then((response) => { // Verifies the server accepted the new book (201).
+                    if (!response.ok) throw new Error('Request failed: ' + response.status); // Rejects 400/500 responses instead of treating errors as books.
+                    return response.json(); // Parses the newly created book (with server-assigned ID).
                   })
-                  .then((book) => {
-                    this.books.push(book);
-                    this.newTitle = '';
-                    this.newAuthor = '';
+                  .then((book) => { // Updates reactive state once the server confirms creation.
+                    this.books.push(book); // Adds the new book; Vue redraws the list automatically.
+                    this.newTitle = ''; // Clears the Title input through two-way v-model binding.
+                    this.newAuthor = ''; // Clears the Author input through two-way v-model binding.
                   })
-                  .catch((err) => console.error(err));
+                  .catch((err) => console.error(err)); // Logs any network or validation error to the console.
               }
             }
-          }).mount('#app');
+          }).mount('#app'); // Connects this Vue app to the <div id="app"> template above.
         <\/script>
       </body>
       </html>
@@ -1287,13 +1290,13 @@ loadBooks();</textarea>
       <div data-tab="1 · Vue HTML (error &amp; delete button)">
         <p><code>v-if="errorMsg"</code> renders the alert box only when an error string is non-empty, and <code>@click="deleteBook(book.id)"</code> passes each row's id straight to the method.</p>
         <script type="text/plain" class="code" data-lang="html" data-title="Vue template excerpt (inside #app)">
-          <p v-if="errorMsg" class="error-banner" role="alert">Error: {{ errorMsg }}</p>
+          <p v-if="errorMsg" class="error-banner" role="alert">Error: {{ errorMsg }}</p> <!-- Renders this alert banner only when errorMsg is non-empty. -->
 
-          <ul class="book-cards">
-            <li v-for="book in books" :key="book.id" class="book-card">
-              <span><strong>{{ book.title }}</strong> by {{ book.author }}</span>
-              <button type="button" class="btn-danger" @click="deleteBook(book.id)">
-                Remove
+          <ul class="book-cards"> <!-- Styled list container for the reactive book cards. -->
+            <li v-for="book in books" :key="book.id" class="book-card"> <!-- Renders one card per book, tracked by its unique ID. -->
+              <span><strong>{{ book.title }}</strong> by {{ book.author }}</span> <!-- Groups title and author on the left side of the flex row. -->
+              <button type="button" class="btn-danger" @click="deleteBook(book.id)"> <!-- Passes this book's ID straight to deleteBook() on click. -->
+                Remove <!-- Visible label on the delete button. -->
               </button>
             </li>
           </ul>
@@ -1302,49 +1305,49 @@ loadBooks();</textarea>
       <div data-tab="2 · Companion CSS (public/style.css)">
         <p>Flexbox pushes the Remove button to the right edge of each card (<code>justify-content: space-between</code>), and <code>.error-banner</code> highlights failures clearly.</p>
         <script type="text/plain" class="code" data-lang="css" data-title="public/style.css">
-          .error-banner {
-            padding: 10px 14px;
-            background: #fef2f2;
-            border: 1px solid #ef4444;
-            color: #991b1b;
-            border-radius: 8px;
-            font-weight: 700;
+          .error-banner { /* Styles the conditional API failure alert box. */
+            padding: 10px 14px; /* Adds inner cushion around the error text. */
+            background: #fef2f2; /* Soft red tint signaling an error state. */
+            border: 1px solid #ef4444; /* Crisp red border to draw attention. */
+            color: #991b1b; /* High-contrast dark red text for readability. */
+            border-radius: 8px; /* Rounds the alert corners to match the cards. */
+            font-weight: 700; /* Bold text so the failure message stands out. */
           }
-          .book-cards { list-style: none; padding: 0; display: grid; gap: 8px; }
-          .book-card {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 12px;
-            padding: 10px 14px;
-            border: 1px solid #cbd5e1;
-            border-radius: 8px;
-            background: #ffffff;
+          .book-cards { list-style: none; padding: 0; display: grid; gap: 8px; } /* Strips bullets and stacks book cards evenly. */
+          .book-card { /* Lays out each individual book row as a flex card. */
+            display: flex; /* Places book info and Remove button on one horizontal row. */
+            justify-content: space-between; /* Pushes the Remove button to the far right edge. */
+            align-items: center; /* Vertically centers text and button inside the card. */
+            gap: 12px; /* Keeps space between long titles and the button. */
+            padding: 10px 14px; /* Comfortable inner padding around card content. */
+            border: 1px solid #cbd5e1; /* Subtle gray card border. */
+            border-radius: 8px; /* Rounded card corners. */
+            background: #ffffff; /* Clean white card surface. */
           }
-          .btn-danger {
-            padding: 5px 10px;
-            border: 1px solid #dc2626;
-            border-radius: 6px;
-            background: #ffffff;
-            color: #b91c1c;
-            font-weight: 700;
-            cursor: pointer;
+          .btn-danger { /* Outlined red styling for destructive Remove buttons. */
+            padding: 5px 10px; /* Compact button padding fitting inside a list row. */
+            border: 1px solid #dc2626; /* Red border signaling a destructive action. */
+            border-radius: 6px; /* Slightly rounded button corners. */
+            background: #ffffff; /* White fill keeps the button calm until hovered. */
+            color: #b91c1c; /* Dark red button label for crisp contrast. */
+            font-weight: 700; /* Bold label so the action is unmistakable. */
+            cursor: pointer; /* Shows the hand pointer on hover. */
           }
-          .btn-danger:hover { background: #fef2f2; }
+          .btn-danger:hover { background: #fef2f2; } /* Tints the button light red on hover for feedback. */
         </script>
       </div>
       <div data-tab="3 · Vue JS (deleteBook method)">
         <p>Sends <code>DELETE /api/books/:id</code>, remembers not to call <code>.json()</code> on the <code>204</code> response, and filters the removed book out of reactive state so Vue redraws automatically.</p>
         <script type="text/plain" class="code" data-lang="js" data-title="Inside Vue methods: { ... }">
-          async deleteBook(id) {
-            this.errorMsg = '';
-            try {
-              const res = await fetch(`/api/books/${id}`, { method: 'DELETE' });
-              if (!res.ok) throw new Error('Could not delete book (' + res.status + ')');
+          async deleteBook(id) { // Vue method that deletes one book on the server and in state.
+            this.errorMsg = ''; // Clears any previous error banner before starting.
+            try { // Wraps the network call so errors land in the catch block below.
+              const res = await fetch(`/api/books/${id}`, { method: 'DELETE' }); // Sends DELETE to the book's item URL.
+              if (!res.ok) throw new Error('Could not delete book (' + res.status + ')'); // Throws on 404/500 without calling res.json() on empty 204 replies.
               // Replace state array without the deleted id — Vue re-renders automatically
-              this.books = this.books.filter((b) => b.id !== id);
-            } catch (err) {
-              this.errorMsg = err.message;
+              this.books = this.books.filter((b) => b.id !== id); // Keeps every book except the deleted one; Vue removes the <li>.
+            } catch (err) { // Catches network failures or the Error thrown above.
+              this.errorMsg = err.message; // Sets reactive errorMsg so v-if displays the .error-banner.
             }
           }
         </script>
@@ -1376,43 +1379,43 @@ loadBooks();</textarea>
     <h3><code>express.Router</code>: a mini-app for one resource</h3>
     <p>An Express <strong>router</strong> is a small, self-contained bundle of routes and middleware that behaves like a mini application. You build one per resource in its own file, defining paths <em>relative</em> to where it will be mounted — inside <code>routes/books.js</code>, the list route is just <code>'/'</code>, because the <code>/api/books</code> part is supplied when the main app mounts it:</p>
     <script type="text/plain" class="code" data-lang="js" data-title="routes/books.js (excerpt)">
-      const express = require('express');
-      const router = express.Router();
+      const express = require('express'); // Loads Express so we can build a mini-router.
+      const router = express.Router(); // Creates an isolated Router instance for book routes.
 
-      let books = [
-        { id: 1, title: 'Dune', author: 'Frank Herbert' },
-        { id: 2, title: 'Emma', author: 'Jane Austen' }
+      let books = [ // In-memory book list owned by this router module.
+        { id: 1, title: 'Dune', author: 'Frank Herbert' }, // Starter book #1.
+        { id: 2, title: 'Emma', author: 'Jane Austen' } // Starter book #2.
       ];
-      let nextId = 3;
+      let nextId = 3; // Next numeric ID assigned when a new book is created.
 
       // Mounted at /api/books, so '/' here means GET /api/books
-      router.get('/', (req, res) => {
-        res.json(books);
+      router.get('/', (req, res) => { // Handles GET /api/books using a path relative to the mount point.
+        res.json(books); // Sends the full book array as JSON.
       });
 
       // '/:id' here means GET /api/books/:id
-      router.get('/:id', (req, res) => {
-        const book = books.find((b) => b.id === Number(req.params.id));
-        if (!book) return res.status(404).json({ error: 'Book not found' });
-        res.json(book);
+      router.get('/:id', (req, res) => { // Handles GET /api/books/:id using a relative parameter path.
+        const book = books.find((b) => b.id === Number(req.params.id)); // Converts string :id to a number and looks up the book.
+        if (!book) return res.status(404).json({ error: 'Book not found' }); // Replies 404 JSON if no book matches.
+        res.json(book); // Sends the matching book as JSON.
       });
 
       // POST, PUT and DELETE move here too, unchanged.
 
-      module.exports = router;
+      module.exports = router; // Exports this router so app.js can require() and mount it.
     </script>
     <p>The main file then shrinks to wiring: build the app, install the global middleware (including the <code>express.static('public')</code> line that keeps serving Section 2.5's front end), and mount each router at its prefix with <code>app.use()</code> — the same <code>app.use()</code> from Section 2.2, now carrying a router instead of a single function:</p>
     <script type="text/plain" class="code" data-lang="js" data-title="app.js (excerpt)" data-run="server" data-harness="wk2-router" data-presets='[{"label":"/api/books","method":"GET","path":"/api/books"},{"label":"/api/books/1","method":"GET","path":"/api/books/1"},{"label":"/hello.txt","method":"GET","path":"/hello.txt"}]'>
-      const express = require('express');
-      const booksRouter = require('./routes/books');
+      const express = require('express'); // Loads the Express framework package.
+      const booksRouter = require('./routes/books'); // Imports the books mini-router from its own file.
 
-      const app = express();
-      app.use(express.json());
-      app.use(express.static('public'));
+      const app = express(); // Creates the main Express application.
+      app.use(express.json()); // Translates incoming JSON request bodies into req.body.
+      app.use(express.static('public')); // Serves static front-end files from public/.
 
-      app.use('/api/books', booksRouter);
+      app.use('/api/books', booksRouter); // Mounts every route in booksRouter under the /api/books prefix.
 
-      app.listen(3000, () => console.log('Listening on port 3000'));
+      app.listen(3000, () => console.log('Listening on port 3000')); // Starts the HTTP server on port 3000.
     </script>
     <p>Be clear about what changed and what did not: <strong>only the filing changed</strong>. The reorganized API answers identically to Section 2.4 — the same requests return the same verified responses, the same statuses, the same JSON — because the handlers themselves were not rewritten, just moved. A <code>GET /api/books/99</code> still returns <code>{"error":"Book not found"}</code> with status 404. When a refactor changes no behavior, that sameness is the success criterion, and the captured session in Section 2.4 is your checklist.</p>
 
@@ -1420,8 +1423,8 @@ loadBooks();</textarea>
     <p>A well-organized app also decides, deliberately, what happens when a request matches <em>nothing</em>, and what happens when a handler <em>fails</em>. Both are middleware — placed at the very end of the line, where only unanswered or failed requests ever reach them.</p>
     <p>First, the <strong>404 handler</strong>: a plain middleware registered after every route. Any request that reaches it was not answered by anything above, so its address names nothing your app has. For an API, it answers in JSON, like every other API response:</p>
     <script type="text/plain" class="code" data-lang="js" data-title="The 404 handler (after all routes)">
-      app.use((req, res) => {
-        res.status(404).json({ error: 'Not found' });
+      app.use((req, res) => { // Runs only when no earlier static file or route answered the request.
+        res.status(404).json({ error: 'Not found' }); // Sends a consistent JSON 404 error for unknown addresses.
       });
     </script>
     <p class="wk2-cap"><strong>Real output</strong> — captured by running the organized app assembled from this section's excerpts (Node 26, Express 5). Compare the two 404s: book 99 matches a route but names no book, while <code>/nope</code> matches nothing at all and falls through to this last station:</p>
@@ -1434,10 +1437,10 @@ Listening on port 3000</div>
     <p>Same status, different sender: the router answered the first (its route matched; the collection simply has no book 99), and the final 404 handler answered the second (no route anywhere matched, so the request travelled the whole line unanswered). Position is what makes the handler safe — registered last, it only ever sees requests nothing else claimed.</p>
     <p>Second, the <strong>error-handling middleware</strong>. Ordinary stations have three arguments; an error handler has <strong>four</strong> — <code>(err, req, res, next)</code> — and that extra first argument is how Express recognizes it. It never runs during a normal request. It runs when an earlier handler calls <code>next(err)</code> with an error, or throws one: Express skips every remaining ordinary station and jumps straight here. Its job is to answer with the right status. Some errors arrive already knowing theirs: when a client sends malformed JSON, <code>express.json()</code> raises an error whose <code>err.status</code> is 400, because the mistake is the client's, not yours. So the handler uses the error's own status when it has one and falls back to 500 when it does not. A 4xx error keeps its message, which tells the client what to fix; a 5xx is logged on the server (where only you can see it) and the client gets a calm, generic reply:</p>
     <script type="text/plain" class="code" data-lang="js" data-title="The error-handling middleware (registered last)">
-      app.use((err, req, res, next) => {
-        const status = err.status || 500;
-        if (status >= 500) console.error(err);
-        res.status(status).json({ error: status >= 500 ? 'Internal server error' : err.message });
+      app.use((err, req, res, next) => { // Four parameters tell Express this is the error-handling station.
+        const status = err.status || 500; // Uses the error's HTTP status if set (like 400), else defaults to 500.
+        if (status >= 500) console.error(err); // Logs full server-side crash details privately in the terminal.
+        res.status(status).json({ error: status >= 500 ? 'Internal server error' : err.message }); // Hides stack traces on 5xx; sends helpful messages on 4xx.
       });
     </script>
     <p class="wk2-cap"><strong>Expected output</strong> — this pattern is shown as the standard shape rather than a fresh capture: with this handler in place, a handler that fails produces one error logged on the server console and a <code>500</code> response whose JSON body is <code>{"error":"Internal server error"}</code>, while a request whose JSON body is malformed gets a <code>400</code> whose <code>error</code> is the parser's own message, and nothing is logged. (The API-level error you have already seen verified is the 404 JSON from Section 2.4: <code>{"error":"Book not found"}</code>.) The client never receives the stack trace — that stays in your server log, where it helps you and leaks nothing.</p>
@@ -1446,21 +1449,21 @@ Listening on port 3000</div>
     <p><strong>Example — how routes reach the 4-argument error handler in Express 5:</strong></p>
     <div class="grid-2">
       <script type="text/plain" class="code" data-lang="js" data-title="Explicit next(err) — classic pattern">
-        router.get('/:id', (req, res, next) => {
-          if (Number.isNaN(Number(req.params.id))) {
-            const err = new Error('Book id must be a number');
-            err.status = 400; // Tells the error handler this is a client error
-            return next(err); // Jumps straight to (err, req, res, next)
+        router.get('/:id', (req, res, next) => { // Accepts next so validation failures can jump to error middleware.
+          if (Number.isNaN(Number(req.params.id))) { // Checks whether the :id parameter fails to parse as a number.
+            const err = new Error('Book id must be a number'); // Builds a descriptive Error for the client.
+            err.status = 400; // Marks this as a 400 client error (not a 500 server crash).
+            return next(err); // Skips normal routes and jumps straight to (err, req, res, next).
           }
-          res.json({ id: Number(req.params.id) });
+          res.json({ id: Number(req.params.id) }); // Replies normally when the numeric ID is valid.
         });
       </script>
       <script type="text/plain" class="code" data-lang="js" data-title="Express 5 async handler — forwarded automatically">
-        router.get('/report', async (req, res) => {
+        router.get('/report', async (req, res) => { // Async handler returning a Promise that Express 5 watches automatically.
           // If loadReport() rejects (e.g. database down), Express 5 catches
           // the rejected promise and forwards it straight to (err, req, res, next).
-          const report = await loadReport();
-          res.json(report);
+          const report = await loadReport(); // Pauses until the async report finishes (or rejects to error middleware).
+          res.json(report); // Sends the resolved report back as JSON.
         });
       </script>
     </div>
@@ -1471,38 +1474,38 @@ Listening on port 3000</div>
       <div data-tab="1 · Client HTML">
         <p>One reusable banner element at the top of the page announces both <code>4xx</code> client warnings and <code>5xx</code> server failures.</p>
         <script type="text/plain" class="code" data-lang="html" data-title="api-notice.html">
-          <div id="api-notice" class="notice" role="alert" hidden></div>
+          <div id="api-notice" class="notice" role="alert" hidden></div> <!-- Reusable error banner announced by screen readers when revealed. -->
         </script>
       </div>
       <div data-tab="2 · Client CSS">
         <p>Distinguishes fixable <code>4xx</code> problems (amber) from <code>5xx</code> server errors (red) while keeping crisp contrast and a text prefix.</p>
         <script type="text/plain" class="code" data-lang="css" data-title="api-notice.css">
-          .notice { padding: 10px 14px; border-radius: 8px; border: 1px solid; font-weight: 700; margin-bottom: 14px; }
-          .notice.warn { background: #fffbeb; border-color: #f59e0b; color: #92400e; }
-          .notice.fail { background: #fef2f2; border-color: #ef4444; color: #991b1b; }
+          .notice { padding: 10px 14px; border-radius: 8px; border: 1px solid; font-weight: 700; margin-bottom: 14px; } /* Shared layout and bold typography for API error notices. */
+          .notice.warn { background: #fffbeb; border-color: #f59e0b; color: #92400e; } /* Amber theme for 4xx client errors the user can fix. */
+          .notice.fail { background: #fef2f2; border-color: #ef4444; color: #991b1b; } /* Red theme for 5xx server failures. */
         </script>
       </div>
       <div data-tab="3 · Client JS (shared apiRequest helper)">
         <p>Wraps <code>fetch()</code> once for the whole front end: parses JSON safely (even if a 500 returned non-JSON), distinguishes <code>4xx</code> vs. <code>5xx</code>, and reads <code>data.error</code>.</p>
         <script type="text/plain" class="code" data-lang="js" data-title="api-helper.js (browser JS)">
-          const notice = document.getElementById('api-notice');
+          const notice = document.getElementById('api-notice'); // Grabs the shared alert banner element once at startup.
 
-          function showNotice(text, isServerError) {
-            notice.hidden = false;
-            notice.className = 'notice ' + (isServerError ? 'fail' : 'warn');
-            notice.textContent = (isServerError ? 'Server error: ' : 'Check input: ') + text;
+          function showNotice(text, isServerError) { // Displays an error message styled for either 4xx or 5xx.
+            notice.hidden = false; // Makes the hidden banner visible on screen.
+            notice.className = 'notice ' + (isServerError ? 'fail' : 'warn'); // Chooses red (.fail) for 5xx or amber (.warn) for 4xx.
+            notice.textContent = (isServerError ? 'Server error: ' : 'Check input: ') + text; // Adds a clear text prefix and inserts the error safely.
           }
 
-          async function apiRequest(url, options) {
-            notice.hidden = true;
-            const res = await fetch(url, options);
-            if (res.status === 204) return null; // DELETE succeeded with no body
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) {
-              showNotice(data.error || `Request failed (${res.status})`, res.status >= 500);
-              return null;
+          async function apiRequest(url, options) { // Shared fetch() wrapper used across the front end.
+            notice.hidden = true; // Clears any stale banner before sending a new request.
+            const res = await fetch(url, options); // Sends the HTTP request and waits for the response.
+            if (res.status === 204) return null; // DELETE succeeded with an empty body — skip res.json().
+            const data = await res.json().catch(() => ({})); // Safely parses JSON, falling back to {} if body isn't JSON.
+            if (!res.ok) { // Handles any non-2xx HTTP status uniformly.
+              showNotice(data.error || `Request failed (${res.status})`, res.status >= 500); // Displays the API's error text with 4xx/5xx styling.
+              return null; // Signals the caller that the request did not return usable data.
             }
-            return data;
+            return data; // Returns the parsed JSON payload on 2xx success.
           }
         </script>
       </div>
@@ -1603,10 +1606,10 @@ Listening on port 3000</div>
           <p><strong>The front end asks.</strong> The click handler sends <code>fetch('/api/books', { method: 'POST', ... })</code> with the new book as a JSON body. The page does not reload; the request travels in the background (Section 2.5).</p>
           <div class="grid-2">
             <script type="text/plain" class="code" data-lang="js" data-title="Client — Browser sends POST JSON">
-              const res = await fetch('/api/books', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title: 'The Hobbit', author: 'Tolkien' })
+              const res = await fetch('/api/books', { // Sends a background POST request without reloading the page.
+                method: 'POST', // Tells the server we want to create a new book.
+                headers: { 'Content-Type': 'application/json' }, // Labels the body as JSON so express.json() parses it.
+                body: JSON.stringify({ title: 'The Hobbit', author: 'Tolkien' }) // Encodes the new book object as JSON text.
               });
             </script>
             <script type="text/plain" class="code" data-lang="text" data-title="Server — Request arrives on :3000">
@@ -1625,9 +1628,9 @@ Listening on port 3000</div>
               (Page stays interactive — no reload!)
             </script>
             <script type="text/plain" class="code" data-lang="js" data-title="Server — Global middleware runs">
-              app.use(morgan('dev'));          // 1. Starts timer
-              app.use(express.json());         // 2. Populates req.body
-              app.use(express.static('public'));// 3. Skips POST -> next()
+              app.use(morgan('dev')); // 1. Starts the request timer and logs when the reply finishes.
+              app.use(express.json()); // 2. Parses the JSON body into req.body and calls next().
+              app.use(express.static('public')); // 3. Only serves GET/HEAD files, so it passes POST straight on.
             </script>
           </div>
         </li>
@@ -1639,11 +1642,11 @@ Listening on port 3000</div>
               (Client does not pick the new id — server assigns it.)
             </script>
             <script type="text/plain" class="code" data-lang="js" data-title="Server — routes/books.js POST /">
-              router.post('/', (req, res) => {
-                if (!req.body?.title || !req.body?.author)
-                  return res.status(400).json({ error: 'Required' });
-                const book = { id: nextId++, ...req.body };
-                books.push(book);
+              router.post('/', (req, res) => { // Handles POST /api/books inside the mounted books router.
+                if (!req.body?.title || !req.body?.author) // Validates that both title and author arrived in req.body.
+                  return res.status(400).json({ error: 'Required' }); // Rejects missing fields with 400 Bad Request.
+                const book = { id: nextId++, ...req.body }; // Builds the new book with the next server-assigned ID.
+                books.push(book); // Stores the new book in the collection array.
               });
             </script>
           </div>
@@ -1659,7 +1662,7 @@ Listening on port 3000</div>
               }
             </script>
             <script type="text/plain" class="code" data-lang="js" data-title="Server — Sends 201 &amp; morgan logs">
-              res.status(201).json(book);
+              res.status(201).json(book); // Replies 201 Created with the saved book (including its new ID).
               // Server console (morgan):
               // POST /api/books 201 1.420 ms - 52
             </script>
@@ -1669,9 +1672,9 @@ Listening on port 3000</div>
           <p><strong>The screen follows.</strong> Back in the browser, the <code>fetch()</code> promise resolves, the code adds the returned book to its state, and <code>render()</code> redraws the list — now three books, exactly as in the Section 2.5 playground. One click used every idea in the week.</p>
           <div class="grid-2">
             <script type="text/plain" class="code" data-lang="js" data-title="Client — Updates state &amp; redraws">
-              const book = await res.json();
-              books.push(book); // State now has 3 books
-              render();         // DOM updates with zero page reload
+              const book = await res.json(); // Parses the 201 JSON response into the saved book object.
+              books.push(book); // Adds the server-confirmed book so client state now holds 3 books.
+              render(); // Redraws the book list in the DOM with zero page reload.
             </script>
             <script type="text/plain" class="code" data-lang="text" data-title="Server — Done, ready for next call">
               Response complete.
@@ -1704,70 +1707,70 @@ Listening on port 3000</div>
       <div data-tab="Express App Wiring (app.js)">
         <p>The exact middleware order: logger → body parser → static files → mounted routers → 404 → 4-argument error handler.</p>
         <script type="text/plain" class="code" data-lang="js" data-title="app.js (complete Week 2 order)" data-run="server" data-harness="wk2-router" data-presets='[{"label":"/api/books","method":"GET","path":"/api/books"},{"label":"Add book (201)","method":"POST","path":"/api/books","headers":{"Content-Type":"application/json"},"body":"{\"title\":\"Beloved\",\"author\":\"Toni Morrison\"}"},{"label":"Delete #1 (204)","method":"DELETE","path":"/api/books/1"},{"label":"/unknown (JSON 404)","method":"GET","path":"/unknown"}]'>
-          const express = require('express');
-          const morgan = require('morgan');
-          const booksRouter = require('./routes/books');
+          const express = require('express'); // Loads the Express framework package.
+          const morgan = require('morgan'); // Loads the third-party request logger.
+          const booksRouter = require('./routes/books'); // Imports the modular books router.
 
-          const app = express();
-          app.use(morgan('dev'));
-          app.use(express.json());
-          app.use(express.static('public'));
+          const app = express(); // Creates the main Express application.
+          app.use(morgan('dev')); // 1. Logger first so every request is recorded.
+          app.use(express.json()); // 2. Body parser next so routes can read req.body.
+          app.use(express.static('public')); // 3. Serves static front-end assets from public/.
 
-          app.use('/api/books', booksRouter);
+          app.use('/api/books', booksRouter); // 4. Mounts all book API endpoints under /api/books.
 
-          app.use((req, res) => res.status(404).json({ error: 'Not found' }));
-          app.use((err, req, res, next) => {
-            const status = err.status || 500;
-            if (status >= 500) console.error(err);
-            res.status(status).json({ error: status >= 500 ? 'Internal server error' : err.message });
+          app.use((req, res) => res.status(404).json({ error: 'Not found' })); // 5. Catches any unmatched URL with a JSON 404.
+          app.use((err, req, res, next) => { // 6. Four-argument error handler catches failures last.
+            const status = err.status || 500; // Uses the error's status code or defaults to 500.
+            if (status >= 500) console.error(err); // Logs 5xx crashes privately on the server console.
+            res.status(status).json({ error: status >= 500 ? 'Internal server error' : err.message }); // Sends calm JSON errors without leaking internals.
           });
 
-          app.listen(3000, () => console.log('Listening on port 3000'));
+          app.listen(3000, () => console.log('Listening on port 3000')); // Starts the HTTP server on port 3000.
         </script>
       </div>
       <div data-tab="Express Router (routes/books.js)">
         <p>Relative paths (<code>/</code> and <code>/:id</code>) exported as a module and mounted at <code>/api/books</code>.</p>
         <script type="text/plain" class="code" data-lang="js" data-title="routes/books.js (starter)">
-          const express = require('express');
-          const router = express.Router();
+          const express = require('express'); // Loads Express to create a resource router.
+          const router = express.Router(); // Builds a mini-app for the /api/books endpoints.
 
-          let books = [{ id: 1, title: 'Dune', author: 'Frank Herbert' }];
-          let nextId = 2;
+          let books = [{ id: 1, title: 'Dune', author: 'Frank Herbert' }]; // In-memory starter array of books.
+          let nextId = 2; // Counter for assigning the next book ID.
 
-          router.get('/', (req, res) => res.json(books));
-          router.post('/', (req, res) => {
-            if (!req.body || !req.body.title) return res.status(400).json({ error: 'title required' });
-            const book = { id: nextId++, title: req.body.title, author: req.body.author || '' };
-            books.push(book);
-            res.status(201).json(book);
+          router.get('/', (req, res) => res.json(books)); // Handles GET /api/books by returning all books as JSON.
+          router.post('/', (req, res) => { // Handles POST /api/books to add a new book.
+            if (!req.body || !req.body.title) return res.status(400).json({ error: 'title required' }); // Rejects requests missing a title with 400.
+            const book = { id: nextId++, title: req.body.title, author: req.body.author || '' }; // Creates the new record with an optional author fallback.
+            books.push(book); // Appends the new book to the collection.
+            res.status(201).json(book); // Sends 201 Created with the saved book object.
           });
-          router.delete('/:id', (req, res) => {
-            const i = books.findIndex((b) => b.id === Number(req.params.id));
-            if (i === -1) return res.status(404).json({ error: 'Book not found' });
-            books.splice(i, 1);
-            res.status(204).send();
+          router.delete('/:id', (req, res) => { // Handles DELETE /api/books/:id to remove one book.
+            const i = books.findIndex((b) => b.id === Number(req.params.id)); // Locates the book's index after converting :id to a number.
+            if (i === -1) return res.status(404).json({ error: 'Book not found' }); // Replies 404 JSON if no book has that ID.
+            books.splice(i, 1); // Removes the book from the array in place.
+            res.status(204).send(); // Replies 204 No Content with an empty body.
           });
 
-          module.exports = router;
+          module.exports = router; // Exports the router so app.js can mount it with app.use().
         </script>
       </div>
       <div data-tab="SPA HTML (public/index.html)">
         <p>Loads once from <code>express.static('public')</code> and lets JavaScript fetch JSON from <code>/api/books</code>.</p>
         <script type="text/plain" class="code" data-lang="html" data-title="public/index.html (starter)">
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-            <meta charset="utf-8">
-            <title>Books SPA</title>
-            <link rel="stylesheet" href="/style.css">
+          <!DOCTYPE html> <!-- Declares HTML5 so the browser renders in standards mode. -->
+          <html lang="en"> <!-- Root HTML element set to English. -->
+          <head> <!-- Page metadata and stylesheet link. -->
+            <meta charset="utf-8"> <!-- Uses UTF-8 character encoding. -->
+            <title>Books SPA</title> <!-- Sets the browser tab title. -->
+            <link rel="stylesheet" href="/style.css"> <!-- Loads public/style.css via express.static. -->
           </head>
-          <body>
-            <main class="container">
-              <h1>Books</h1>
-              <p id="err" class="error-banner" role="alert" hidden></p>
-              <ul id="book-list" class="book-cards"></ul>
+          <body> <!-- Visible page shell loaded once by the browser. -->
+            <main class="container"> <!-- Centered main landmark for the SPA content. -->
+              <h1>Books</h1> <!-- Page heading. -->
+              <p id="err" class="error-banner" role="alert" hidden></p> <!-- Accessible alert box shown only when an API call fails. -->
+              <ul id="book-list" class="book-cards"></ul> <!-- Empty list that /app.js fills with JSON from /api/books. -->
             </main>
-            <script src="/app.js" defer><\/script>
+            <script src="/app.js" defer><\/script> <!-- Loads public/app.js and runs it once the DOM is ready. -->
           </body>
           </html>
         </script>
@@ -1775,11 +1778,11 @@ Listening on port 3000</div>
       <div data-tab="SPA CSS (public/style.css)">
         <p>Responsive container, card rows, and accessible error banner styling for your static front end.</p>
         <script type="text/plain" class="code" data-lang="css" data-title="public/style.css (starter)">
-          body { font-family: system-ui, sans-serif; margin: 0; padding: 24px 16px; background: #f8fafc; color: #1f2937; }
-          .container { max-width: 600px; margin: 0 auto; }
-          .book-cards { list-style: none; padding: 0; display: grid; gap: 8px; }
-          .book-cards li { padding: 12px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; }
-          .error-banner { padding: 10px 14px; background: #fef2f2; border: 1px solid #ef4444; color: #991b1b; border-radius: 8px; font-weight: 700; }
+          body { font-family: system-ui, sans-serif; margin: 0; padding: 24px 16px; background: #f8fafc; color: #1f2937; } /* Sets system font, soft page tint, and dark readable text. */
+          .container { max-width: 600px; margin: 0 auto; } /* Centers the app shell at a comfortable reading width. */
+          .book-cards { list-style: none; padding: 0; display: grid; gap: 8px; } /* Removes default bullets and spaces cards evenly. */
+          .book-cards li { padding: 12px 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; } /* Styles each rendered book item as a clean white card. */
+          .error-banner { padding: 10px 14px; background: #fef2f2; border: 1px solid #ef4444; color: #991b1b; border-radius: 8px; font-weight: 700; } /* Red alert box styling for visible API errors. */
         </script>
       </div>
     </div>

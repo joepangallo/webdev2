@@ -1135,5 +1135,98 @@ pre.bare { background: var(--code-bg); border: 1px solid var(--code-line); borde
 }
 
 @media print {
-  .code-run-bar, .runner-panel { display: none !important; }
+  .code-run-bar, .runner-panel, .line-inspector { display: none !important; }
 }
+
+/* ---------- Line-by-line Code Inspector (Who / What / Where / When / Why) ---------- */
+
+.code-block.has-inspector pre { padding: 14px 0 12px; }
+.code-block.has-inspector pre code { display: block; min-width: max-content; }
+.code-ln-row {
+  display: flex; align-items: baseline; padding: 0 16px 0 0;
+  cursor: pointer; border-left: 3px solid transparent;
+  transition: background .1s ease, border-color .1s ease;
+}
+.code-ln-row:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.code-ln-row.is-active {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-left-color: var(--accent);
+}
+.code-ln-num {
+  flex: none; width: 38px; padding-right: 12px; text-align: right;
+  font-size: .76rem; color: var(--ink-3); user-select: none; -webkit-user-select: none;
+  font-variant-numeric: tabular-nums; opacity: .75;
+}
+.code-ln-row.is-active .code-ln-num { color: var(--accent); font-weight: 700; opacity: 1; }
+.code-ln-src { flex: 1; white-space: pre; }
+
+.code-block.insp-open .code-run-bar { border-radius: 0; border-bottom: 1px solid var(--line); }
+.code-run-bar .insp-trigger { color: var(--ink-2); border-color: var(--line); background: var(--surface); }
+.code-run-bar .insp-trigger:hover { color: var(--ink); border-color: var(--accent); background: var(--accent-soft); }
+.code-run-bar .insp-trigger[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+
+.line-inspector {
+  padding: 14px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.line-inspector:last-of-type { border-bottom: 0; border-radius: 0 0 calc(var(--radius) - 1px) calc(var(--radius) - 1px); }
+.insp-head {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;
+  margin-bottom: 10px;
+}
+.insp-line {
+  font-family: var(--font-mono); font-size: .78rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em; color: var(--accent);
+}
+.insp-line .of { color: var(--ink-3); font-weight: 500; }
+.insp-nav { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+
+.insp-code {
+  margin: 0 0 12px; padding: 8px 12px; border-radius: 8px;
+  background: var(--code-bg); border: 1px solid var(--code-line);
+  font-family: var(--font-mono); font-size: .84rem; line-height: 1.5;
+  white-space: pre-wrap; overflow-wrap: anywhere; color: var(--code-ink);
+}
+.five { margin: 0; display: grid; gap: 0; }
+.five-row {
+  display: grid; grid-template-columns: 60px minmax(0, 1fr); gap: 8px 12px;
+  padding: 7px 0; border-top: 1px solid var(--line); align-items: baseline;
+}
+.five-row:first-child { border-top: 0; padding-top: 2px; }
+.five dt {
+  font-family: var(--font-mono); font-size: .7rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .07em; color: var(--ink-3);
+}
+.five-what dt { color: var(--accent); }
+.five-why dt { color: var(--good); }
+.five dd {
+  margin: 0; font-size: .92rem; line-height: 1.5; color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.five-what dd { font-weight: 600; }
+
+.insp-terms {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line);
+}
+.insp-terms-label {
+  font-family: var(--font-mono); font-size: .72rem; color: var(--ink-3);
+  text-transform: uppercase; letter-spacing: .05em; margin-right: 2px;
+}
+.insp-term {
+  font-family: var(--font-mono); font-size: .78rem; font-weight: 700;
+  min-height: 28px; min-width: 28px; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--line-2); background: var(--surface-2); color: var(--mod);
+  cursor: pointer;
+}
+.insp-term:hover, .insp-term.on { border-color: var(--mod); background: color-mix(in srgb, var(--mod) 14%, var(--surface)); }
+.insp-term-def {
+  margin: 8px 0 0; padding: 9px 12px; border-radius: 8px;
+  background: var(--surface-2); border-left: 3px solid var(--mod);
+  font-size: .88rem; line-height: 1.5; color: var(--ink-2); overflow-wrap: anywhere;
+}
+.insp-term-def strong { color: var(--ink); font-family: var(--font-mono); }
+
+.stepper .step-body .code-block.has-inspector pre { padding: 12px 0 10px; }
+.stepper .step-body .code-ln-num { width: 30px; padding-right: 8px; }
