@@ -829,7 +829,7 @@ About page (language: en)</div>
     <p>That three-file view reveals the complete browser-to-server contract: the server sends <code>text/html</code> first, the browser discovers <code>/style.css</code> and <code>/clock.js</code> inside that HTML and requests each one, and the server labels each response with its matching <code>Content-Type</code> (<code>text/css</code> and <code>text/javascript</code>) so the browser knows how to execute it.</p>
 
     <h3>Ports: the numbered doors</h3>
-    <p>One computer runs many programs that use the network, so an address alone is not enough — the request also names a <strong>port</strong>, a number from 0 to 65535 that identifies which listening program should receive it. You met ports in Web Dev I with addresses like <code>localhost:5500</code>. Three ports matter this week:</p>
+    <p>One computer runs many programs that use the network, so an address alone is not enough — the request also names a <strong>port</strong>, a number from 0 to 65535 that identifies which listening program should receive it. You met ports in Web Dev I with addresses like <code>localhost:5500</code>. Three ports matter this week, and three more join the course later:</p>
     <div class="table-wrap">
       <table class="data-table">
         <thead><tr><th scope="col">Port</th><th scope="col">Used for</th><th scope="col">Why you care</th></tr></thead>
@@ -837,6 +837,9 @@ About page (language: en)</div>
           <tr><th scope="row"><code>80</code></th><td>Plain HTTP on the public web</td><td>The default: <code>http://</code> addresses quietly mean port 80, so it is never written out.</td></tr>
           <tr><th scope="row"><code>443</code></th><td>HTTPS — HTTP with encryption</td><td>The default for <code>https://</code>. Real sites live here.</td></tr>
           <tr><th scope="row"><code>3000</code></th><td>Nothing official — a common development choice</td><td>High enough to avoid the reserved low ports, easy to type and remember. Every example in this course uses it, so <code>http://localhost:3000</code> will become muscle memory.</td></tr>
+          <tr><th scope="row"><code>5173</code></th><td>The Vite dev server — your Vue front end in Week 2</td><td>Your page and your API will live on different ports, which is exactly why Week 2 needs CORS.</td></tr>
+          <tr><th scope="row"><code>3306</code></th><td>MySQL</td><td>Week 3: your Node app connects here when it talks to a MySQL database.</td></tr>
+          <tr><th scope="row"><code>27017</code></th><td>MongoDB</td><td>Week 3: the MongoDB server listens here — a connection error naming this port almost always means the database is not running.</td></tr>
         </tbody>
       </table>
     </div>
