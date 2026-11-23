@@ -24,7 +24,7 @@
   WD1.OBJECTIVES = [
     'Build interactive and dynamic user interfaces utilizing a front-end framework',
     'Implement robust server-side logic with a JavaScript runtime for back-end web development',
-    'Design and implement route processing for efficient handling of HTTP request/response objects.',
+    'Design and implement route processing for efficient handling of HTTP request/response objects',
     'Develop and/or apply middleware functions to separate and streamline server-side logic',
     'Build and consume RESTful APIs that adhere to industry standards',
     'Apply authentication and authorization mechanisms to secure a web application',
@@ -99,12 +99,29 @@
   /* ---------- Storage (safe: works when localStorage is blocked) ---------- */
 
   const KEY = 'wd2:v1';
-  const blank = () => ({ done: {}, quiz: {}, pg: {}, challenge: {}, custom: {}, last: null, prefs: {} });
+  // Revision 2 rewrote every challenge: before it, the starter code already passed every check,
+  // so "solved" records were granted on page load. Older state therefore drops those records and
+  // the code saved for the old tasks, once. Section progress and quiz scores are kept.
+  const CHALLENGE_REV = 2;
+  const NAMESPACES = ['done', 'quiz', 'pg', 'challenge', 'custom', 'prefs'];
+  const blank = () => ({ done: {}, quiz: {}, pg: {}, challenge: {}, custom: {}, last: null, prefs: {}, challengeRev: CHALLENGE_REV });
+  const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+
+  // Saved or imported data is only trusted for its shape: each namespace must be a plain object.
+  function sanitize(data) {
+    const s = blank();
+    if (!isObj(data)) return s;
+    NAMESPACES.forEach((ns) => { if (isObj(data[ns])) s[ns] = data[ns]; });
+    if (isObj(data.last) && typeof data.last.section === 'string') s.last = data.last;
+    if (data.challengeRev !== CHALLENGE_REV) { s.challenge = {}; s.pg = {}; }
+    return s;
+  }
+
   let state = blank();
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) state = Object.assign(blank(), JSON.parse(raw));
-  } catch (e) { /* storage unavailable: keep in-memory state */ }
+    if (raw) state = sanitize(JSON.parse(raw));
+  } catch (e) { /* storage unavailable or unreadable: keep in-memory state */ }
 
   function persist() {
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
@@ -120,13 +137,22 @@
     all() { return state; },
     exportJSON() { return JSON.stringify(state, null, 2); },
     importJSON(text) {
-      const data = JSON.parse(text);
-      if (!data || typeof data !== 'object' || !data.done) throw new Error('That file is not a course progress export.');
-      state = Object.assign(blank(), data);
+      let data = null;
+      try { data = JSON.parse(text); } catch (e) { data = null; }
+      if (!isObj(data) || !isObj(data.done)) throw new Error('That file is not a course progress export.');
+      state = sanitize(data);
+      applyTheme(state.prefs.theme);
+      updateThemeButton();
       persist();
       refreshProgressUI();
     },
-    reset() { state = blank(); persist(); refreshProgressUI(); }
+    reset() {
+      state = blank();
+      applyTheme(state.prefs.theme);
+      updateThemeButton();
+      persist();
+      refreshProgressUI();
+    }
   };
 
   /* ---------- Theme (applied immediately to avoid a flash) ---------- */
@@ -147,13 +173,14 @@
     state.prefs.theme = next; persist(); applyTheme(next); updateThemeButton();
   };
 
-  /* ---------- Fonts (pages may also link them directly) ---------- */
+  /* ---------- Favicon (set here so no page needs its own <link>) ---------- */
 
-  (function ensureFonts() {
-    if (document.querySelector('link[href*="fonts.googleapis.com"]')) return;
+  (function ensureIcon() {
+    if (document.querySelector('link[rel~="icon"]')) return;
     const l = document.createElement('link');
-    l.rel = 'stylesheet';
-    l.href = 'https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=JetBrains+Mono:wght@400;700&display=swap';
+    l.rel = 'icon';
+    l.type = 'image/svg+xml';
+    l.href = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231F4FD1'/%3E%3Cpath d='M24 22 12 32l12 10M40 22l12 10-12 10M35 16 29 48' fill='none' stroke='%23fff' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E";
     document.head.appendChild(l);
   })();
 
@@ -268,6 +295,19 @@
   const iconBtn = (icon, label, cls, onclick) =>
     h('button', { type: 'button', class: 'btn small ' + (cls || ''), 'aria-label': label, title: label, html: ICON[icon] + '<span>' + esc(label) + '</span>', onclick });
 
+  /* Right / wrong is never shown by colour alone: mark() adds a visible ✓ or ✗ and the same
+     verdict as screen-reader text. unmark() removes it again. */
+  function unmark(el) {
+    const old = el.querySelector(':scope > .mark');
+    if (old) old.remove();
+  }
+  function mark(el, ok, srText) {
+    unmark(el);
+    el.appendChild(h('span', { class: 'mark ' + (ok ? 'mark-good' : 'mark-bad') },
+      h('span', { 'aria-hidden': 'true', text: ok ? '✓' : '✗' }),
+      h('span', { class: 'sr-only', text: ' ' + srText })));
+  }
+
   /* ---------- Toasts and announcements ---------- */
 
   let toastWrap = null;
@@ -284,9 +324,10 @@
   WD1.copy = function (text, btn) {
     const done = () => {
       if (!btn) return;
-      const old = btn.innerHTML;
+      if (btn._copyHtml == null) btn._copyHtml = btn.innerHTML;
+      clearTimeout(btn._copyTimer);
       btn.innerHTML = ICON.check + '<span>Copied</span>';
-      setTimeout(() => { btn.innerHTML = old; }, 1400);
+      btn._copyTimer = setTimeout(() => { btn.innerHTML = btn._copyHtml; btn._copyTimer = null; }, 1400);
     };
     try {
       navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
@@ -382,7 +423,7 @@
     // Top bar
     const menu = h('div', { class: 'menu', role: 'list' },
       WD1.MODULES.map((m) => h('a', { href: WD1.url(m.href), role: 'listitem', 'aria-current': m.id === modId ? 'page' : null },
-        h('span', { class: 'm-num', text: m.num === 'L' ? 'Lvl' : 'Wk ' + m.num }),
+        h('span', { class: 'm-num', text: 'Wk ' + m.num }),
         h('span', { text: m.title }),
         h('span', { class: 'm-pct', dataset: { modPct: m.id } }))),
       h('hr', { style: { margin: '6px 0' } }),
@@ -699,10 +740,35 @@
     return out;
   }
 
+  const SQL_KW = new Set(('SELECT FROM WHERE INSERT INTO VALUES UPDATE SET DELETE CREATE TABLE DROP ALTER ADD COLUMN ' +
+    'PRIMARY KEY FOREIGN REFERENCES UNIQUE NOT NULL DEFAULT AUTO_INCREMENT INT INTEGER BIGINT VARCHAR TEXT BOOLEAN DATE DATETIME TIMESTAMP ' +
+    'AND OR IN IS AS ON JOIN LEFT RIGHT INNER OUTER ORDER BY GROUP HAVING LIMIT OFFSET ASC DESC DISTINCT COUNT SUM AVG MIN MAX IF EXISTS INDEX BEGIN COMMIT ROLLBACK').split(' '));
+  function hlSQL(src) {
+    let out = '', i = 0;
+    const n = src.length;
+    const at = (re) => { re.lastIndex = i; const m = re.exec(src); return m ? m[0] : null; };
+    const reWs = /\s+/y, reCom = /--[^\n]*|\/\*[\s\S]*?(?:\*\/|$)/y;
+    const reStr = /'(?:[^']|'')*'?|"(?:[^"]|"")*"?/y, reNum = /\d+(?:\.\d+)?\b/y, reId = /[A-Za-z_][\w$]*/y;
+    while (i < n) {
+      let t;
+      if ((t = at(reWs))) { out += esc(t); i += t.length; continue; }
+      if ((t = at(reCom))) { out += span('com', t); i += t.length; continue; }
+      if ((t = at(reStr))) { out += span('str', t); i += t.length; continue; }
+      if ((t = at(reNum))) { out += span('num', t); i += t.length; continue; }
+      if ((t = at(reId))) {
+        out += SQL_KW.has(t.toUpperCase()) ? span('kw', t) : esc(t);
+        i += t.length; continue;
+      }
+      out += span('punct', src[i]); i++;
+    }
+    return out;
+  }
+
   WD1.highlight = function (code, lang) {
     lang = (lang || 'html').toLowerCase();
     if (lang === 'css') return hlCSS(code);
     if (lang === 'js' || lang === 'javascript' || lang === 'json') return hlJS(code);
+    if (lang === 'sql') return hlSQL(code);
     if (lang === 'html' || lang === 'xml' || lang === 'svg') return hlHTML(code);
     return esc(code);
   };
@@ -713,19 +779,25 @@
     const pre = h('pre', null, h('code', { html: WD1.highlight(code, lang) }));
     const copyBtn = iconBtn('copy', 'Copy', 'ghost copy-btn');
     copyBtn.addEventListener('click', () => WD1.copy(code, copyBtn));
-    return h('div', { class: 'code-block' },
+    const el = h('div', { class: 'code-block' },
       lang || title ? h('span', { class: 'code-lang', text: title || lang }) : null,
       pre, copyBtn);
+    el._wdCode = code;
+    el._wdLang = lang || 'text';
+    return el;
   }
   WD1.codeBlock = codeBlock;
 
   // A <script type="text/plain"> cannot contain a literal </script>, so authors write <\/script>.
   const unescapeScript = (t) => t.replace(/<\\\/script/gi, '</script');
+  const RUN_ATTRS = ['run', 'presets', 'harness', 'env'];
 
   function mountCode(root) {
     $$('script[type="text/plain"].code', root).forEach((s) => {
       const code = dedent(unescapeScript(s.textContent));
-      s.replaceWith(codeBlock(code, s.dataset.lang || 'html', s.dataset.title));
+      const block = codeBlock(code, s.dataset.lang || 'html', s.dataset.title);
+      RUN_ATTRS.forEach((k) => { if (s.dataset[k] != null) block.dataset[k] = s.dataset[k]; });
+      s.replaceWith(block);
     });
     $$('pre > code[class*="lang-"]', root).forEach((c) => {
       const pre = c.parentNode;
@@ -861,8 +933,10 @@
         btns.forEach((b) => b.addEventListener('click', () => {
           const k = +b.dataset.k, ok = answers.includes(k);
           lock();
+          b.setAttribute('aria-pressed', 'true');
           b.classList.add(ok ? 'correct' : 'wrong');
-          if (!ok) btns.forEach((x) => { if (answers.includes(+x.dataset.k)) x.classList.add('correct'); });
+          mark(b, ok, ok ? '(your answer, correct)' : '(your answer, incorrect)');
+          if (!ok) btns.forEach((x) => { if (answers.includes(+x.dataset.k)) { x.classList.add('correct'); mark(x, true, '(the correct answer)'); } });
           showFb(ok);
           done(ok);
         }));
@@ -876,10 +950,10 @@
           lock(); check.disabled = true;
           btns.forEach((b) => {
             const k = +b.dataset.k, sel = picked.includes(k), right = answers.includes(k);
-            if (right) b.classList.add('correct');
-            else if (sel) b.classList.add('wrong');
+            if (right) { b.classList.add('correct'); mark(b, true, sel ? '(selected, correct)' : '(correct, not selected)'); }
+            else if (sel) { b.classList.add('wrong'); mark(b, false, '(selected, incorrect)'); }
           });
-          showFb(ok, ok ? '' : 'The highlighted choices are the full correct set.');
+          showFb(ok, ok ? '' : 'The choices marked ✓ are the full correct set.');
           done(ok);
         });
         wrap.appendChild(check);
@@ -923,40 +997,54 @@
     el.classList.add('widget', 'flashcards');
     const front = h('div', { class: 'fc-face fc-front' }, h('span', { class: 'fc-label', text: el.dataset.front || 'Term' }), h('div', { class: 'fc-text' }));
     const back = h('div', { class: 'fc-face fc-back' }, h('span', { class: 'fc-label', text: el.dataset.back || 'Definition' }), h('div', { class: 'fc-text' }));
-    const card = h('button', { type: 'button', class: 'fc-card', 'aria-live': 'polite' }, front, back);
+    // The button is named by the face that is showing (the other face is aria-hidden), the hint
+    // describes what pressing it does, and the live region reads each new face aloud.
+    const hintId = 'fc-hint-' + Math.random().toString(36).slice(2, 8);
+    const hint = h('span', { class: 'sr-only', id: hintId, text: 'Press to flip the card.' });
+    const live = h('div', { class: 'sr-only', 'aria-live': 'polite' });
+    const card = h('button', { type: 'button', class: 'fc-card', 'aria-describedby': hintId }, front, back);
+    const setFace = () => {
+      card.classList.toggle('flipped', flipped);
+      front.setAttribute('aria-hidden', String(flipped));
+      back.setAttribute('aria-hidden', String(!flipped));
+    };
+    const announce = (prefix) => {
+      const face = flipped ? back : front;
+      live.textContent = (prefix || '') + $('.fc-label', face).textContent + ': ' + $('.fc-text', face).textContent;
+    };
     const count = h('span', { class: 'fc-count' });
     const knownEl = h('span', { class: 'fc-count' });
     frame(el, 'Flashcards', title, [
-      iconBtn('shuffle', 'Shuffle', 'ghost', () => { order = WD1.shuffle(order); i = 0; show(); }),
-      iconBtn('reset', 'Restart', 'ghost', () => { order = cards.map((_, k) => k); known.clear(); i = 0; show(); })
+      iconBtn('shuffle', 'Shuffle', 'ghost', () => { order = WD1.shuffle(order); i = 0; show(true); }),
+      iconBtn('reset', 'Restart', 'ghost', () => { order = cards.map((_, k) => k); known.clear(); i = 0; show(true); })
     ]);
     const prevB = h('button', { type: 'button', class: 'btn small', text: '← Prev', onclick: () => go(-1) });
     const nextB = h('button', { type: 'button', class: 'btn small', text: 'Next →', onclick: () => go(1) });
     const gotB = h('button', { type: 'button', class: 'btn small', text: 'I knew it', onclick: () => { known.add(order[i]); go(1); } });
     const againB = h('button', { type: 'button', class: 'btn small ghost', text: 'Study again', onclick: () => { known.delete(order[i]); go(1); } });
-    el.appendChild(h('div', { class: 'fc-stage' }, card));
+    el.appendChild(h('div', { class: 'fc-stage' }, card, hint, live));
     el.appendChild(h('div', { class: 'fc-controls' },
       h('div', { class: 'btn-row' }, prevB, nextB),
       h('div', { class: 'cluster' }, count, knownEl),
       h('div', { class: 'btn-row' }, againB, gotB)));
 
-    card.addEventListener('click', () => { flipped = !flipped; card.classList.toggle('flipped', flipped); card.setAttribute('aria-label', flipped ? 'Showing definition. Press to show term.' : 'Showing term. Press to reveal definition.'); });
+    card.addEventListener('click', () => { flipped = !flipped; setFace(); announce(); });
     el.addEventListener('keydown', (e) => {
       if (e.target.matches('input, textarea')) return;
       if (e.key === 'ArrowRight') { e.preventDefault(); go(1); }
       if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); }
     });
 
-    function go(d) { i = (i + d + order.length) % order.length; show(); }
-    function show() {
+    function go(d) { i = (i + d + order.length) % order.length; show(true); }
+    function show(speak) {
       if (!cards.length) return;
       const c = cards[order[i]];
-      flipped = false; card.classList.remove('flipped');
+      flipped = false; setFace();
       $('.fc-text', front).innerHTML = WD1.fmt(c.front);
       $('.fc-text', back).innerHTML = WD1.fmt(c.back);
       count.textContent = 'Card ' + (i + 1) + ' / ' + order.length;
       knownEl.textContent = '· Known ' + known.size + ' / ' + cards.length;
-      card.setAttribute('aria-label', 'Showing term. Press to reveal definition.');
+      if (speak) announce('Card ' + (i + 1) + ' of ' + order.length + '. ');
       requestAnimationFrame(fit);
     }
     function fit() {
@@ -964,7 +1052,11 @@
       const need = Math.max(200, front.scrollHeight, back.scrollHeight);
       card.style.height = need + 'px';
     }
-    window.addEventListener('resize', fit);
+    function onResize() {
+      if (!el.isConnected) { window.removeEventListener('resize', onResize); return; }
+      fit();
+    }
+    window.addEventListener('resize', onResize);
     show();
   }
   WD1.flashcards = mountFlashcards;
@@ -1033,24 +1125,187 @@
     return {
       el: box, textarea: ta,
       get: () => ta.value,
-      set: (v) => { ta.value = v; paint(); if (opts.onInput) opts.onInput(v); },
+      set: (v, silent) => { ta.value = v; paint(); if (!silent && opts.onInput) opts.onInput(v); },
       focus: () => ta.focus()
     };
   };
 
   /* ---------- Playground ---------- */
 
+  /* Student code runs in a sandboxed <iframe srcdoc>: scripts, forms and alert() work, but the
+     frame has its own throwaway origin, so it cannot read this site's storage, touch the lesson
+     page, or open windows. Everything it tells the page arrives by postMessage and is treated
+     as plain text. */
+  const PREVIEW_SANDBOX = 'allow-scripts allow-forms allow-modals';
+  WD1.previewFrame = function (title, lazy) {
+    const f = h('iframe', { title: title || 'Preview', loading: lazy ? 'lazy' : null });
+    f.setAttribute('sandbox', PREVIEW_SANDBOX);
+    return f;
+  };
+  WD1.PREVIEW_SANDBOX = PREVIEW_SANDBOX;
+
+  const LOG_TYPES = ['log', 'info', 'warn', 'error'];
+  const MAX_CONSOLE_LINES = 1000;
+  WD1.MAX_CONSOLE_LINES = MAX_CONSOLE_LINES;
   const pgRegistry = new Map();
   window.addEventListener('message', (e) => {
     const d = e.data;
-    if (!d || typeof d !== 'object' || !d.wd1pg) return;
+    if (!d || typeof d !== 'object' || typeof d.wd1pg !== 'string') return;
     const pg = pgRegistry.get(d.wd1pg);
-    if (pg) pg.log(d.type, d.args || []);
+    if (!pg || e.source !== pg.iframe.contentWindow) return;
+    if (d.type === 'checks') { pg.onChecks(d.results); return; }
+    if (LOG_TYPES.includes(d.type)) pg.log(d.type, Array.isArray(d.args) ? d.args.map(String) : []);
   });
 
+  /* Rewrites loop conditions so a runaway loop stops itself instead of freezing the tab:
+       while (c)       ->  while (__wd2loop() && (c))
+       for (a; c; u)   ->  for (a; __wd2loop() && (c); u)
+     __wd2loop() lives in the preview (see previewHelper) and throws once a single stretch of
+     synchronous code has been looping for 1.5 seconds. Line structure is preserved, so error
+     line numbers still match. for…of and for…in are left alone. If the rewritten code does not
+     parse, or the original did not, the original is returned untouched. */
+  function guardLoops(src) {
+    src = String(src);
+    const compiles = (code) => { try { new Function(code); return true; } catch (e) { return false; } };
+    if (!/\b(?:while|for)\b/.test(src) || !compiles(src)) return src;
+
+    // 1. Tokenize just far enough to tell code from strings, comments and regex literals.
+    const toks = [];
+    const n = src.length;
+    const reId = /[A-Za-z_$][\w$]*/y, reNum = /(?:0[xX][0-9a-fA-F]+|\d+(?:\.\d+)?(?:e[+-]?\d+)?)/y;
+    const reRegex = /\/(?![*\/])(?:[^\/\\\n\[]|\\.|\[(?:[^\]\\\n]|\\.)*\])+\/[a-z]*/y;
+    const skipString = (i, q) => { for (i++; i < n; i++) { if (src[i] === '\\') i++; else if (src[i] === q || src[i] === '\n') return i + 1; } return n; };
+    const skipTemplate = (i) => {
+      for (i++; i < n; i++) {
+        if (src[i] === '\\') i++;
+        else if (src[i] === '`') return i + 1;
+        else if (src[i] === '$' && src[i + 1] === '{') {
+          let depth = 1;
+          for (i += 2; i < n && depth; i++) {
+            const c = src[i];
+            if (c === '"' || c === "'") i = skipString(i, c) - 1;
+            else if (c === '`') i = skipTemplate(i) - 1;
+            else if (c === '{') depth++;
+            else if (c === '}') depth--;
+          }
+          i--;
+        }
+      }
+      return n;
+    };
+    let i = 0, prev = '';
+    while (i < n) {
+      const c = src[i];
+      if (/\s/.test(c)) { i++; continue; }
+      if (c === '/' && src[i + 1] === '/') { const e = src.indexOf('\n', i); i = e < 0 ? n : e; continue; }
+      if (c === '/' && src[i + 1] === '*') { const e = src.indexOf('*/', i + 2); i = e < 0 ? n : e + 2; continue; }
+      if (c === '"' || c === "'") { i = skipString(i, c); prev = 'x'; continue; }
+      if (c === '`') { i = skipTemplate(i); prev = 'x'; continue; }
+      if (c === '/' && (!prev || /[(,=:[!&|?{};+\-*%<>~^]/.test(prev))) {
+        reRegex.lastIndex = i;
+        const m = reRegex.exec(src);
+        if (m) { i += m[0].length; prev = 'x'; continue; }
+      }
+      reNum.lastIndex = i;
+      let m = reNum.exec(src);
+      if (m) { i += m[0].length; prev = 'x'; continue; }
+      reId.lastIndex = i;
+      m = reId.exec(src);
+      if (m) {
+        toks.push({ t: 'id', v: m[0], at: i, dot: prev === '.' });
+        i += m[0].length;
+        prev = /^(?:return|typeof|case|in|of|do|else|void|delete|throw|new|yield|await)$/.test(m[0]) ? '(' : 'x';
+        continue;
+      }
+      toks.push({ t: 'p', v: c, at: i });
+      prev = c; i++;
+    }
+
+    // 2. Find each loop head and plan an insertion; apply them back to front.
+    const edits = [];
+    for (let k = 0; k < toks.length - 1; k++) {
+      const tk = toks[k];
+      if (tk.t !== 'id' || tk.dot || (tk.v !== 'while' && tk.v !== 'for')) continue;
+      const open = toks[k + 1];
+      if (open.t !== 'p' || open.v !== '(') continue;
+      let depth = 0, close = -1;
+      const semis = [];
+      for (let j = k + 1; j < toks.length; j++) {
+        const p = toks[j];
+        if (p.t !== 'p') continue;
+        if (p.v === '(' || p.v === '[' || p.v === '{') depth++;
+        else if (p.v === ')' || p.v === ']' || p.v === '}') { depth--; if (depth === 0) { close = j; break; } }
+        else if (p.v === ';' && depth === 1) semis.push(p.at);
+      }
+      if (close < 0 || toks[close].v !== ')') continue;
+      let from, to;
+      if (tk.v === 'while') { if (semis.length) continue; from = open.at + 1; to = toks[close].at; }
+      else { if (semis.length !== 2) continue; from = semis[0] + 1; to = semis[1]; }
+      const cond = src.slice(from, to);
+      edits.push({ from, to, text: cond.trim() ? ' __wd2loop() && (' + cond + ')' : ' __wd2loop()' });
+    }
+    if (!edits.length) return src;
+    let out = src;
+    edits.sort((a, b) => b.from - a.from).forEach((e) => { out = out.slice(0, e.from) + e.text + out.slice(e.to); });
+    return compiles(out) ? out : src;
+  }
+  WD1.guardLoops = guardLoops;
+
   // Runs INSIDE the preview iframe. Must stay ES5-safe and self-contained.
-  function previewHelper(pgId) {
-    var send = function (type, args) { try { parent.postMessage({ wd1pg: pgId, type: type, args: args }, '*'); } catch (e) { /* ignore */ } };
+  function previewHelper(pgId, checks, code, jsLine) {
+    var later = window.setTimeout;
+    var post = function (msg) { try { parent.postMessage(msg, '*'); } catch (e) { /* ignore */ } };
+    // Console traffic is budgeted: at most 500 lines (plus 50 errors) every two seconds. A loop
+    // that logs forever is cut off with a note instead of burying the lesson page in messages.
+    var LINES = 500, ERRORS = 50, lines = 0, errors = 0;
+    (function refill() { lines = 0; errors = 0; later(refill, 2000); })();
+    var send = function (type, payload) {
+      if (type === 'checks') { post({ wd1pg: pgId, type: type, results: payload }); return; }
+      if (type === 'error') { if (++errors > ERRORS) return; }
+      else if (++lines > LINES) {
+        if (lines === LINES + 1) post({ wd1pg: pgId, type: 'warn', args: ['Console paused: more than ' + LINES + ' lines arrived at once. The rest of this burst is not shown.'] });
+        return;
+      }
+      post({ wd1pg: pgId, type: type, args: payload });
+    };
+
+    // Loop guard, called from loop conditions rewritten by guardLoops(). The clock restarts
+    // whenever the browser gets a turn, so loops that wait on timers are never stopped.
+    var gCount = 0, gStart = 0, gArmed = false, gTripped = false;
+    window.__wd2loop = function () {
+      if (!gArmed) { gArmed = true; gTripped = false; gCount = 0; gStart = Date.now(); later(function () { gArmed = false; }, 0); }
+      gCount++;
+      if (gTripped || ((gCount < 50 || gCount % 200 === 0) && Date.now() - gStart > 1500)) {
+        gTripped = true;
+        var err = new Error('Loop stopped after 1.5 seconds. It never finished, so it is probably an infinite loop: check that its condition can become false.');
+        // The throw happens here, in the helper; the stack's first frame inside the JS tab is the loop itself.
+        var frames = String(err.stack || '').match(/:\d+:\d+/g) || [];
+        for (var f = 0; f < frames.length; f++) {
+          var ln = parseInt(frames[f].slice(1), 10);
+          if (jsLine && ln >= jsLine) { err.wd2Line = ln; break; }
+        }
+        throw err;
+      }
+      return true;
+    };
+
+    // Challenge checks run here, inside the preview, and only pass/fail flags are reported.
+    if (checks) {
+      window.addEventListener('load', function () {
+        later(function () {
+          var q = function (s) { return document.querySelector(s); };
+          var qa = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
+          var style = function (s, p) { var el = typeof s === 'string' ? q(s) : s; return el ? window.getComputedStyle(el).getPropertyValue(p).trim() : ''; };
+          var results = [];
+          for (var k = 0; k < checks.length; k++) {
+            var ok = false;
+            try { ok = !!new Function('doc', 'win', '$', '$$', 'style', 'code', checks[k])(document, window, q, qa, style, code); } catch (e) { ok = false; }
+            results.push(ok);
+          }
+          send('checks', results);
+        }, 60);
+      });
+    }
     var fmt = function (v) {
       try {
         if (typeof v === 'string') return v;
@@ -1075,7 +1330,18 @@
         if (orig) orig.apply(console, arguments);
       };
     });
-    window.addEventListener('error', function (e) { send('error', [e.message + (e.lineno ? ' (line ' + e.lineno + ')' : '')]); });
+    // jsLine is where the JS tab's first line sits in this document, so errors can cite the tab's own line.
+    window.addEventListener('error', function (e) {
+      var line = (e.error && e.error.wd2Line) || e.lineno, where = '';
+      if (line && jsLine && line >= jsLine) where = ' (JS line ' + (line - jsLine + 1) + ')';
+      else if (line && !jsLine) where = ' (line ' + line + ')';
+      send('error', [e.message + where]);
+    });
+    window.addEventListener('unhandledrejection', function (e) {
+      var r = e.reason;
+      var msg = r instanceof Error ? r.name + ': ' + r.message : fmt(r);
+      send('error', ['Unhandled promise rejection: ' + msg]);
+    });
 
     var panel = null;
     function note(html) {
@@ -1138,11 +1404,24 @@
     });
   }
 
-  WD1.buildPreviewDoc = function (code, pgId) {
+  // JSON that is safe to place inside an inline <script>: no "<" survives to end the element early.
+  const inlineJSON = (v) => JSON.stringify(v).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+
+  // `checks` (optional) is the playground's [{label, test}] list; the tests run inside the preview.
+  WD1.buildPreviewDoc = function (code, pgId, checks) {
     const html = code.html || '', css = code.css || '', js = code.js || '';
-    const helper = '<script>(' + previewHelper.toString() + ')(' + JSON.stringify(pgId || 'x') + ');<\/script>';
+    const tests = Array.isArray(checks) && checks.length ? checks.map((c) => String(c.test)) : null;
+    const JS_LINE = '"__WD2_JS_LINE__"', JS_MARK = '<script data-wd2-js>\n';
+    const helper = '<script>(' + previewHelper.toString() + ')(' + inlineJSON(pgId || 'x') + ',' + inlineJSON(tests) + ',' +
+      inlineJSON(tests ? { html, css, js } : null) + ',' + JS_LINE + ');<\/script>';
+    // Fill in the line the JS tab starts on once the whole document has been assembled.
+    const finish = (doc) => {
+      const at = doc.lastIndexOf(JS_MARK);
+      const line = at < 0 ? 0 : doc.slice(0, at).split('\n').length + 1;
+      return doc.replace(JS_LINE, () => String(line));
+    };
     const style = css ? '<style>\n' + css + '\n</style>' : '';
-    const script = js ? '<script>\n' + js.replace(/<\/script/gi, '<\\/script') + '\n<\/script>' : '';
+    const script = js ? JS_MARK + guardLoops(js).replace(/<\/script/gi, '<\\/script') + '\n<\/script>' : '';
     if (/<html[\s>]|<!doctype/i.test(html)) {
       let doc = html;
       const inject = helper + style;
@@ -1151,10 +1430,10 @@
       else if (/<!doctype[^>]*>/i.test(doc)) doc = doc.replace(/<!doctype[^>]*>/i, (m) => m + inject);
       else doc = inject + doc;
       if (script) doc = /<\/body>/i.test(doc) ? doc.replace(/<\/body>/i, () => script + '</body>') : doc + script;
-      return doc;
+      return finish(doc);
     }
-    return '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
-      helper + style + '</head><body>\n' + html + '\n' + script + '</body></html>';
+    return finish('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">' +
+      helper + style + '</head><body>\n' + html + '\n' + script + '</body></html>');
   };
 
   const LANG_LABEL = { html: 'HTML', css: 'CSS', js: 'JS' };
@@ -1181,37 +1460,53 @@
     if (el.dataset.preview === 'false') el.classList.add('console-only');
 
     const resetB = iconBtn('reset', 'Reset', 'ghost', () => {
+      clearTimeout(timer); clearTimeout(saveTimer);
       Object.assign(code, orig);
-      editors.forEach((ed, l) => ed.set(orig[l]));
+      editors.forEach((ed, l) => ed.set(orig[l], true));
       WD1.store.set('pg', id, undefined);
       run();
     });
     const openB = iconBtn('open', 'Open in playground', 'ghost', () => {
       try { localStorage.setItem('wd2:handoff', JSON.stringify({ html: code.html || '', css: code.css || '', js: code.js || '', title })); } catch (e) { /* ignore */ }
-      window.open(WD1.url('tools/playground.html#handoff'), '_blank');
+      window.open(WD1.url('tools/playground.html#handoff'), '_blank', 'noopener');
     });
     frame(el, 'Playground', title, [resetB, openB]);
 
-    const tabs = h('div', { class: 'pg-tabs', role: 'tablist' });
+    const tabs = h('div', { class: 'pg-tabs', role: 'tablist', 'aria-label': 'Code editors' });
     const edCol = h('div', { class: 'pg-editor-col' }, tabs);
     const editors = new Map();
+    const uid = 'pg' + Math.random().toString(36).slice(2, 8);
     let active = langs[0];
-    langs.forEach((l) => {
-      const tab = h('button', { type: 'button', class: 'pg-tab', role: 'tab', 'aria-selected': String(l === active), text: LANG_LABEL[l],
-        onclick: () => select(l) });
+    langs.forEach((l, idx) => {
+      const tabId = uid + '-t-' + l, panelId = uid + '-p-' + l;
+      const tab = h('button', {
+        type: 'button', class: 'pg-tab', role: 'tab', id: tabId, 'aria-controls': panelId,
+        'aria-selected': String(l === active), tabindex: l === active ? '0' : '-1', text: LANG_LABEL[l],
+        onclick: () => select(l)
+      });
+      tab.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight') { e.preventDefault(); select(langs[(idx + 1) % langs.length], true); }
+        if (e.key === 'ArrowLeft') { e.preventDefault(); select(langs[(idx - 1 + langs.length) % langs.length], true); }
+      });
       tabs.appendChild(tab);
-      const holder = h('div', { style: { display: 'flex', flexDirection: 'column', flex: '1' }, hidden: l !== active });
+      const holder = h('div', { id: panelId, role: 'tabpanel', 'aria-labelledby': tabId, style: { display: 'flex', flexDirection: 'column', flex: '1' }, hidden: l !== active });
       edCol.appendChild(holder);
       const ed = WD1.editor(holder, { value: code[l], lang: l, height, onInput: (v) => { code[l] = v; schedule(); saveSoon(); } });
       ed.holder = holder; ed.tab = tab;
       editors.set(l, ed);
     });
-    function select(l) {
+    function select(l, focusTab) {
       active = l;
-      editors.forEach((ed, k) => { ed.holder.hidden = k !== l; ed.tab.setAttribute('aria-selected', String(k === l)); });
+      editors.forEach((ed, k) => {
+        const on = k === l;
+        ed.holder.hidden = !on;
+        ed.tab.setAttribute('aria-selected', String(on));
+        ed.tab.tabIndex = on ? 0 : -1;
+      });
+      if (focusTab) editors.get(l).tab.focus();
     }
 
-    const iframe = h('iframe', { title: title + ' preview', loading: 'lazy' });
+    const iframe = WD1.previewFrame(title + ' preview', true);
     iframe.style.minHeight = height + 'px';
     const consoleEl = wantConsole ? h('div', { class: 'pg-console', 'aria-live': 'polite', 'aria-label': 'Console output' }) : null;
     const prevCol = h('div', { class: 'pg-preview-col' },
@@ -1240,9 +1535,10 @@
       const empty = $('.empty', consoleEl);
       if (empty) empty.remove();
       consoleEl.appendChild(h('div', { class: 'log-line ' + (type === 'log' ? '' : type), text: (type === 'error' ? '✖ ' : type === 'warn' ? '⚠ ' : type === 'info' ? '› ' : '') + args.join(' ') }));
+      while (consoleEl.childElementCount > MAX_CONSOLE_LINES) consoleEl.firstElementChild.remove();
       consoleEl.scrollTop = consoleEl.scrollHeight;
     }
-    pgRegistry.set(id, { log });
+    pgRegistry.set(id, { log, iframe, onChecks: showChecks });
 
     let timer = null, saveTimer = null;
     function schedule() { clearTimeout(timer); timer = setTimeout(run, 350); }
@@ -1250,33 +1546,31 @@
 
     function run() {
       clearConsole();
-      iframe.srcdoc = WD1.buildPreviewDoc(code, id);
+      iframe.srcdoc = WD1.buildPreviewDoc(code, id, checks);
     }
-    iframe.addEventListener('load', () => { if (checks) setTimeout(runChecks, 60); });
 
-    function runChecks() {
-      let doc, win;
-      try { doc = iframe.contentDocument; win = iframe.contentWindow; } catch (e) { return; }
-      if (!doc) return;
-      const q = (s) => doc.querySelector(s);
-      const qa = (s) => Array.from(doc.querySelectorAll(s));
-      const style = (s, p) => { const n = typeof s === 'string' ? q(s) : s; return n ? win.getComputedStyle(n).getPropertyValue(p).trim() : ''; };
+    // The preview reports one pass/fail flag per check (see previewHelper).
+    function showChecks(results) {
+      if (!checks || !checks.length || !Array.isArray(results)) return;
       let passed = 0;
       checkList.innerHTML = '';
-      checks.forEach((c) => {
-        let ok = false;
-        try { ok = !!new Function('doc', 'win', '$', '$$', 'style', 'code', c.test)(doc, win, q, qa, style, code); } catch (e) { ok = false; }
+      checks.forEach((c, k) => {
+        const ok = results[k] === true;
         if (ok) passed++;
-        checkList.appendChild(h('li', { class: ok ? 'pass' : 'fail' }, h('span', { class: 'ck', text: ok ? '✓' : '' }), h('span', { html: WD1.fmt(c.label) })));
+        checkList.appendChild(h('li', { class: ok ? 'pass' : 'fail' },
+          h('span', { class: 'ck', 'aria-hidden': 'true', text: ok ? '✓' : '' }),
+          h('span', { class: 'sr-only', text: ok ? 'Passed: ' : 'Not yet: ' }),
+          h('span', { html: WD1.fmt(c.label) })));
       });
       const all = passed === checks.length;
-      const prevDone = WD1.store.get('challenge', id);
+      // A challenge only counts once the student has changed the starter code.
+      const edited = langs.some((l) => code[l] !== orig[l]);
       $$('.all-pass', checksBox).forEach((x) => x.remove());
-      if (all) {
+      if (all && edited) {
         checksBox.appendChild(h('p', { class: 'all-pass', text: '✓ Challenge complete. Every check passes.', style: { margin: '8px 0 0' } }));
-        if (!prevDone) { WD1.store.set('challenge', id, Date.now()); WD1.toast('Challenge complete!', 'visited'); }
+        if (!WD1.store.get('challenge', id)) { WD1.store.set('challenge', id, Date.now()); WD1.toast('Challenge complete!', 'visited'); }
       }
-      el.dispatchEvent(new CustomEvent('checks', { detail: { passed, total: checks.length }, bubbles: true }));
+      el.dispatchEvent(new CustomEvent('checks', { detail: { passed, total: checks.length, complete: all && edited }, bubbles: true }));
     }
 
     run();
@@ -1293,12 +1587,12 @@
     function build() {
       el.innerHTML = '';
       el.classList.add('widget', 'match');
-      const status = h('span', { class: 'muted small' });
+      const status = h('span', { class: 'muted small', role: 'status' });
       frame(el, 'Match', title, [iconBtn('reset', 'Reset', 'ghost', build)]);
       const left = h('div', { class: 'match-col' }, h('span', { class: 'match-col-title', text: data.leftTitle || 'Term' }));
       const right = h('div', { class: 'match-col' }, h('span', { class: 'match-col-title', text: data.rightTitle || 'Matches' }));
       let sel = null, matched = 0, misses = 0;
-      const mk = (text, k, side) => h('button', { type: 'button', class: 'match-item ' + (side === 'L' ? 'term' : ''), dataset: { k, side } },
+      const mk = (text, k, side) => h('button', { type: 'button', class: 'match-item ' + (side === 'L' ? 'term' : ''), 'aria-pressed': 'false', dataset: { k, side } },
         h('span', { class: 'm-badge', text: side === 'L' ? String(k + 1) : '·' }), h('span', { html: WD1.fmt(text) }));
       const L = pairs.map((p, k) => mk(p[0], k, 'L'));
       const R = WD1.shuffle(pairs.map((p, k) => mk(p[1], k, 'R')));
@@ -1308,12 +1602,12 @@
       const onClick = (b) => {
         if (b.classList.contains('matched')) return;
         if (!sel || sel.dataset.side === b.dataset.side) {
-          if (sel) sel.classList.remove('selected');
+          if (sel) { sel.classList.remove('selected'); sel.setAttribute('aria-pressed', 'false'); }
           sel = sel === b ? null : b;
-          if (sel) sel.classList.add('selected');
+          if (sel) { sel.classList.add('selected'); sel.setAttribute('aria-pressed', 'true'); }
           return;
         }
-        const a = sel; sel = null; a.classList.remove('selected');
+        const a = sel; sel = null; a.classList.remove('selected'); a.setAttribute('aria-pressed', 'false');
         if (a.dataset.k === b.dataset.k) {
           matched++;
           [a, b].forEach((x) => { x.classList.add('matched', 'pop'); x.disabled = true; $('.m-badge', x).textContent = String(+x.dataset.k + 1); });
@@ -1355,7 +1649,7 @@
       let idxs = items.map((_, k) => k);
       do { idxs = WD1.shuffle(idxs); } while (items.length > 1 && idxs.every((v, k) => v === k));
       let dragEl = null;
-      const clearMarks = () => $$('.order-item', list).forEach((x) => x.classList.remove('drop-before', 'drop-after', 'right', 'wrong'));
+      const clearMarks = () => $$('.order-item', list).forEach((x) => { x.classList.remove('drop-before', 'drop-after', 'right', 'wrong'); unmark(x); });
       idxs.forEach((k) => {
         const li = h('li', { class: 'order-item', draggable: 'true', dataset: { k } },
           h('span', { class: 'o-text' + (mono ? ' mono' : ''), html: mono ? esc(items[k]) : WD1.fmt(items[k]) }),
@@ -1381,19 +1675,24 @@
         list.appendChild(li);
       });
       el.appendChild(list);
-      const status = h('span', { class: 'small muted', text: 'Drag items, or use the arrow buttons.' });
+      const status = h('span', { class: 'small muted', role: 'status', text: 'Drag items, or use the arrow buttons.' });
       el.appendChild(h('div', { class: 'fill-actions' },
         h('button', { type: 'button', class: 'btn small primary', text: 'Check order', onclick: () => {
           const lis = $$('.order-item', list);
           let right = 0;
-          lis.forEach((li, pos) => { const ok = +li.dataset.k === pos; li.classList.toggle('right', ok); li.classList.toggle('wrong', !ok); if (ok) right++; });
+          lis.forEach((li, pos) => {
+            const ok = +li.dataset.k === pos;
+            li.classList.toggle('right', ok); li.classList.toggle('wrong', !ok);
+            mark(li, ok, ok ? '(in the right spot)' : '(not in the right spot)');
+            if (ok) right++;
+          });
           status.textContent = right === lis.length ? '✓ Perfect order!' : right + ' of ' + lis.length + ' in the right spot.';
           status.className = 'pill ' + (right === lis.length ? 'good' : 'warn');
           if (right === lis.length) WD1.toast('Correct order!');
         } }),
         h('button', { type: 'button', class: 'btn small ghost', text: 'Show answer', onclick: () => {
           const lis = $$('.order-item', list).sort((a, b) => a.dataset.k - b.dataset.k);
-          lis.forEach((li) => { list.appendChild(li); li.classList.remove('wrong'); li.classList.add('right'); });
+          lis.forEach((li) => { list.appendChild(li); li.classList.remove('wrong'); li.classList.add('right'); mark(li, true, '(in the right spot)'); });
           status.textContent = 'Here is the correct order.'; status.className = 'small muted';
         } }),
         h('button', { type: 'button', class: 'btn small ghost', text: 'Shuffle', onclick: build }),
@@ -1422,18 +1721,20 @@
       let armed = null, dragChip = null;
       const zones = [];
       const arm = (chip) => {
-        if (armed) armed.classList.remove('selected');
+        if (armed) { armed.classList.remove('selected'); armed.setAttribute('aria-pressed', 'false'); }
         armed = armed === chip ? null : chip;
-        if (armed) armed.classList.add('selected');
+        if (armed) { armed.classList.add('selected'); armed.setAttribute('aria-pressed', 'true'); }
         zones.forEach((z) => z.classList.toggle('armed', !!armed));
       };
       const place = (chip, zone) => {
         chip.classList.remove('selected', 'right', 'wrong');
+        chip.setAttribute('aria-pressed', 'false');
+        unmark(chip);
         (zone ? $('.bk-bucket-items', zone) : pool).appendChild(chip);
         armed = null; zones.forEach((z) => z.classList.remove('armed'));
       };
       WD1.shuffle(items.map((it, k) => k)).forEach((k) => {
-        const chip = h('button', { type: 'button', class: 'bk-chip' + (mono ? ' mono' : ''), draggable: 'true', dataset: { k },
+        const chip = h('button', { type: 'button', class: 'bk-chip' + (mono ? ' mono' : ''), draggable: 'true', 'aria-pressed': 'false', dataset: { k },
           html: mono ? esc(items[k][0]) : WD1.fmt(items[k][0]) });
         chip.addEventListener('click', (e) => { e.stopPropagation(); arm(chip); });
         chip.addEventListener('dragstart', (e) => { dragChip = chip; try { e.dataTransfer.setData('text/plain', ''); } catch (err) { /* ignore */ } });
@@ -1444,11 +1745,16 @@
       pool.addEventListener('dragover', (e) => { if (dragChip) e.preventDefault(); });
       pool.addEventListener('drop', (e) => { e.preventDefault(); if (dragChip) place(dragChip, null); });
       const grid = h('div', { class: 'bk-grid' });
-      buckets.forEach((name) => {
-        const zone = h('div', { class: 'bk-bucket', role: 'button', tabindex: '0', dataset: { bucket: name }, 'aria-label': 'Place selected item in ' + name },
-          h('span', { class: 'bk-bucket-title', html: WD1.fmt(name) }), h('div', { class: 'bk-bucket-items' }));
+      const uid = 'bk' + Math.random().toString(36).slice(2, 8);
+      buckets.forEach((name, idx) => {
+        const titleId = uid + '-b' + idx;
+        const headBtn = h('button', { type: 'button', class: 'bk-bucket-head', 'aria-label': 'Place selected item in ' + name },
+          h('span', { class: 'bk-bucket-title', id: titleId, html: WD1.fmt(name) }),
+          h('span', { class: 'bk-place-hint', 'aria-hidden': 'true', text: 'Place here' }));
+        const zone = h('div', { class: 'bk-bucket', role: 'region', 'aria-labelledby': titleId, dataset: { bucket: name } },
+          headBtn, h('div', { class: 'bk-bucket-items' }));
+        headBtn.addEventListener('click', (e) => { e.stopPropagation(); if (armed) place(armed, zone); });
         zone.addEventListener('click', () => { if (armed) place(armed, zone); });
-        zone.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && armed) { e.preventDefault(); place(armed, zone); } });
         zone.addEventListener('dragover', (e) => { if (dragChip) { e.preventDefault(); zone.classList.add('over'); } });
         zone.addEventListener('dragleave', () => zone.classList.remove('over'));
         zone.addEventListener('drop', (e) => { e.preventDefault(); zone.classList.remove('over'); if (dragChip) place(dragChip, zone); });
@@ -1456,23 +1762,26 @@
       });
       el.appendChild(pool);
       el.appendChild(grid);
-      const status = h('span', { class: 'small muted' });
+      const status = h('span', { class: 'small muted', role: 'status' });
       el.appendChild(h('div', { class: 'fill-actions' },
         h('button', { type: 'button', class: 'btn small primary', text: 'Check', onclick: () => {
           if ($$('.bk-chip', pool).length) { status.textContent = 'Place every item first (' + $$('.bk-chip', pool).length + ' left).'; status.className = 'pill warn'; return; }
           let right = 0;
           zones.forEach((z) => $$('.bk-chip', z).forEach((c) => {
             const ok = items[c.dataset.k][1] === z.dataset.bucket;
-            c.classList.toggle('right', ok); c.classList.toggle('wrong', !ok); if (ok) right++;
+            c.classList.toggle('right', ok); c.classList.toggle('wrong', !ok);
+            mark(c, ok, ok ? '(correct category)' : '(wrong category)');
+            if (ok) right++;
           }));
-          status.textContent = right === items.length ? '✓ All ' + right + ' sorted correctly!' : right + ' of ' + items.length + ' correct. Move the red ones.';
+          status.textContent = right === items.length ? '✓ All ' + right + ' sorted correctly!' : right + ' of ' + items.length + ' correct. Move the ones marked ✗.';
           status.className = 'pill ' + (right === items.length ? 'good' : 'warn');
           if (right === items.length) WD1.toast('All sorted!');
         } }),
         h('button', { type: 'button', class: 'btn small ghost', text: 'Show answers', onclick: () => {
+          armed = null; zones.forEach((z) => z.classList.remove('armed'));
           $$('.bk-chip', el).forEach((c) => {
             const z = zones.find((x) => x.dataset.bucket === items[c.dataset.k][1]);
-            if (z) { $('.bk-bucket-items', z).appendChild(c); c.classList.remove('wrong', 'selected'); c.classList.add('right'); }
+            if (z) { $('.bk-bucket-items', z).appendChild(c); c.classList.remove('wrong', 'selected'); c.setAttribute('aria-pressed', 'false'); c.classList.add('right'); mark(c, true, '(correct category)'); }
           });
           status.textContent = 'Answers shown.'; status.className = 'small muted';
         } }),
@@ -1572,22 +1881,32 @@
       if (m.index > last) box.appendChild(isText ? h('span', { html: WD1.fmt(raw.slice(last, m.index)) }) : document.createTextNode(raw.slice(last, m.index)));
       const answers = m[1].split('|');
       const width = Math.max(3, ...answers.map((a) => a.length)) + 1;
-      const inp = h('input', { type: 'text', 'aria-label': 'Blank ' + (blanks.length + 1), autocomplete: 'off', spellcheck: 'false', autocapitalize: 'off', style: { width: width + 'ch' } });
-      inp.addEventListener('input', () => inp.classList.remove('right', 'wrong'));
+      const name = 'Blank ' + (blanks.length + 1);
+      const inp = h('input', { type: 'text', 'aria-label': name, autocomplete: 'off', spellcheck: 'false', autocapitalize: 'off', style: { width: width + 'ch' } });
+      const wrap = h('span', { class: 'blank' }, inp);
+      const blank = { inp, wrap, name, answers };
+      inp.addEventListener('input', () => verdict(blank, null));
       inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); check(); } });
-      blanks.push({ inp, answers });
-      box.appendChild(inp);
+      blanks.push(blank);
+      box.appendChild(wrap);
       last = re.lastIndex;
     }
     if (last < raw.length) box.appendChild(isText ? h('span', { html: WD1.fmt(raw.slice(last)) }) : document.createTextNode(raw.slice(last)));
     el.appendChild(isText ? box : h('div', { style: { overflowX: 'auto' } }, box));
     const norm = (s) => { s = s.trim().replace(/\s+/g, ' '); return caseSensitive ? s : s.toLowerCase(); };
-    const status = h('span', { class: 'small muted' });
+    const status = h('span', { class: 'small muted', role: 'status' });
+    // ok: true / false sets the verdict, null clears it.
+    function verdict(b, ok) {
+      b.inp.classList.toggle('right', ok === true); b.inp.classList.toggle('wrong', ok === false);
+      if (ok === false) b.inp.setAttribute('aria-invalid', 'true'); else b.inp.removeAttribute('aria-invalid');
+      b.inp.setAttribute('aria-label', b.name + (ok === null ? '' : ok ? ', correct' : ', incorrect'));
+      if (ok === null) unmark(b.wrap); else mark(b.wrap, ok, '');
+    }
     function check() {
       let right = 0;
       blanks.forEach((b) => {
         const ok = b.answers.some((a) => norm(a) === norm(b.inp.value));
-        b.inp.classList.toggle('right', ok); b.inp.classList.toggle('wrong', !ok); if (ok) right++;
+        verdict(b, ok); if (ok) right++;
       });
       status.textContent = right === blanks.length ? '✓ All blanks correct!' : right + ' of ' + blanks.length + ' correct.';
       status.className = 'pill ' + (right === blanks.length ? 'good' : 'warn');
@@ -1596,11 +1915,11 @@
     el.appendChild(h('div', { class: 'fill-actions' },
       h('button', { type: 'button', class: 'btn small primary', text: 'Check', onclick: check }),
       h('button', { type: 'button', class: 'btn small ghost', text: 'Show answers', onclick: () => {
-        blanks.forEach((b) => { b.inp.value = b.answers[0]; b.inp.classList.remove('wrong'); b.inp.classList.add('right'); });
+        blanks.forEach((b) => { b.inp.value = b.answers[0]; verdict(b, true); });
         status.textContent = 'Answers filled in.'; status.className = 'small muted';
       } }),
       h('button', { type: 'button', class: 'btn small ghost', text: 'Clear', onclick: () => {
-        blanks.forEach((b) => { b.inp.value = ''; b.inp.classList.remove('right', 'wrong'); });
+        blanks.forEach((b) => { b.inp.value = ''; verdict(b, null); });
         status.textContent = '';
       } }),
       status));
