@@ -567,8 +567,8 @@ About page</div>
 
     <aside class="callout">
       <strong>Before you start</strong>
-      <p>Install Node 26 (the LTS release) from nodejs.org. Then open a terminal and type <code>node --version</code>: it should answer with a version number that starts with <code>v26</code>. If the terminal says it cannot find <code>node</code>, close it and open a new one — a terminal only learns about newly installed programs when it starts.</p>
-      <p>Later on this page you will test your servers with <code>curl</code>, a tool that sends requests from the terminal. Those commands are written for the macOS and Linux terminals and for Git Bash. On Windows, use Git Bash, which installs with Git for Windows, and every command works exactly as written. If you stay in PowerShell instead, type <code>curl.exe</code> rather than <code>curl</code>: in Windows PowerShell 5.1, plain <code>curl</code> is an alias for a different command.</p>
+      <p><strong>Stay right on this page during class:</strong> every Node and Express example below has a <strong>▶ Run live</strong> or <strong>▶ Start &amp; test server</strong> button so you can run code, send requests, and inspect headers/cookies visually right in your browser — no terminal required.</p>
+      <p><strong>When you are ready to build locally:</strong> install Node 26 (the LTS release) from nodejs.org and run <code>node --version</code> in a terminal (close and reopen your terminal if it cannot find <code>node</code>). Each server example also includes an optional collapsed <strong>terminal (<code>curl</code>)</strong> panel — on Windows, use Git Bash (or type <code>curl.exe</code> in PowerShell, where plain <code>curl</code> is an alias for a different command).</p>
     </aside>
 
     <p>Here is your first program. It stores two values, prints a greeting built from them, and does a small calculation. Nothing here is new JavaScript — and that is exactly the point.</p>
@@ -615,10 +615,13 @@ Role: web developer
       });
     </script>
 
-    <p>Start it with <code>node http-server.js</code>. Unlike <code>node-hello.js</code>, it does not exit — it prints one line and then waits, listening. Now ask it for pages. The commands below use <code>curl</code>, a terminal tool that acts like a tiny browser: it sends an HTTP request and shows you the raw response, with no rendering.</p>
+    <p>Click <strong>▶ Start &amp; test server</strong> above, then click the <strong>/</strong>, <strong>/about</strong>, and <strong>/missing (404)</strong> preset buttons to watch this server answer live right here. Notice how <code>/</code> answers <code>200 OK</code> with "Home page", <code>/about</code> answers <code>200 OK</code> with "About page", and <code>/missing</code> answers <code>404 Not Found</code> with "Page not found" — while the Server Console prints only the one startup line because the server prints nothing per request unless you tell it to.</p>
 
-    <p class="wk1-caption">Real output — captured by running this exact program (Node 26, Express 5).</p>
-    <div class="output">$ curl http://localhost:3000/
+    <details class="reveal">
+      <summary>Optional: test from your terminal with <code>curl</code> (captured output)</summary>
+      <p>On your own machine, start the server with <code>node http-server.js</code>, then send requests from a second terminal window using <code>curl</code> — a tiny, screenless browser that prints raw server replies:</p>
+      <p class="wk1-caption">Real output — captured by running this exact program (Node 26, Express 5).</p>
+      <div class="output">$ curl http://localhost:3000/
 Home page
 $ curl http://localhost:3000/about
 About page
@@ -628,8 +631,27 @@ $ curl http://localhost:3000/missing
 Page not found
 --- server console ---
 Server listening on http://localhost:3000</div>
+      <p class="small muted">In command #3, <code>-s -o /dev/null -w "%{http_code}"</code> is just a terminal trick to hide the body and print only the status number (<code>404</code>). In everyday work, <code>curl -i http://localhost:3000/missing</code> is much simpler — it prints the status line, headers, and body together.</p>
+    </details>
 
-    <p>Every line of that output is earned by the code. <code>/</code> answered "Home page", <code>/about</code> answered "About page", and a path the server does not know answered with the body "Page not found" <em>and</em> the status code 404 — the third command asks curl to print only the status code, to prove the 404 really was sent. And in the server's own terminal there is just the one listening line: the server prints nothing per request unless you tell it to.</p>
+    <details class="reveal">
+      <summary>What is <code>curl</code>? Plain-English flag cheat sheet (for Weeks 1–4)</summary>
+      <p><strong><code>curl</code> is just a web browser with no screen.</strong> You do not have to memorize its flags to follow this course — every server panel on this site lets you click buttons visually <em>and</em> includes a <strong>Show as curl &amp; browser fetch()</strong> preview that writes the exact command for you. Whenever you see a <code>curl</code> flag in a terminal transcript, look it up here:</p>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th scope="col"><code>curl</code> flag</th><th scope="col">Plain English</th><th scope="col">Visual runner equivalent</th></tr></thead>
+          <tbody>
+            <tr><th scope="row"><code>curl http://localhost:3000/about</code></th><td>Send a plain <code>GET</code> request and print the body (same as typing a URL in Chrome).</td><td>Method <code>GET</code> + Path <code>/about</code> + <strong>Send</strong></td></tr>
+            <tr><th scope="row"><code>-i</code></th><td><strong>I</strong>nclude the HTTP status line (<code>200 OK</code>, <code>404</code>) and response headers (<code>Set-Cookie:</code>) above the body.</td><td>Shown automatically at the top of <strong>HTTP Response</strong></td></tr>
+            <tr><th scope="row"><code>-X POST</code> (or <code>PUT</code>, <code>DELETE</code>)</th><td>Pick a different HTTP method (browser address bars can only do <code>GET</code>).</td><td>The <strong>Method</strong> dropdown</td></tr>
+            <tr><th scope="row"><code>-H "Content-Type: application/json"</code></th><td>Add a request <strong>H</strong>eader (tells Express to parse JSON, or sends <code>Cookie:</code> / <code>Authorization:</code>).</td><td><strong>Headers &amp; Body → Headers</strong></td></tr>
+            <tr><th scope="row"><code>-d '{"title":"Dune"}'</code></th><td>Attach request body <strong>d</strong>ata (form pairs or JSON text).</td><td><strong>Headers &amp; Body → Request body</strong></td></tr>
+            <tr><th scope="row"><code>-c jar.txt</code> / <code>-b jar.txt</code></th><td>Save <strong>c</strong>ookies to a file (<code>-c</code>) and send them <strong>b</strong>ack (<code>-b</code>) — manually imitating a browser's cookie jar.</td><td><strong>Browser cookies</strong> bar + <strong>Clear cookies</strong></td></tr>
+            <tr><th scope="row"><code>-w "%{http_code}"</code></th><td><strong>W</strong>rite out an extra value such as the 3-digit status code after the reply.</td><td>The colored status pill (e.g. <code>201 Created</code>)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
 
     <aside class="callout warn">
       <strong>One sharp edge: req.url includes the query string</strong>
@@ -657,12 +679,17 @@ Server listening on http://localhost:3000</div>
 
       server.listen(3000); // Starts listening for requests on port 3000.
     </script>
-    <p class="wk1-caption">Expected output — now a query string no longer breaks the route match:</p>
-    <div class="output">$ curl "http://localhost:3000/about?lang=es"
+    <p>Try it above with <strong>▶ Start &amp; test server</strong>: click <strong>/about?lang=es</strong> (answers <code>About page (language: es)</code>) and <strong>/about (default en)</strong> (falls back to <code>en</code>).</p>
+    <details class="reveal">
+      <summary>Optional: test from your terminal with <code>curl</code></summary>
+      <p class="wk1-caption">Expected output — now a query string no longer breaks the route match:</p>
+      <div class="output">$ curl "http://localhost:3000/about?lang=es"
 About page (language: es)
 $ curl http://localhost:3000/about
 About page (language: en)</div>
-    <p>Read those three parsing lines closely. Because <code>req.url</code> is only the relative part (<code>'/about?lang=es'</code>), passing a second argument (<code>'http://localhost:3000'</code>) gives <code>new URL(...)</code> a valid full address to parse. From there, <code>parsed.pathname</code> gives you just the path (<code>'/about'</code>) so your <code>if</code> test matches reliably, and <code>parsed.searchParams.get('lang')</code> extracts the value for <code>lang</code> — returning <code>null</code> when absent, which triggers the <code>|| 'en'</code> fallback. (Quotes around the curl URL stop your terminal shell from treating <code>?</code> or <code>&amp;</code> as special shell characters.)</p>
+      <p class="small muted">Quotes around the terminal URL stop your shell from treating <code>?</code> or <code>&amp;</code> as special characters.</p>
+    </details>
+    <p>Read those three parsing lines closely. Because <code>req.url</code> is only the relative part (<code>'/about?lang=es'</code>), passing a second argument (<code>'http://localhost:3000'</code>) gives <code>new URL(...)</code> a valid full address to parse. From there, <code>parsed.pathname</code> gives you just the path (<code>'/about'</code>) so your <code>if</code> test matches reliably, and <code>parsed.searchParams.get('lang')</code> extracts the value for <code>lang</code> — returning <code>null</code> when absent, which triggers the <code>|| 'en'</code> fallback.</p>
 
     <h3>Reading the program, piece by piece</h3>
     <div class="table-wrap">
@@ -1181,13 +1208,17 @@ server.[[listen]](3000);
       });
     </script>
 
-    <p class="wk1-caption">Real output — captured by running this exact program (Node 26, Express 5).</p>
-    <div class="output">$ curl http://localhost:3000/
+    <p>Click <strong>▶ Start &amp; test server</strong> above and try <strong>/</strong> (<code>Hello from Express!</code>), <strong>/about</strong> (<code>About this site</code>), and <strong>/missing (404)</strong>.</p>
+    <details class="reveal">
+      <summary>Optional: test from your terminal with <code>curl</code> (captured output)</summary>
+      <p class="wk1-caption">Real output — captured by running this exact program (Node 26, Express 5).</p>
+      <div class="output">$ curl http://localhost:3000/
 Hello from Express!
 $ curl http://localhost:3000/about
 About this site
 --- server console ---
 Server listening on http://localhost:3000</div>
+    </details>
 
     <p>Same behavior, in eleven lines of code where the raw server needed sixteen (blank lines aside). What is gone is exactly the plumbing: no <code>writeHead</code>, no <code>Content-Type</code> bookkeeping, no <code>if</code> chain. And one invisible improvement: ask this server for <code>/missing</code> and Express answers with a proper 404 on its own — the fallback branch you had to write by hand is built in.</p>
 
@@ -1270,8 +1301,11 @@ Server listening on http://localhost:3000</div>
         console.log('Listening on http://localhost:3000'); // Prints the local address on startup.
       });
     </script>
-    <p class="wk1-caption">Expected output when testing the three routes and one missing path with curl:</p>
-    <div class="output">$ curl http://localhost:3000/ping
+    <p>Click <strong>▶ Start &amp; test server</strong> above to test all four responses right here — try <strong>/ (HTML page)</strong> and click <strong>Preview rendered HTML</strong>, then test <strong>/ping</strong>, <strong>/api/status</strong>, and <strong>/missing (Custom 404)</strong>.</p>
+    <details class="reveal">
+      <summary>Optional: test from your terminal with <code>curl</code></summary>
+      <p class="wk1-caption">Expected output when testing the routes and one missing path with curl (<code>-i</code> includes the status line and headers):</p>
+      <div class="output">$ curl http://localhost:3000/ping
 pong
 $ curl http://localhost:3000/api/status
 {"ok":true,"visits":0,"routes":["/","/ping","/api/status"]}
@@ -1280,6 +1314,7 @@ HTTP/1.1 404 Not Found
 Content-Type: text/html; charset=utf-8
 ...
 &lt;h1&gt;404 — Page Not Found&lt;/h1&gt;&lt;p&gt;Check the URL or &lt;a href=&quot;/&quot;&gt;go home&lt;/a&gt;.&lt;/p&gt;</div>
+    </details>
     <p>Walk through every piece of <code>express-responses.js</code>:</p>
     <ul>
       <li><strong><code>res.send(string)</code> vs. <code>res.type('text/plain').send(string)</code>:</strong> when you pass a string to <code>res.send()</code>, Express sets <code>Content-Type: text/html; charset=utf-8</code> by default so browsers render HTML tags immediately. Calling <code>res.type('text/plain')</code> first changes that header to plain text when you do not want HTML rendering.</li>
@@ -1553,17 +1588,19 @@ What Express hands your handler as req.query:
       });
     </script>
 
-    <p>Read the handler closely, because it is the pattern for the rest of the course. <code>app.post</code> registers a route for POST requests — a GET to <code>/signup</code> would <em>not</em> match it. The handler takes whatever the translators put in <code>req.body</code> and answers with <code>res.json</code>, which sends an object back as JSON. Now watch the same route answer both kinds of client:</p>
+    <p>Read the handler closely, because it is the pattern for the rest of the course. <code>app.post</code> registers a route for POST requests — a GET to <code>/signup</code> would <em>not</em> match it. The handler takes whatever the translators put in <code>req.body</code> and answers with <code>res.json</code>, which sends an object back as JSON. Click <strong>▶ Start &amp; test server</strong> above and try both presets — <strong>/signup (Form)</strong> and <strong>/signup (JSON)</strong> — then expand <strong>Show as curl &amp; browser fetch()</strong> to see the exact headers and body each one sends.</p>
 
-    <p class="wk1-caption">Real output — captured by running this exact program (Node 26, Express 5). The first request sends a form-style body, the second sends JSON.</p>
-    <div class="output">$ curl -X POST http://localhost:3000/signup -d "name=Ada&amp;plan=free"
+    <details class="reveal">
+      <summary>Optional: test both POST formats from your terminal with <code>curl</code> (captured output)</summary>
+      <p class="wk1-caption">Real output — captured by running this exact program (Node 26, Express 5). The first request sends a form-style body, the second sends JSON.</p>
+      <div class="output">$ curl -X POST http://localhost:3000/signup -d "name=Ada&amp;plan=free"
 {"received":{"name":"Ada","plan":"free"}}
 $ curl -X POST http://localhost:3000/signup -H "Content-Type: application/json" -d '{"name":"Ada","plan":"pro"}'
 {"received":{"name":"Ada","plan":"pro"}}
 --- server console ---
 Listening on port 3000</div>
-
-    <p>Three curl flags do the work in those commands. <code>-X POST</code> sets the method. <code>-d</code> supplies the body — and, used alone, it also labels that body as form data (<code>Content-Type: application/x-www-form-urlencoded</code>), just as a browser form does. <code>-H</code> adds a header of your choosing, and the second command uses it to relabel its body as JSON. That label is the only reason the JSON example works: leave out the <code>-H</code> and the form translator claims the body, misreads the whole JSON text as one oddly named field, and the JSON translator never looks at it.</p>
+      <p>Three curl flags do the work in those commands: <code>-X POST</code> sets the method, <code>-d</code> supplies the body (and automatically labels it as form data <code>application/x-www-form-urlencoded</code>), and <code>-H</code> adds a header — the second command uses <code>-H "Content-Type: application/json"</code> to label its body as JSON. Leave out that <code>-H</code> header and Express's JSON translator ignores the body.</p>
+    </details>
 
     <p>Two different body formats went in; the same shape of answer came out, because <code>req.body</code> held <code>{ name: 'Ada', plan: 'free' }</code> the first time and <code>{ name: 'Ada', plan: 'pro' }</code> the second. Forget both translators and <code>req.body</code> is <code>undefined</code>: nothing translated the body, so there is no object at all, and the first line that reads a field from it — <code>req.body.name</code>, say — fails with <span class="wk1-err">TypeError: Cannot read properties of undefined</span>. That is the single most common beginner bug with POST, and now you know its cause before you ever meet it.</p>
 

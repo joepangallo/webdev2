@@ -69,8 +69,11 @@
       app.listen(3000, () => console.log('Listening on port 3000')); // Starts the HTTP server on port 3000.
     </script>
     <p>Two objects do all the work. <code>req.query</code> is an object Express builds from the query string: for <code>?name=Ada</code> it is <code>{ name: 'Ada' }</code>, and when there is no query string it is an empty object, which is why the code falls back to <code>'stranger'</code>. <code>req.params</code> holds the route parameters: for the path <code>/users/42</code> matched against <code>/users/:id</code>, it is <code>{ id: '42' }</code>. Notice the value is the <em>string</em> <code>'42'</code>, not the number 42 — everything that arrives in a URL is text, and converting it is your job when it matters.</p>
-    <p class="wk2-cap"><strong>Real output</strong> — captured by running this exact program (Node 26, Express 5):</p>
-    <div class="output wk2-output">$ curl "http://localhost:3000/greet?name=Ada"
+    <p>Click <strong>▶ Start &amp; test server</strong> above to try <strong>/greet?name=Ada</strong>, <strong>/greet</strong> (defaults to <code>"stranger"</code>), and <strong>/users/42</strong> (returns <code>{"userId":"42"}</code>) live right here.</p>
+    <details class="reveal">
+      <summary>Optional: test from your terminal with <code>curl</code> (captured output)</summary>
+      <p class="wk2-cap"><strong>Real output</strong> — captured by running this exact program (Node 26, Express 5):</p>
+      <div class="output wk2-output">$ curl "http://localhost:3000/greet?name=Ada"
 {"message":"Hello, Ada!"}
 $ curl http://localhost:3000/greet
 {"message":"Hello, stranger!"}
@@ -78,6 +81,7 @@ $ curl http://localhost:3000/users/42
 {"userId":"42"}
 --- server console ---
 Listening on port 3000</div>
+    </details>
     <p>The first two requests hit the <em>same</em> route. The query string never changes which route matches; it only changes what the handler finds in <code>req.query</code>. The third request shows a parameter doing the opposite job: <code>/users/42</code>, <code>/users/7</code> and <code>/users/ada</code> all match the one route <code>/users/:id</code>, and the handler learns which user from <code>req.params.id</code>.</p>
 
     <h3>Three places values hide: a map</h3>
@@ -313,14 +317,18 @@ console.log(parseUrl('/search?tag=node&amp;tag=express'));</textarea>
 
       app.listen(3000, () => console.log('Listening on port 3000')); // Starts the HTTP server on port 3000.
     </script>
-    <p class="wk2-cap"><strong>Real output</strong> — captured by running this exact program (Node 26, Express 5). The client — here <code>curl</code> — receives one word; the server console tells the real story:</p>
-    <div class="output wk2-output">$ curl http://localhost:3000/
+    <p>Click <strong>▶ Start &amp; test server → / (Watch console order)</strong> above: the HTTP response is just one word (<code>Done</code>), while the <strong>Server Console</strong> prints Middleware 1, Middleware 2, and Route handler in exact registration order.</p>
+    <details class="reveal">
+      <summary>Optional: test from your terminal with <code>curl</code> (captured output)</summary>
+      <p class="wk2-cap"><strong>Real output</strong> — captured by running this exact program (Node 26, Express 5). The client receives one word; the server console tells the real story:</p>
+      <div class="output wk2-output">$ curl http://localhost:3000/
 Done
 --- server console ---
 Listening on port 3000
 Middleware 1: request received
 Middleware 2: checking the request
 Route handler: sending the response</div>
+    </details>
     <p>Read the console top to bottom and you are reading the conveyor belt: Middleware 1 runs first because it was registered first, its <code>next()</code> call starts Middleware 2, whose <code>next()</code> starts the route handler, which sends <code>Done</code> and ends the journey. One request, three functions, strict order.</p>
     <p>Open the same address in a real browser and the console shows a second, shorter pass: Middleware 1 and Middleware 2 print again, with no route-handler line after them. That is the browser asking, on its own, for <code>/favicon.ico</code> — the little icon in the tab. The extra request travels the same line, but no route matches it, so Express answers 404.</p>
 
@@ -548,13 +556,17 @@ app.use((req, res, [[next]]) => {
         <h1>Static home page</h1> <!-- Served automatically by express.static when a visitor requests /. -->
       </script>
     </div>
-    <p class="wk2-cap"><strong>Real output</strong> — captured by running this exact program (Node 26, Express 5):</p>
-    <div class="output wk2-output">$ curl http://localhost:3000/hello.txt
+    <p>Click <strong>▶ Start &amp; test server</strong> above and test <strong>/hello.txt</strong> and <strong>/ (index.html)</strong> — <code>express.static('public')</code> serves both files automatically without a single route handler.</p>
+    <details class="reveal">
+      <summary>Optional: test from your terminal with <code>curl</code> (captured output)</summary>
+      <p class="wk2-cap"><strong>Real output</strong> — captured by running this exact program (Node 26, Express 5):</p>
+      <div class="output wk2-output">$ curl http://localhost:3000/hello.txt
 Hello from the public folder!
 $ curl http://localhost:3000/
 &lt;h1&gt;Static home page&lt;/h1&gt;
 --- server console ---
 Listening on port 3000</div>
+    </details>
     <p>Notice what is <em>not</em> in the console: no route handler ran. The static middleware answered both requests itself. That is the assembly line working as designed — a station that can finish the job does, and the request never travels further.</p>
 
     <p><strong>Example — how <code>express.static('public')</code> maps HTML, CSS, and browser JS to URLs:</strong> put all three front-end files inside <code>public/</code>, and Express automatically sends each one with the right <code>Content-Type</code> header (<code>text/html</code>, <code>text/css</code>, <code>text/javascript</code>):</p>
@@ -852,8 +864,11 @@ SyntaxError: Expected double-quoted property name in JSON at position 57 (line 4
       app.listen(3000, () => console.log('Listening on port 3000')); // Starts the HTTP server on port 3000.
     </script>
     <p>Four details to carry away. First, <code>Number(req.params.id)</code>: parameters arrive as strings (Section 2.1), and the stored <code>id</code> is a number, so the comparison converts first — skip that and no book would ever be found. Second, the <code>404</code> answers are JSON too: <code>{"error":"Book not found"}</code>. An API client is a program, not a person, so even errors arrive in the format it can parse. Third, the <code>DELETE</code> handler answers <code>204</code> with no body at all — success, nothing to say. Fourth, the guard at the top of the <code>POST</code> and <code>PUT</code> handlers: if the body is missing, or has no title or no author, the handler answers <code>400</code> with a JSON error and returns before it touches the collection. That is validation in its smallest form — check what the client sent before you store it — and the <code>!req.body</code> test also covers the case from Section 2.3 where no body was translated at all, so the handler answers 400 instead of crashing.</p>
-    <p class="wk2-cap"><strong>Real output</strong> — the full captured session, running this exact program (Node 26, Express 5) and driving it with <code>curl</code>, a command-line tool for making HTTP requests. The requests run in order against one running server, so you can watch the collection change:</p>
-    <div class="output wk2-output">$ curl http://localhost:3000/api/books
+    <p><strong>Try the full CRUD lifecycle live right above:</strong> click <strong>▶ Start &amp; test server</strong> on <code>rest-api.js</code> and step through the preset buttons — <strong>List books</strong> (<code>200</code>), <strong>Add book (201)</strong>, <strong>Bad body (400)</strong>, <strong>Update #1 (200)</strong>, <strong>Delete #2 (204)</strong>, <strong>Book #99 (404)</strong>, and <strong>List books</strong> again to watch the in-memory collection change in real time. Expand <strong>Show as curl &amp; browser fetch()</strong> inside the runner to see the exact terminal command and browser <code>fetch()</code> call for any button you click.</p>
+    <details class="reveal">
+      <summary>Optional: run the 8-request CRUD session from your terminal with <code>curl</code> (captured output)</summary>
+      <p class="wk2-cap"><strong>Real output</strong> — the full captured session, running this exact program (Node 26, Express 5) and driving it from a terminal with <code>curl</code> (<code>-X</code> sets method, <code>-H</code> sets the JSON header, <code>-d</code> sends the body, and <code>-w</code> appends the status code):</p>
+      <div class="output wk2-output">$ curl http://localhost:3000/api/books
 [{"id":1,"title":"Dune","author":"Frank Herbert"},{"id":2,"title":"Emma","author":"Jane Austen"}]
 $ curl http://localhost:3000/api/books/2
 {"id":2,"title":"Emma","author":"Jane Austen"}
@@ -871,8 +886,9 @@ $ curl http://localhost:3000/api/books
 [{"id":1,"title":"Dune (revised)","author":"Frank Herbert"},{"id":3,"title":"The Hobbit","author":"J.R.R. Tolkien"}]
 --- server console ---
 Listening on port 3000</div>
-    <p>Trace the final list and check it against the session: book 1 was renamed by the <code>PUT</code>, book 2 (<em>Emma</em>) was deleted, book 3 (<em>The Hobbit</em>) was created by the first <code>POST</code>. The two requests that failed on purpose changed nothing: the second <code>POST</code>, sent without an author, was refused with <code>400</code>, and the request for book 99 reported <code>404</code> — each in JSON. That is a complete CRUD story told in eight requests.</p>
-    <p>Two practical notes on typing those commands. The <code>-H "Content-Type: application/json"</code> part is not decoration: leave it out and <code>express.json()</code> ignores the body, <code>req.body</code> is <code>undefined</code>, and the guard answers the same 400 you saw above. And the single quotes around the JSON after <code>-d</code> only work in macOS and Linux terminals and in Git Bash, so on Windows run these commands in Git Bash. (In Command Prompt, use double quotes and put a backslash before each inner one: <code>-d "{\"title\":\"The Hobbit\",\"author\":\"J.R.R. Tolkien\"}"</code>. In PowerShell, type <code>curl.exe</code> rather than <code>curl</code>, and expect its quoting rules to differ again.)</p>
+      <p>Trace the final list: book 1 was renamed by <code>PUT</code>, book 2 (<em>Emma</em>) was deleted, book 3 (<em>The Hobbit</em>) was created by the first <code>POST</code>, and the two intentional failures (<code>400</code> and <code>404</code>) changed nothing.</p>
+      <p>Two practical terminal notes: never omit <code>-H "Content-Type: application/json"</code> (without it, <code>express.json()</code> ignores the body and <code>req.body</code> stays <code>undefined</code>). On Windows, run these commands in Git Bash — Command Prompt needs escaped double quotes (<code>-d "{\"title\":\"The Hobbit\",\"author\":\"J.R.R. Tolkien\"}"</code>) and PowerShell requires typing <code>curl.exe</code>.</p>
+    </details>
 
     <p><strong>Example — the full REST client talking to <code>rest-api.js</code> (HTML, CSS &amp; Browser JS):</strong> here is the browser equivalent of that curl session, showing the interface controls, status-pill styling, and all four <code>fetch()</code> CRUD calls ready for Section 2.5:</p>
     <div class="tabs wk2-tabs">
@@ -1427,13 +1443,16 @@ loadBooks();</textarea>
         res.status(404).json({ error: 'Not found' }); // Sends a consistent JSON 404 error for unknown addresses.
       });
     </script>
-    <p class="wk2-cap"><strong>Real output</strong> — captured by running the organized app assembled from this section's excerpts (Node 26, Express 5). Compare the two 404s: book 99 matches a route but names no book, while <code>/nope</code> matches nothing at all and falls through to this last station:</p>
-    <div class="output wk2-output">$ curl http://localhost:3000/api/books/99 -w " [status %{http_code}]"
+    <details class="reveal">
+      <summary>Optional: see both 404 responses from the terminal with <code>curl</code> (captured output)</summary>
+      <p class="wk2-cap"><strong>Real output</strong> — captured by running the organized app assembled from this section's excerpts (Node 26, Express 5). Book 99 matches a route but names no book, while <code>/nope</code> matches nothing at all and falls through to this last station (<code>-w</code> just appends the status code):</p>
+      <div class="output wk2-output">$ curl http://localhost:3000/api/books/99 -w " [status %{http_code}]"
 {"error":"Book not found"} [status 404]
 $ curl http://localhost:3000/nope -w " [status %{http_code}]"
 {"error":"Not found"} [status 404]
 --- server console ---
 Listening on port 3000</div>
+    </details>
     <p>Same status, different sender: the router answered the first (its route matched; the collection simply has no book 99), and the final 404 handler answered the second (no route anywhere matched, so the request travelled the whole line unanswered). Position is what makes the handler safe — registered last, it only ever sees requests nothing else claimed.</p>
     <p>Second, the <strong>error-handling middleware</strong>. Ordinary stations have three arguments; an error handler has <strong>four</strong> — <code>(err, req, res, next)</code> — and that extra first argument is how Express recognizes it. It never runs during a normal request. It runs when an earlier handler calls <code>next(err)</code> with an error, or throws one: Express skips every remaining ordinary station and jumps straight here. Its job is to answer with the right status. Some errors arrive already knowing theirs: when a client sends malformed JSON, <code>express.json()</code> raises an error whose <code>err.status</code> is 400, because the mistake is the client's, not yours. So the handler uses the error's own status when it has one and falls back to 500 when it does not. A 4xx error keeps its message, which tells the client what to fix; a 5xx is logged on the server (where only you can see it) and the client gets a calm, generic reply:</p>
     <script type="text/plain" class="code" data-lang="js" data-title="The error-handling middleware (registered last)">

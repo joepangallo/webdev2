@@ -85,9 +85,12 @@
       app.listen(3000, () => console.log('Listening on port 3000')); // Start the server on port 3000.
     </script>
 
-    <p>Run it, then ask for the page twice — once with no cookie, once sending the cookie back, exactly as a browser would:</p>
+    <p><strong>Try it right here:</strong> click <strong>▶ Start &amp; test server</strong> above, then click <strong>/visit (Click twice!)</strong>. On the first click, the response carries <code>set-cookie: visited=yes; Path=/</code> and the <strong>Browser cookies</strong> bar saves <code>visited=yes</code>. On the second click, the browser automatically sends that cookie back, and the same route replies <em>"Welcome back!"</em>. Click <strong>Clear cookies</strong> to become a brand-new visitor again. That difference <em>is</em> state.</p>
 
-    <div class="output">$ curl -i http://localhost:3000/visit   (first visit; showing only the interesting headers + body)
+    <details class="reveal">
+      <summary>Optional: test from your terminal with <code>curl</code> (captured output)</summary>
+      <p>In a terminal, <code>-i</code> prints the <code>Set-Cookie</code> response header on the first visit, and <code>-H "Cookie: visited=yes"</code> manually sends it back on the second:</p>
+      <div class="output">$ curl -i http://localhost:3000/visit   (first visit; showing only the interesting headers + body)
 HTTP/1.1 200 OK
 Set-Cookie: visited=yes; Path=/
 First visit! We just set a cookie named visited.
@@ -95,7 +98,8 @@ $ curl http://localhost:3000/visit -H "Cookie: visited=yes"
 Welcome back! Your browser sent the visited cookie.
 --- server console ---
 Listening on port 3000</div>
-    <p class="wk3-note">Real output — captured from running this code (Node v26.13.1, Express 5.3.0). Read it line by line: the first response carries the <code>Set-Cookie</code> header, so the browser stores <code>visited=yes</code>. The second request presents it in a <code>Cookie</code> header, and the same route gives a completely different answer. That difference <em>is</em> state.</p>
+      <p class="wk3-note">Real output — captured from running this code (Node v26.13.1, Express 5.3.0).</p>
+    </details>
 
     <aside class="callout tip">
       <strong>See your own cookies</strong>
@@ -330,9 +334,12 @@ console.log(Object.keys(parseCookies('a=1; oops; b=2')).join(', ')); // want a, 
       app.listen(3000, () => console.log('Listening on port 3000')); // Start listening for requests on port 3000.
     </script>
 
-    <p>Now watch the count behave. <code>curl</code> forgets cookies between runs unless you give it a <strong>cookie jar</strong> — a file where it saves cookies (<code>-c</code>) and sends them back (<code>-b</code>), doing the job a browser normally does:</p>
+    <p><strong>Try it live right above:</strong> click <strong>▶ Start &amp; test server</strong>, then click <strong>/count (Click repeatedly!)</strong> three times. Watch the response climb <code>Visit number 1</code> → <code>Visit number 2</code> → <code>Visit number 3</code> while the <strong>Browser cookies</strong> bar holds only a signed <code>connect.sid</code> ticket (with <code>HttpOnly</code> and <code>SameSite=Lax</code> — no count anywhere inside the cookie!). Now click <strong>Clear cookies</strong> and click <strong>/count</strong> again: without the cookie ticket, the server has no session to look up and starts a fresh session back at <code>Visit number 1</code>.</p>
 
-    <div class="output">$ curl -c jar.txt http://localhost:3000/count   (first visit, saves the session cookie)
+    <details class="reveal">
+      <summary>Optional: run this from your terminal with a <code>curl</code> cookie jar (captured output)</summary>
+      <p>Unlike a browser, <code>curl</code> forgets cookies between runs unless you give it a <strong>cookie jar</strong> file: <code>-c jar.txt</code> saves cookies the server sets, and <code>-b jar.txt</code> sends saved cookies back on later requests:</p>
+      <div class="output">$ curl -c jar.txt http://localhost:3000/count   (first visit, saves the session cookie)
 Visit number 1
 $ curl -b jar.txt http://localhost:3000/count   (same browser jar)
 Visit number 2
@@ -342,7 +349,8 @@ $ curl http://localhost:3000/count   (no cookie: a new session)
 Visit number 1
 --- server console ---
 Listening on port 3000</div>
-    <p class="wk3-note">Real output — captured from running this code (Node v26.13.1, Express 5.3.0). The count climbs 1, 2, 3 while the jar presents the same session ID, because the number itself lives on the server. Drop the cookie and the server has no ticket to look up, so it starts a brand-new session at 1. Notice the visitor never sees the count in their cookie — only the ID travels. Repeating that last request with <code>-i</code>, in the same captured run, showed the ticket itself: <code>Set-Cookie: connect.sid=s%3A…; Path=/; HttpOnly; SameSite=Lax</code> (the long random ID is shortened here). A signed ID, the two attributes from the <code>cookie</code> setting, and no count anywhere.</p>
+      <p class="wk3-note">Real output — captured from running this code (Node v26.13.1, Express 5.3.0). Repeating that last request with <code>-i</code> showed the ticket itself: <code>Set-Cookie: connect.sid=s%3A…; Path=/; HttpOnly; SameSite=Lax</code> — a signed ID, the two attributes from the <code>cookie</code> setting, and no count anywhere.</p>
+    </details>
 
     <p><strong>Example — the two sides of one session, side by side:</strong></p>
     <div class="output">IN THE BROWSER — the whole cookie is just the ticket:

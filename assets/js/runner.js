@@ -1949,6 +1949,7 @@ function handleLogin(req, res) {
                 reqPathInp.value = p.path || '/';
                 reqHeadersInp.value = p.headers ? Object.entries(p.headers).map(([k, v]) => `${k}: ${v}`).join('\n') : '';
                 reqBodyInp.value = p.body || '';
+                updateEquiv();
                 sendCurrentRequest();
               }
             }, h('span', { class: 'm-tag', text: (p.method || 'GET').toUpperCase() }), p.label || p.path || '/');
@@ -1976,15 +1977,102 @@ function handleLogin(req, res) {
           h('div', { class: 'field' }, h('label', { text: 'Request body (JSON or form key=value&...)' }), reqBodyInp)
         );
 
+        const curlPre = h('pre', { class: 'runner-equiv-code' });
+        const curlKey = h('p', { class: 'runner-equiv-key' });
+        const fetchPre = h('pre', { class: 'runner-equiv-code' });
+        const equivDetails = h('details', { class: 'runner-req-extra runner-equiv' },
+          h('summary', { text: 'Show as curl & browser fetch()' }),
+          h('div', { class: 'runner-equiv-grid' },
+            h('div', { class: 'runner-equiv-box' },
+              h('div', { class: 'runner-equiv-lbl', text: 'Terminal (curl)' }),
+              curlPre,
+              curlKey),
+            h('div', { class: 'runner-equiv-box' },
+              h('div', { class: 'runner-equiv-lbl', text: 'Browser JS (fetch)' }),
+              fetchPre))
+        );
+
+        function updateEquiv() {
+          const method = reqMethodSel.value || 'GET';
+          const rawPath = (reqPathInp.value || '/').trim() || '/';
+          const path = rawPath.startsWith('/') ? rawPath : '/' + rawPath;
+          const url = 'http://localhost:3000' + path;
+          const headers = {};
+          reqHeadersInp.value.split('\n').forEach((line) => {
+            const idx = line.indexOf(':');
+            if (idx > 0) headers[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+          });
+          const body = reqBodyInp.value;
+          const hasCt = Object.keys(headers).some((k) => k.toLowerCase() === 'content-type');
+          if (body && !hasCt) {
+            headers['Content-Type'] = /^\s*[{[]/.test(body) ? 'application/json' : 'application/x-www-form-urlencoded';
+          }
+          const jarStr = cookieJar.headerString();
+
+          // Build equivalent curl command + plain-English flag key
+          const curlParts = ['curl -i'];
+          const flags = ['-i shows status + headers'];
+          if (method !== 'GET') {
+            curlParts.push(`-X ${method}`);
+            flags.push(`-X ${method} sets HTTP method`);
+          }
+          Object.entries(headers).forEach(([k, v]) => {
+            curlParts.push(`-H "${k}: ${v.replace(/"/g, '\\"')}"`);
+            if (!flags.some((f) => f.startsWith('-H'))) flags.push('-H adds a header');
+          });
+          if (jarStr && !Object.keys(headers).some((k) => k.toLowerCase() === 'cookie')) {
+            curlParts.push('-b jar.txt');
+            flags.push('-b sends saved cookies');
+          }
+          if (body) {
+            curlParts.push(`-d '${body.replace(/'/g, "'\\''")}'`);
+            flags.push('-d attaches request body');
+          }
+          curlParts.push(path.includes('?') || path.includes('&') ? `"${url}"` : url);
+          curlPre.textContent = curlParts.join(' \\\n  ');
+          curlKey.textContent = flags.join(' · ');
+
+          // Build equivalent browser fetch() code
+          const fetchOpts = [];
+          if (method !== 'GET') fetchOpts.push(`  method: '${method}'`);
+          if (Object.keys(headers).length) {
+            const hLines = Object.entries(headers).map(([k, v]) => `    '${k}': '${v.replace(/'/g, "\\'")}'`).join(',\n');
+            fetchOpts.push(`  headers: {\n${hLines}\n  }`);
+          }
+          if (body) {
+            const isJson = /^\s*[{[]/.test(body);
+            if (isJson) {
+              try {
+                JSON.parse(body);
+                fetchOpts.push(`  body: JSON.stringify(${body})`);
+              } catch {
+                fetchOpts.push(`  body: ${JSON.stringify(body)}`);
+              }
+            } else {
+              fetchOpts.push(`  body: ${JSON.stringify(body)}`);
+            }
+          }
+          fetchPre.textContent = fetchOpts.length
+            ? `const res = await fetch('${path}', {\n${fetchOpts.join(',\n')}\n});`
+            : `const res = await fetch('${path}');`;
+        }
+
+        [reqMethodSel, reqPathInp, reqHeadersInp, reqBodyInp].forEach((el) => {
+          el.addEventListener('input', updateEquiv);
+          el.addEventListener('change', updateEquiv);
+        });
+        updateEquiv();
+
         outCol.appendChild(h('div', { class: 'runner-req' },
           h('div', { class: 'runner-req-row' }, reqMethodSel, reqPathInp, sendBtn),
-          extraDetails
+          extraDetails,
+          equivDetails
         ));
 
         cookiesList = h('span', { class: 'cluster' });
         const clearCookiesBtn = h('button', {
           type: 'button', class: 'btn small ghost', text: 'Clear cookies',
-          onclick: () => { cookieJar.clear(); renderCookies(); log('info', 'Browser cookie jar cleared (acting as a new visitor).'); }
+          onclick: () => { cookieJar.clear(); renderCookies(); updateEquiv(); log('info', 'Browser cookie jar cleared (acting as a new visitor).'); }
         });
         cookiesBar = h('div', { class: 'runner-cookies', hidden: true },
           h('strong', { text: 'Browser cookies:' }), cookiesList, clearCookiesBtn);
@@ -2098,6 +2186,7 @@ function handleLogin(req, res) {
         lastResponse = res;
         (res.setCookies || []).forEach((sc) => cookieJar.applySetCookie(sc));
         renderCookies();
+        if (typeof updateEquiv === 'function') updateEquiv();
         renderFiles();
 
         respBox.innerHTML = '';

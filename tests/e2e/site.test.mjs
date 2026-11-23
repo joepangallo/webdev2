@@ -1263,6 +1263,8 @@ test('live runner: Node scripts, Express servers, cookies/sessions, MongoDB, SQL
     };
     const rList = await clickPreset('List books');
     const rAdd = await clickPreset('Add book (201)');
+    const equivCurl = api.querySelectorAll('.runner-equiv-code')[0]?.textContent || '';
+    const equivFetch = api.querySelectorAll('.runner-equiv-code')[1]?.textContent || '';
     const rMiss = await clickPreset('Book #99');
     const rAfter = await clickPreset('List books');
 
@@ -1275,6 +1277,8 @@ test('live runner: Node scripts, Express servers, cookies/sessions, MongoDB, SQL
       rList: JSON.parse(rList.body).length,
       rAddStatus: rAdd.status,
       rAddId: JSON.parse(rAdd.body).id,
+      equivCurl,
+      equivFetch,
       rMissStatus: rMiss.status,
       rAfter: JSON.parse(rAfter.body).length,
       hangStatus: hang.querySelector('.runner-resp-head .pill').textContent
@@ -1283,6 +1287,8 @@ test('live runner: Node scripts, Express servers, cookies/sessions, MongoDB, SQL
   assert.equal(wk2.rList, 2);
   assert.equal(wk2.rAddStatus, '201 Created');
   assert.equal(wk2.rAddId, 3);
+  assert.match(wk2.equivCurl, /curl -i[\s\S]*-X POST[\s\S]*Content-Type: application\/json/);
+  assert.match(wk2.equivFetch, /fetch\('\/api\/books'[\s\S]*method: 'POST'/);
   assert.equal(wk2.rMissStatus, '404 Not Found');
   assert.equal(wk2.rAfter, 3);
   assert.match(wk2.hangStatus, /Hung/);

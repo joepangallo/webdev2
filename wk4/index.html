@@ -338,8 +338,11 @@ stored as : salt + ':' + hash, in a single column</div>
 
       app.listen(3000, () => console.log('Listening on port 3000')); // Starts the HTTP server on port 3000.
     </script>
-    <p>Captured run (Node v26.13.1, Express 5.3.0). The <code>-c</code> flag saves the session cookie into a jar file and <code>-b</code> sends it back — that is exactly what a browser does for you automatically.</p>
-    <div class="output">$ curl -c jar.txt http://localhost:3000/count   (first visit, saves the session cookie)
+    <p>Click <strong>▶ Start &amp; test server → /count</strong> three times to watch the count climb <code>1 → 2 → 3</code>, then click <strong>Clear cookies</strong> and request <code>/count</code> again to see a brand-new session start back at <code>1</code>. Notice what the cookie holds: only the signed session ID — the visit count itself never leaves the server. That split (an unguessable ID in the browser, real data on the server) is what makes sessions safe enough to carry login state.</p>
+    <details class="reveal">
+      <summary>Optional: run from your terminal with a <code>curl</code> cookie jar (captured output)</summary>
+      <p class="small muted">Captured run (Node v26.13.1, Express 5.3.0). In <code>curl</code>, <code>-c jar.txt</code> saves the session cookie into a file and <code>-b jar.txt</code> sends it back — imitating what a browser does automatically.</p>
+      <div class="output">$ curl -c jar.txt http://localhost:3000/count   (first visit, saves the session cookie)
 Visit number 1
 $ curl -b jar.txt http://localhost:3000/count   (same browser jar)
 Visit number 2
@@ -349,7 +352,7 @@ $ curl http://localhost:3000/count   (no cookie: a new session)
 Visit number 1
 --- server console ---
 Listening on port 3000</div>
-    <p>Notice what the cookie holds: only the session ID. The visit count itself never leaves the server. That split — an unguessable ID in the browser, the real data on the server — is what makes sessions safe enough to carry login state.</p>
+    </details>
 
     <h3>The login flow, step by step</h3>
     <p>Logging in is just a session that gets a name attached to it. Step through the whole exchange:</p>

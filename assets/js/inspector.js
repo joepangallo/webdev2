@@ -33,6 +33,7 @@
     JSON: 'JavaScript Object Notation: JSON.stringify() turns an object into text for the wire; JSON.parse() turns JSON text back into an object.',
 
     // HTTP & Express
+    curl: 'Terminal tool that acts like a screenless browser: sends a raw HTTP request (-X method, -H header, -d body, -i show headers, -c/-b cookies) and prints the server reply.',
     http: 'Node.js built-in module for creating low-level HTTP servers with http.createServer() without installing any external package.',
     express: 'Minimal web framework for Node.js that handles routing, middleware pipelines, JSON/form parsing, and response helpers cleanly.',
     Router: 'express.Router() groups related routes (such as all /api/books endpoints) into a mini-app in its own file.',
@@ -1274,6 +1275,25 @@
         where: 'In the HTTP headers section, right between the start line and the blank line before the body.',
         when: 'Read before the message body is parsed.',
         why: 'Headers carry metadata (formats, cookies, auth tokens, caching) separately from the main content body.'
+      };
+    }
+    if (/^\$?\s*curl\b/.test(code)) {
+      const notes = [];
+      if (/\s-i\b/.test(code)) notes.push('-i prints status line + response headers');
+      const xm = code.match(/\s-X\s+(\w+)/);
+      if (xm) notes.push(`-X ${xm[1]} sets the HTTP method`);
+      if (/\s-H\s+/.test(code)) notes.push('-H attaches an HTTP request header');
+      if (/\s-d\s+/.test(code)) notes.push('-d sends the request body data');
+      if (/\s-c\s+/.test(code)) notes.push('-c saves response cookies into a jar file');
+      if (/\s-b\s+/.test(code)) notes.push('-b sends saved cookies back from the jar file');
+      if (/\s-w\s+/.test(code)) notes.push('-w prints extra formatting such as the HTTP status code');
+      if (/\s-s\b/.test(code) || /\s-o\s+\/dev\/null/.test(code)) notes.push('-s -o /dev/null hides progress and discards the body so only the status prints');
+      return {
+        who: 'curl — a screenless terminal HTTP client acting like a tiny browser.',
+        what: `Sends an HTTP request from the terminal${notes.length ? ' (' + notes.join('; ') + ')' : ' using GET by default'}.`,
+        where: 'In your local terminal (or try the same request visually with "▶ Start & test server"!).',
+        when: 'Executed when you press Enter; prints the server’s raw reply and exits.',
+        why: 'Lets you test GET, POST, PUT, DELETE, headers, and cookies directly without building an HTML page first.'
       };
     }
     if (/^node\s+-e\s+/.test(code)) {
