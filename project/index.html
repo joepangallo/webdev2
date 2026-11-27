@@ -2,16 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Final Project · Web Dev II</title>
 <meta name="description" content="The Web Development II final project: one full-stack web app, built a milestone at a time — Express server, REST API, database persistence, and logins with roles.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/course.css">
 <script src="../assets/js/course.js"></script>
-<script src="../assets/js/inspector.js"></script>
-<style>
-  .proj-tabs .tab-panel > .code-block:first-child { margin-top: 8px; }
-  .proj-tabs .tab-panel > p + .code-block { margin-top: 14px; }
-</style>
 </head>
 <body data-page="project">
 <main id="main">
@@ -48,8 +46,8 @@
     </div>
     <p><strong>Example — one theme, worked:</strong></p>
     <p>Take the <strong>Collection tracker</strong>, tracking a shelf of books. The one main collection is <strong>books</strong>: each book has a title, a category, a year and a note. Browsing is public; adding, editing and deleting belong to the owner (that last part switches on at Milestone 4). Its routes:</p>
-    <div class="table-wrap"><table class="data-table">
-      <thead><tr><th scope="col">Verb</th><th scope="col">URL</th><th scope="col">Purpose</th></tr></thead>
+    <div class="table-wrap"><table class="data">
+      <thead><tr><th>Verb</th><th>URL</th><th>Purpose</th></tr></thead>
       <tbody>
         <tr><td>GET</td><td><code>/api/books</code></td><td>List every book in the collection (public)</td></tr>
         <tr><td>GET</td><td><code>/api/books/:id</code></td><td>Show one book (public)</td></tr>
@@ -66,8 +64,8 @@
     <h2 id="m1-h">Milestone 1 · A Running Server</h2>
     <p><strong>Goal:</strong> a Node project with an Express server that starts cleanly and answers real routes. This is the skeleton everything else hangs on.</p>
     <p><strong>Builds on:</strong> Week 1 — Node, the http module, npm, Express, GET and POST.</p>
-    <div class="table-wrap"><table class="data-table">
-      <thead><tr><th scope="col">Requirement</th><th scope="col">What "done" looks like</th></tr></thead>
+    <div class="table-wrap"><table class="data">
+      <thead><tr><th>Requirement</th><th>What "done" looks like</th></tr></thead>
       <tbody>
         <tr><td>Project setup</td><td><code>npm init</code> done; <code>express</code> in <code>dependencies</code>; a <code>start</code> script in package.json</td></tr>
         <tr><td>Server</td><td><code>node</code> starts it with no errors; it listens on a port taken from <code>process.env.PORT</code> with a sensible default</td></tr>
@@ -76,7 +74,7 @@
       </tbody>
     </table></div>
     <p><strong>Done looks like:</strong></p>
-    <script type="text/plain" class="code" data-lang="text" data-title="Request — POST /api/books">
+    <script type="text/plain" class="code" data-title="Request — POST /api/books">
       POST /api/books HTTP/1.1
       Host: localhost:3000
       Content-Type: application/json
@@ -88,59 +86,6 @@
 Content-Type: application/json
 
 { "title": "Dune", "category": "Sci-fi", "year": 1965 }</div>
-    <p><strong>Reference starter blueprint (adapt the routes to your own theme):</strong></p>
-    <div class="tabs proj-tabs">
-      <div data-tab="server.js (Express)">
-        <p>Reads <code>process.env.PORT</code> with a fallback to <code>3000</code>, turns on JSON and form body parsers, answers three GET routes plus one POST route, and includes a clean 404 fallback.</p>
-        <script type="text/plain" class="code" data-lang="js" data-title="server.js (Milestone 1 blueprint)">
-          const express = require('express'); // Load the Express web framework from node_modules.
-          const app = express(); // Create the Express application that handles incoming requests.
-
-          // Translate incoming JSON and HTML form bodies into req.body
-          app.use(express.json()); // Parse JSON request bodies (e.g., from fetch or curl) into req.body.
-          app.use(express.urlencoded({ extended: true })); // Parse HTML form submissions into req.body.
-
-          app.get('/', (req, res) => { // Handle GET requests to the home page.
-            res.send('<h1>Book Shelf Tracker</h1><p>Try /about, /api/books, or POST /api/books.</p>'); // Reply with a simple HTML landing page.
-          });
-          app.get('/about', (req, res) => { // Handle GET /about with app metadata.
-            res.json({ app: 'Book Shelf Tracker', collection: 'books' }); // Send a JSON object describing this project.
-          });
-          app.get('/api/books', (req, res) => { // Handle GET /api/books to list starter books.
-            res.json([{ title: 'Dune', category: 'Sci-fi', year: 1965 }]); // Return a hardcoded JSON array for Milestone 1.
-          });
-          app.post('/api/books', (req, res) => { // Handle POST /api/books when a client sends a new book.
-            res.json(req.body); // Echo the parsed request body back as JSON to confirm receipt.
-          });
-
-          // Last station: clear 404 for unknown addresses
-          app.use((req, res) => { // Catch any request that did not match a route above.
-            res.status(404).json({ error: 'Not found' }); // Send HTTP 404 with a clear JSON error instead of hanging.
-          });
-
-          const port = process.env.PORT || 3000; // Use the host's PORT environment variable, or 3000 locally.
-          app.listen(port, () => console.log('Listening on http://localhost:' + port)); // Bind to the port and log the local URL once ready.
-        </script>
-      </div>
-      <div data-tab="package.json (JSON)">
-        <p>Declares <code>express</code> under <code>dependencies</code> and a <code>start</code> script so <code>npm start</code> launches your server with one command.</p>
-        <script type="text/plain" class="code" data-lang="json" data-title="package.json (Milestone 1 blueprint)">
-          {
-            "name": "book-shelf-tracker",
-            "version": "1.0.0",
-            "main": "server.js",
-            "scripts": {
-              "start": "node server.js",
-              "dev": "node --watch server.js"
-            },
-            "dependencies": {
-              "express": "^5.3.0"
-            }
-          }
-        </script>
-      </div>
-    </div>
-    <p>Every Milestone 1 requirement is visible in those two files: <code>process.env.PORT || 3000</code> lets hosting platforms choose the port while keeping <code>3000</code> locally, <code>express.json()</code> and <code>express.urlencoded()</code> make <code>POST /api/books</code> work for both curl JSON requests and HTML forms, and the final <code>app.use(...)</code> prevents hangs or ugly defaults on unknown paths.</p>
     <p><strong>Deliverable:</strong> your project folder (or repo link) plus a one-paragraph note naming your theme and your main collection.</p>
     <div class="quiz" data-title="Milestone 1 self-check">
       <script type="application/json">
@@ -149,10 +94,10 @@ Content-Type: application/json
     "q": "Your server answers at `http://localhost:3000` on your machine. A classmate on another computer types the same address and gets nothing. Why?",
     "shuffle": true,
     "choices": [
-      "Your server crashed the moment a second visitor tried to connect to it",
+      "Your code is broken",
       "`localhost` means *this* computer — theirs points at their own machine",
-      "Express answers one visitor at a time, and you were already using it",
-      "Port 3000 is reserved, so other computers are not allowed to ask for it"
+      "Express only serves one visitor",
+      "The port is too low"
     ],
     "answer": 1,
     "explain": "`localhost` always means the machine you are sitting at. Sharing your running app with others is a deployment step, not a code fix."
@@ -170,16 +115,16 @@ Content-Type: application/json
     "explain": "`package.json` lists dependencies; `npm install` rebuilds `node_modules` from it. You share the list, never the folder."
   },
   {
-    "q": "Your POST route receives a form, but `req.body` is `undefined`. The most likely cause is…",
+    "q": "Your POST route receives a form but `req.body` is empty. The most likely cause is…",
     "shuffle": true,
     "choices": [
-      "Form fields always arrive in `req.query`, so `req.body` stays unset for every form you submit",
+      "The form used GET",
       "The body-parsing middleware (`express.urlencoded`) is missing or runs after the route",
-      "The handler is missing its `next` argument, so Express never fills in the body",
-      "Port 3000 was already in use, so the request reached a different program"
+      "POST routes cannot read forms",
+      "The port is already in use"
     ],
     "answer": 1,
-    "explain": "Express does not unpack form bodies until the matching middleware has run — and middleware only applies to routes defined after it. Until then `req.body` is `undefined`, so reading a field from it crashes."
+    "explain": "Express does not unpack form bodies until the matching middleware has run — and middleware only applies to routes defined after it."
   }
 ]
       </script>
@@ -191,8 +136,8 @@ Content-Type: application/json
     <h2 id="m2-h">Milestone 2 · API and Front End</h2>
     <p><strong>Goal:</strong> your main collection becomes a small REST API, and a web page uses it. For now the data can live in memory — Week 3 makes it permanent.</p>
     <p><strong>Builds on:</strong> Week 2 — routing in depth, middleware, REST design, single-page front ends.</p>
-    <div class="table-wrap"><table class="data-table">
-      <thead><tr><th scope="col">Requirement</th><th scope="col">What "done" looks like</th></tr></thead>
+    <div class="table-wrap"><table class="data">
+      <thead><tr><th>Requirement</th><th>What "done" looks like</th></tr></thead>
       <tbody>
         <tr><td>REST endpoints</td><td>GET all, GET one by id, POST, PUT, DELETE for your main collection, with nouns-not-verbs paths like <code>/api/books</code></td></tr>
         <tr><td>Status codes</td><td>201 on create, 204 on delete, 404 with a JSON error when an id does not exist</td></tr>
@@ -202,7 +147,7 @@ Content-Type: application/json
       </tbody>
     </table></div>
     <p><strong>Done looks like:</strong></p>
-    <script type="text/plain" class="code" data-lang="text" data-title="Request — POST /api/books">
+    <script type="text/plain" class="code" data-title="Request — POST /api/books">
       POST /api/books HTTP/1.1
       Host: localhost:3000
       Content-Type: application/json
@@ -214,133 +159,6 @@ Content-Type: application/json
 Content-Type: application/json
 
 { "id": 3, "title": "The Left Hand of Darkness", "category": "Sci-fi", "year": 1969, "note": "First edition" }</div>
-    <p><strong>Reference starter blueprint (router + styled Vue SPA served by <code>express.static('public')</code>):</strong></p>
-    <div class="tabs proj-tabs">
-      <div data-tab="routes/books.js (Router JS)">
-        <p>Moves all five CRUD routes into their own module, mounted with <code>app.use('/api/books', booksRouter)</code> in <code>server.js</code>.</p>
-        <script type="text/plain" class="code" data-lang="js" data-title="routes/books.js (Milestone 2 blueprint)">
-          const express = require('express'); // Load Express so we can create a modular router.
-          const router = express.Router(); // Create a mini-app for /api/books routes (mounted in server.js).
-
-          let books = [ // Temporary in-memory collection (replaced by a database in Milestone 3).
-            { id: 1, title: 'Dune', category: 'Sci-fi', year: 1965, note: 'Paperback' }, // Starter book #1.
-            { id: 2, title: 'Emma', category: 'Classic', year: 1815, note: 'Annotated' } // Starter book #2.
-          ];
-          let nextId = 3; // Counter for generating the next unique numeric book ID.
-
-          router.get('/', (req, res) => res.json(books)); // GET /api/books: return the full list of books as JSON.
-          router.get('/:id', (req, res) => { // GET /api/books/:id: look up one book by its URL parameter.
-            const book = books.find((b) => b.id === Number(req.params.id)); // Convert :id from text to a number and find the match.
-            if (!book) return res.status(404).json({ error: 'Book not found' }); // Reply 404 if no book has that ID.
-            res.json(book); // Send the matching book as JSON.
-          });
-          router.post('/', (req, res) => { // POST /api/books: create a new book from the request body.
-            const { title, category, year, note } = req.body || {}; // Safely unpack submitted fields (defaulting if body is missing).
-            if (!title || !category) return res.status(400).json({ error: 'title and category are required' }); // Reject incomplete input with HTTP 400.
-            const book = { id: nextId++, title, category, year: Number(year) || null, note: note || '' }; // Build the new record with the next ID and clean defaults.
-            books.push(book); // Store the new book in the in-memory array.
-            res.status(201).json(book); // Reply 201 Created with the newly saved book.
-          });
-          router.put('/:id', (req, res) => { // PUT /api/books/:id: update an existing book's fields.
-            const book = books.find((b) => b.id === Number(req.params.id)); // Locate the target book by numeric ID.
-            if (!book) return res.status(404).json({ error: 'Book not found' }); // Reply 404 if the book does not exist.
-            Object.assign(book, { // Copy updated fields onto the book object in place.
-              title: req.body.title ?? book.title, // Use the new title if provided, otherwise keep the existing one.
-              category: req.body.category ?? book.category, // Use the new category if provided, otherwise keep the existing one.
-              year: req.body.year ?? book.year, // Use the new year if provided, otherwise keep the existing one.
-              note: req.body.note ?? book.note // Use the new note if provided, otherwise keep the existing one.
-            });
-            res.json(book); // Return the updated book with status 200 OK.
-          });
-          router.delete('/:id', (req, res) => { // DELETE /api/books/:id: remove a book from the collection.
-            const i = books.findIndex((b) => b.id === Number(req.params.id)); // Find the array index of the matching book (-1 if missing).
-            if (i === -1) return res.status(404).json({ error: 'Book not found' }); // Reply 404 if no book has that ID.
-            books.splice(i, 1); // Remove that single item from the array.
-            res.status(204).send(); // Reply 204 No Content to confirm deletion with an empty body.
-          });
-
-          module.exports = router; // Export the router so server.js can mount it with app.use().
-        </script>
-      </div>
-      <div data-tab="public/index.html (HTML + Vue)">
-        <p>Uses Vue 3 from a pinned CDN script (no build step): <code>@submit.prevent</code> stops page reloads and calls <code>addBook()</code>, which POSTs JSON and pushes the server's <code>201</code> response into reactive state.</p>
-        <script type="text/plain" class="code" data-lang="html" data-title="public/index.html (Milestone 2 blueprint)">
-          <!DOCTYPE html> <!-- Declare modern HTML5 so the browser renders in standards mode. -->
-          <html lang="en"> <!-- Root element; lang="en" helps screen readers and search engines. -->
-          <head> <!-- Page metadata and external assets (not displayed directly). -->
-            <meta charset="utf-8"> <!-- Use UTF-8 encoding so all text and symbols display cleanly. -->
-            <meta name="viewport" content="width=device-width, initial-scale=1"> <!-- Scale the layout properly on mobile screens. -->
-            <title>Book Shelf Tracker</title> <!-- Title shown in the browser tab. -->
-            <link rel="stylesheet" href="/styles.css"> <!-- Load the stylesheet served by express.static('public'). -->
-            <script src="https://unpkg.com/vue@3.5.45/dist/vue.global.prod.js"><\/script> <!-- Load Vue 3 from a CDN (no build step needed). -->
-          </head>
-          <body> <!-- Visible content of the web page. -->
-            <main id="app" class="container"> <!-- Mount point (#app) where Vue controls the interface. -->
-              <h1>Book Shelf Tracker</h1> <!-- Main page heading. -->
-              <p v-if="error" class="alert" role="alert">{{ error }}</p> <!-- Show an accessible error banner only when error is non-empty. -->
-
-              <form class="add-form" @submit.prevent="addBook"> <!-- Intercept form submit to call addBook() without a page reload. -->
-                <input v-model="form.title" placeholder="Title" required> <!-- Two-way bind the title input to form.title. -->
-                <input v-model="form.category" placeholder="Category" required> <!-- Two-way bind the category input to form.category. -->
-                <input v-model.number="form.year" type="number" placeholder="Year"> <!-- Two-way bind the year input as a number to form.year. -->
-                <button type="submit">Add book</button> <!-- Trigger the form's @submit.prevent handler. -->
-              </form>
-
-              <ul class="item-list"> <!-- Unordered list displaying every book from reactive state. -->
-                <li v-for="b in books" :key="b.id"> <!-- Render one list item per book, tracked by its unique id. -->
-                  <span><strong>{{ b.title }}</strong> ({{ b.category }}, {{ b.year }})</span> <!-- Display the book's title, category, and year safely. -->
-                  <button type="button" class="btn-del" @click="removeBook(b.id)">Delete</button> <!-- Call removeBook() with this book's id when clicked. -->
-                </li>
-              </ul>
-            </main>
-            <!-- Client-side Vue 3 script that talks to the Express REST API. -->
-            <script>
-              Vue.createApp({ // Create the Vue application configuration.
-                data: () => ({ books: [], error: '', form: { title: '', category: '', year: '' } }), // Define reactive state for the list, error message, and form inputs.
-                async mounted() { // Run automatically once the page mounts in the browser.
-                  const res = await fetch('/api/books'); // Request the current list of books from the server API.
-                  this.books = await res.json(); // Parse the JSON response and update the reactive books list.
-                },
-                methods: { // Event handlers called by the template above.
-                  async addBook() { // Send a POST request to create a new book.
-                    this.error = ''; // Clear any previous error banner before submitting.
-                    const res = await fetch('/api/books', { // POST the form data to the Express API.
-                      method: 'POST', // Use HTTP POST to create a new resource.
-                      headers: { 'Content-Type': 'application/json' }, // Tell Express the request body is JSON.
-                      body: JSON.stringify(this.form) // Serialize the reactive form fields into a JSON string.
-                    });
-                    const data = await res.json(); // Parse the server's JSON response (new book or error object).
-                    if (!res.ok) { this.error = data.error || 'Could not add book'; return; } // Show the error and stop if the server rejected the request.
-                    this.books.push(data); // Append the newly created book to the list immediately.
-                    this.form = { title: '', category: '', year: '' }; // Reset the form inputs for the next entry.
-                  },
-                  async removeBook(id) { // Send a DELETE request to remove one book by id.
-                    const res = await fetch('/api/books/' + id, { method: 'DELETE' }); // Ask the API to delete this book.
-                    if (res.ok) this.books = this.books.filter((b) => b.id !== id); // Remove the book from local state if the server confirmed deletion.
-                  }
-                }
-              }).mount('#app'); // Attach the Vue app to the <main id="app"> element.
-            <\/script>
-          </body>
-          </html>
-        </script>
-      </div>
-      <div data-tab="public/styles.css (CSS)">
-        <p>Clean responsive CSS for the SPA list, form row, delete buttons, and error banner — served automatically at <code>/styles.css</code>.</p>
-        <script type="text/plain" class="code" data-lang="css" data-title="public/styles.css (Milestone 2 blueprint)">
-          body { font-family: system-ui, sans-serif; margin: 0; padding: 24px 16px; background: #f8fafc; color: #1f2937; } /* Base font, light page background, dark text, and outer padding. */
-          .container { max-width: 640px; margin: 0 auto; } /* Cap content width and center the app horizontally. */
-          .add-form { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; } /* Lay out form inputs and button in a wrapping row with even gaps. */
-          .add-form input { flex: 1 1 130px; padding: 8px 10px; border: 1px solid #94a3b8; border-radius: 6px; font: inherit; } /* Let inputs grow evenly, inherit page font, and show crisp borders. */
-          .add-form button { padding: 8px 16px; border: 0; border-radius: 6px; background: #1f4fd1; color: #fff; font-weight: 700; cursor: pointer; } /* High-contrast primary submit button with pointer cursor. */
-          .item-list { list-style: none; padding: 0; display: grid; gap: 8px; } /* Remove default bullets and stack book rows with uniform spacing. */
-          .item-list li { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; } /* Style each book row as a card with text left and Delete button right. */
-          .btn-del { padding: 4px 10px; border: 1px solid #dc2626; border-radius: 6px; background: #fff; color: #b91c1c; cursor: pointer; } /* Outlined red destructive button for deleting a book. */
-          .alert { padding: 10px 12px; background: #fef2f2; border: 1px solid #ef4444; border-radius: 8px; color: #991b1b; font-weight: 700; } /* High-contrast red banner for API validation or network errors. */
-        </script>
-      </div>
-    </div>
-    <p>Notice how <code>@submit.prevent</code> in Vue replaces <code>event.preventDefault()</code>, letting the form work cleanly with the Enter key while sending JSON via <code>fetch()</code> and updating the screen with zero full-page reload.</p>
     <p><strong>Deliverable:</strong> the updated project, plus a short list of your endpoints (method + path + what it does).</p>
     <div class="quiz" data-title="Milestone 2 self-check">
       <script type="application/json">
@@ -361,10 +179,10 @@ Content-Type: application/json
     "q": "Your front end shows the list but the add-form reloads the whole page. What is missing?",
     "shuffle": true,
     "choices": [
-      "An `express.static` line on the server, so the browser stops asking for a whole new page",
+      "A bigger server",
       "JavaScript that intercepts the submit, sends the data with `fetch`, and updates the page",
-      "A second HTML file for the form, loaded into the page each time a book is added",
-      "A `201` status on the POST route, which tells the browser to stay on the page it is showing"
+      "A second HTML file",
+      "A database"
     ],
     "answer": 1,
     "explain": "A plain form submit always navigates. Single-page behavior comes from JavaScript handling the event and talking to the API itself."
@@ -373,10 +191,10 @@ Content-Type: application/json
     "q": "Why move the book routes into a router file instead of leaving everything in the server file?",
     "shuffle": true,
     "choices": [
-      "Express matches routes in a router file faster than routes in the server file",
+      "Routers run faster",
       "Each file stays about one thing, so the app remains readable as it grows",
-      "Express refuses to start once one file defines more than a handful of routes",
-      "Code in a router file is hidden from visitors; the server file is public"
+      "Express requires exactly two files",
+      "Routers hide the code from users"
     ],
     "answer": 1,
     "explain": "Organization is about the humans. The API answers identically either way — you proved that in Week 2 — but a one-topic file is far easier to change safely."
@@ -391,8 +209,8 @@ Content-Type: application/json
     <h2 id="m3-h">Milestone 3 · Real Persistence</h2>
     <p><strong>Goal:</strong> restart your server and your data is still there. Your API now reads and writes a real database — MongoDB or MySQL, your choice — and refuses bad data.</p>
     <p><strong>Builds on:</strong> Week 3 — cookies and sessions, relational vs non-relational databases, CRUD, validation and configuration.</p>
-    <div class="table-wrap"><table class="data-table">
-      <thead><tr><th scope="col">Requirement</th><th scope="col">What "done" looks like</th></tr></thead>
+    <div class="table-wrap"><table class="data">
+      <thead><tr><th>Requirement</th><th>What "done" looks like</th></tr></thead>
       <tbody>
         <tr><td>Database</td><td>Main collection stored in MongoDB or MySQL; all five API operations use the database, not an in-memory array</td></tr>
         <tr><td>Safe queries</td><td>MySQL: every query uses placeholders — no user input glued into SQL strings. MongoDB: filters built from validated fields only</td></tr>
@@ -403,61 +221,16 @@ Content-Type: application/json
     </table></div>
     <p><strong>Done looks like:</strong></p>
     <script type="text/plain" class="code" data-lang="js" data-title="One book, as stored in MongoDB">
-      { // One document stored inside the MongoDB "books" collection.
-        "_id": "66f1c2a4b8e3d5f60718293a", // Unique 24-character ObjectId generated automatically by MongoDB.
-        "title": "The Left Hand of Darkness", // Book title saved from the API request.
-        "category": "Sci-fi", // Genre or category field used for grouping and filtering.
-        "year": 1969, // Publication year stored as a numeric value.
-        "note": "First edition" // Optional user note saved alongside the book.
+      {
+        "_id": "66f1c2a4b8e3d5f60718293a",
+        "title": "The Left Hand of Darkness",
+        "category": "Sci-fi",
+        "year": 1969,
+        "note": "First edition"
       }
     </script>
     <p>MongoDB generates the <code>_id</code> when the record is saved — yours will differ. Restart the server and this record is still there; that is the milestone.</p>
     <p class="muted">A note on ids: the milestone checks keep illustrating the API with the simple numeric ids from the in-memory stage (Milestone 2). In the MongoDB version, the document's <code>_id</code> — that 24-character ObjectId — is what plays the id role in the URL.</p>
-    <p><strong>Reference starter blueprint (seed script + environment template):</strong></p>
-    <div class="tabs proj-tabs">
-      <div data-tab="seed.js (MongoDB seed script)">
-        <p>Run once with <code>node --env-file=.env seed.js</code> so a fresh clone starts with visible starter records instead of an empty list.</p>
-        <script type="text/plain" class="code" data-lang="js" data-title="seed.js (Milestone 3 blueprint)">
-          const { MongoClient } = require('mongodb'); // Load the official MongoDB driver for Node.
-
-          const STARTER_BOOKS = [ // Sample records to populate an empty database on first setup.
-            { title: 'Dune', category: 'Sci-fi', year: 1965, note: 'Paperback' }, // Starter record #1.
-            { title: 'Emma', category: 'Classic', year: 1815, note: 'Annotated' }, // Starter record #2.
-            { title: 'The Left Hand of Darkness', category: 'Sci-fi', year: 1969, note: 'First edition' } // Starter record #3.
-          ];
-
-          async function seed() { // Async function so we can await each database step cleanly.
-            const client = new MongoClient(process.env.MONGO_URI); // Read the connection string from the environment (never hardcode secrets).
-            await client.connect(); // Open the connection to the MongoDB server.
-            const books = client.db('bookshelf').collection('books'); // Select the "books" collection inside the "bookshelf" database.
-
-            // Only insert starter books if the collection is empty
-            if ((await books.countDocuments()) === 0) { // Check how many documents already exist so re-running stays safe.
-              await books.insertMany(STARTER_BOOKS); // Insert all starter books in a single database call.
-              console.log('Inserted', STARTER_BOOKS.length, 'starter books.'); // Report how many records were added.
-            } else { // Skip seeding if the collection already contains records.
-              console.log('Collection already has data — skipping seed.'); // Confirm nothing was duplicated.
-            }
-            await client.close(); // Close the database connection so the Node script exits cleanly.
-          }
-
-          seed().catch((err) => { console.error(err); process.exit(1); }); // Run seed(), logging any error and exiting with failure code 1.
-        </script>
-      </div>
-      <div data-tab=".env.example (Config template)">
-        <p>Commit <code>.env.example</code> with placeholder text and keep your real <code>.env</code> in <code>.gitignore</code>.</p>
-        <script type="text/plain" class="code" data-lang="text" data-title=".env.example (Milestone 3 blueprint)">
-          PORT=3000
-          MONGO_URI=mongodb://localhost:27017/bookshelf
-          # Or for MySQL:
-          # DB_HOST=localhost
-          # DB_USER=root
-          # DB_PASSWORD=replace-me
-          # DB_NAME=bookshelf
-        </script>
-      </div>
-    </div>
-    <p>Notice the idempotent guard <code>if ((await books.countDocuments()) === 0)</code> in <code>seed.js</code>: running the seed command twice by accident will never duplicate your starter records.</p>
     <p><strong>Deliverable:</strong> the updated project; your README now includes setup steps that end with a running app and visible seed data.</p>
     <div class="quiz" data-title="Milestone 3 self-check">
       <script type="application/json">
@@ -466,10 +239,10 @@ Content-Type: application/json
     "q": "You restart your server and the items your classmate added are gone. What does that tell you?",
     "shuffle": true,
     "choices": [
-      "The database server stopped along with your app and erased its tables",
+      "The database is down",
       "The data was still living in an in-memory array, not the database",
-      "The browser cleared its cookies, so the server forgot the items",
-      "The items were saved, but the restart moved the database to a new port"
+      "The browser cleared its cookies",
+      "The port changed"
     ],
     "answer": 1,
     "explain": "Memory dies with the process. Surviving a restart is the whole point of persistence — it is also the fastest test that your API really uses the database."
@@ -478,10 +251,10 @@ Content-Type: application/json
     "q": "Why must the server validate data the browser form already checked?",
     "shuffle": true,
     "choices": [
-      "Browsers skip their own checks whenever a form is submitted with the Enter key",
+      "Browsers check badly",
       "Anyone can send requests without your form — the server is the last line of defense",
-      "Validation rules written in HTML stop working once Express serves the page",
-      "Repeating the checks on the server is what lets the response come back sooner"
+      "Validation is faster on the server",
+      "It is required by HTML"
     ],
     "answer": 1,
     "explain": "Your form is a courtesy, not a guard. Tools like curl can POST anything; server-side validation is what actually protects the data."
@@ -490,10 +263,10 @@ Content-Type: application/json
     "q": "Your database password is sitting in `server.js`, which you pushed to a public repo. What now?",
     "shuffle": true,
     "choices": [
-      "Make the repo private right away — a secret only counts as leaked while the repo is public",
-      "Delete the file in a new commit — once the latest version is clean, the password is safe again",
-      "Treat it as leaked: change the password, then move secrets into environment variables kept out of Git",
-      "Rename the variable and store the value in Base64, so it no longer reads as a password"
+      "Nothing — passwords in code are normal",
+      "Delete the file from the repo and relax",
+      "Treat the password as leaked: change it, move secrets to environment variables, and keep them out of Git from now on",
+      "Rename the variable so nobody notices"
     ],
     "answer": 2,
     "explain": "Once a secret is pushed, assume it is copied. Changing the password is the fix; removing the file alone does not un-leak it."
@@ -508,19 +281,19 @@ Content-Type: application/json
     <h2 id="m4-h">Milestone 4 · Accounts and Roles</h2>
     <p><strong>Goal:</strong> your app knows who is using it and what they may do. This is the finished full-stack application — the course in one project.</p>
     <p><strong>Builds on:</strong> Week 4 — authentication, sessions, hashing, roles and protected routes, security hygiene.</p>
-    <div class="table-wrap"><table class="data-table">
-      <thead><tr><th scope="col">Requirement</th><th scope="col">What "done" looks like</th></tr></thead>
+    <div class="table-wrap"><table class="data">
+      <thead><tr><th>Requirement</th><th>What "done" looks like</th></tr></thead>
       <tbody>
-        <tr><td>Accounts</td><td>Register and log in; passwords stored only as salted hashes (never plain text, never reversible); a new account's role is set by the server, never read from the sign-up form</td></tr>
+        <tr><td>Accounts</td><td>Register and log in; passwords stored only as salted hashes (never plain text, never reversible)</td></tr>
         <tr><td>Sessions</td><td>Login creates a session; the browser carries only the session ID cookie; logout truly ends it</td></tr>
         <tr><td>Authorization</td><td>At least two roles (for example member and admin, or owner and visitor) with different powers, enforced on the server</td></tr>
         <tr><td>Protected routes</td><td>Creating/editing/deleting through the API requires the right login and role: 401 when signed out, 403 when signed in but not allowed</td></tr>
-        <tr><td>Hygiene pass</td><td>Secrets in environment variables, cookie flags set sensibly (<code>httpOnly</code>, <code>sameSite</code>, a lifetime), dependencies checked, no passwords or keys in the repo</td></tr>
+        <tr><td>Hygiene pass</td><td>Secrets in environment variables, cookie flags set sensibly, dependencies checked, no passwords or keys in the repo</td></tr>
       </tbody>
     </table></div>
     <p><strong>Done looks like:</strong></p>
     <p>Ask to edit a book with no login cookie, and the server refuses before anything is touched:</p>
-    <script type="text/plain" class="code" data-lang="text" data-title="Request — PUT /api/books/3, signed out">
+    <script type="text/plain" class="code" data-title="Request — PUT /api/books/3, signed out">
       PUT /api/books/3 HTTP/1.1
       Host: localhost:3000
       Content-Type: application/json
@@ -532,7 +305,7 @@ Content-Type: application/json
 
 { "error": "Please log in" }</div>
     <p>The same request with the session cookie from logging in as the book's owner (your session id will differ):</p>
-    <script type="text/plain" class="code" data-lang="text" data-title="Request — PUT /api/books/3, signed in as the owner">
+    <script type="text/plain" class="code" data-title="Request — PUT /api/books/3, signed in as the owner">
       PUT /api/books/3 HTTP/1.1
       Host: localhost:3000
       Cookie: sid=9f2e7a1c
@@ -545,7 +318,7 @@ Content-Type: application/json
 
 { "id": 3, "title": "The Left Hand of Darkness", "category": "Sci-fi", "year": 1969, "note": "First edition, good condition" }</div>
     <p>Signed in is not always enough. The same request carrying a different user's session cookie — someone signed in, but not the book's owner — is refused as well, and the stored book is left unchanged:</p>
-    <script type="text/plain" class="code" data-lang="text" data-title="Request — PUT /api/books/3, signed in as a non-owner">
+    <script type="text/plain" class="code" data-title="Request — PUT /api/books/3, signed in as a non-owner">
       PUT /api/books/3 HTTP/1.1
       Host: localhost:3000
       Cookie: sid=4b8c1d9e
@@ -557,87 +330,7 @@ Content-Type: application/json
 Content-Type: application/json
 
 { "error": "Only the owner can edit this book" }</div>
-    <p><strong>Reference starter blueprint (guards + HTML/CSS login &amp; register page):</strong></p>
-    <div class="tabs proj-tabs">
-      <div data-tab="middleware/auth.js (JS Guards)">
-        <p>Two small reusable middleware functions enforcing authentication (<code>401</code>) first, then role authorization (<code>403</code>).</p>
-        <script type="text/plain" class="code" data-lang="js" data-title="middleware/auth.js (Milestone 4 blueprint)">
-          function requireLogin(req, res, next) { // Middleware that blocks visitors who are not signed in.
-            if (!req.session || !req.session.userId) { // Check whether a valid logged-in session exists.
-              return res.status(401).json({ error: 'Please log in' }); // Stop here with 401 Unauthorized when signed out.
-            }
-            next(); // Visitor is signed in — pass the request to the next handler.
-          }
-
-          function requireRole(...allowedRoles) { // Factory that builds middleware allowing only specific roles (e.g., 'admin').
-            return (req, res, next) => { // Return the actual Express middleware function for the route.
-              if (!req.session || !req.session.userId) { // First verify authentication before checking roles.
-                return res.status(401).json({ error: 'Please log in' }); // Reply 401 Unauthorized if nobody is signed in.
-              }
-              if (!allowedRoles.includes(req.session.role)) { // Check whether the signed-in user's role is permitted.
-                return res.status(403).json({ error: 'You are not allowed to do this' }); // Reply 403 Forbidden: signed in, but lacking permission.
-              }
-              next(); // Both authenticated and authorized — continue to the route handler.
-            };
-          }
-
-          module.exports = { requireLogin, requireRole }; // Export both guard functions for use on protected routes.
-        </script>
-      </div>
-      <div data-tab="public/login.html (HTML)">
-        <p>Two separate <code>POST</code> forms — notice neither form includes a <code>role</code> input, because the server always assigns the default role at registration.</p>
-        <script type="text/plain" class="code" data-lang="html" data-title="public/login.html (Milestone 4 blueprint)">
-          <!DOCTYPE html> <!-- Declare modern HTML5 so the browser renders in standards mode. -->
-          <html lang="en"> <!-- Root document element with English language metadata. -->
-          <head> <!-- Page metadata and stylesheet link. -->
-            <meta charset="utf-8"> <!-- Use UTF-8 character encoding. -->
-            <meta name="viewport" content="width=device-width, initial-scale=1"> <!-- Make the layout responsive on mobile screens. -->
-            <title>Account · Book Shelf Tracker</title> <!-- Browser tab title for the account page. -->
-            <link rel="stylesheet" href="/auth.css"> <!-- Load the auth page stylesheet from public/auth.css. -->
-          </head>
-          <body> <!-- Visible account page content. -->
-            <main class="auth-grid"> <!-- Responsive two-column grid holding both account panels. -->
-              <section class="auth-panel"> <!-- Card containing the sign-in form for existing users. -->
-                <h1>Log in</h1> <!-- Primary heading for the login panel. -->
-                <form method="post" action="/login"> <!-- Send credentials via HTTP POST (never GET) to /login. -->
-                  <label for="li-user">Username</label> <!-- Accessible label linked to the login username input. -->
-                  <input id="li-user" name="username" type="text" autocomplete="username" required> <!-- Sends req.body.username; required before submit. -->
-                  <label for="li-pass">Password</label> <!-- Accessible label linked to the login password input. -->
-                  <input id="li-pass" name="password" type="password" autocomplete="current-password" required> <!-- Masked password field for req.body.password with password-manager support. -->
-                  <button type="submit">Log in</button> <!-- Submit the login form to the server. -->
-                </form>
-              </section>
-
-              <section class="auth-panel"> <!-- Card containing the registration form for new accounts. -->
-                <h2>Create an account</h2> <!-- Heading for the sign-up panel. -->
-                <form method="post" action="/register"> <!-- POST new account credentials to /register; server assigns the role. -->
-                  <label for="rg-user">Username</label> <!-- Accessible label linked to the registration username input. -->
-                  <input id="rg-user" name="username" type="text" autocomplete="username" required> <!-- Desired username sent as req.body.username. -->
-                  <label for="rg-pass">Password (15+ characters)</label> <!-- Tell users the minimum password length up front. -->
-                  <input id="rg-pass" name="password" type="password" autocomplete="new-password" minlength="15" required> <!-- Browser hint for 15+ characters (server must still validate it too). -->
-                  <button type="submit">Register</button> <!-- Submit the sign-up form to create an account. -->
-                </form>
-              </section>
-            </main>
-          </body>
-          </html>
-        </script>
-      </div>
-      <div data-tab="public/auth.css (CSS)">
-        <p>Two-column responsive layout that stacks cleanly on phones, with clear focus outlines and full-width buttons.</p>
-        <script type="text/plain" class="code" data-lang="css" data-title="public/auth.css (Milestone 4 blueprint)">
-          body { font-family: system-ui, sans-serif; margin: 0; padding: 32px 16px; background: #f8fafc; color: #1f2937; } /* Base typography, light page backdrop, and outer spacing. */
-          .auth-grid { max-width: 760px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; } /* Responsive grid: two columns on desktop, stacked into one on phones. */
-          .auth-panel { background: #ffffff; border: 1px solid #cbd5e1; border-radius: 12px; padding: 22px; } /* White rounded card container for each form. */
-          .auth-panel label { display: block; font-weight: 700; margin-top: 12px; font-size: 0.9rem; } /* Place each bold label on its own line above its input. */
-          .auth-panel input { display: block; width: 100%; margin-top: 4px; padding: 9px 10px; border: 1.5px solid #94a3b8; border-radius: 6px; font: inherit; box-sizing: border-box; } /* Full-width inputs; border-box keeps padding inside the 100% width. */
-          .auth-panel input:focus-visible { outline: 2px solid #1f4fd1; outline-offset: 2px; } /* Visible keyboard focus ring for accessibility. */
-          .auth-panel button { width: 100%; margin-top: 16px; padding: 10px; border: 0; border-radius: 6px; background: #1f4fd1; color: #ffffff; font: inherit; font-weight: 700; cursor: pointer; } /* Full-width primary action button with bold white label. */
-        </script>
-      </div>
-    </div>
-    <p>Pair <code>middleware/auth.js</code> with an ownership check inside your <code>PUT</code> and <code>DELETE</code> handlers (<code>book.ownerId !== req.session.userId &amp;&amp; req.session.role !== 'admin'</code> → <code>403</code>) to satisfy every Milestone 4 requirement end to end.</p>
-    <p><strong>Deliverable:</strong> the finished project, a README with setup and test accounts (a demo member and a demo admin — give the admin its role in your seed data, not through sign-up), and a half-page reflection: what your app does, and which course idea was hardest to make real.</p>
+    <p><strong>Deliverable:</strong> the finished project, a README with setup and test accounts (a demo member and a demo admin), and a half-page reflection: what your app does, and which course idea was hardest to make real.</p>
     <div class="quiz" data-title="Milestone 4 self-check">
       <script type="application/json">
 [
@@ -645,10 +338,10 @@ Content-Type: application/json
     "q": "Your UI hides the Delete button from members, but a member deletes an item by sending a DELETE request directly. What went wrong?",
     "shuffle": true,
     "choices": [
-      "The button was hidden with CSS instead of being removed from the HTML, so the browser could still send it",
+      "The button was not hidden well enough",
       "Authorization was only done in the interface — the server must check the role on every protected request",
-      "The session cookie lasted too long, so the member kept permissions that belonged to an earlier admin",
-      "DELETE requests skip middleware in Express, so the role check has to be repeated in the front end"
+      "Members should not know URLs",
+      "The session cookie was too short"
     ],
     "answer": 1,
     "explain": "Hiding a button is presentation. The server is the authority: every protected route verifies who is asking and what they may do."
@@ -657,7 +350,7 @@ Content-Type: application/json
     "q": "A signed-in member tries to open the admin page. Which response is correct?",
     "shuffle": true,
     "choices": [
-      "200",
+      "200 with an apology",
       "401",
       "403",
       "404"
@@ -669,10 +362,10 @@ Content-Type: application/json
     "q": "Why store a salted hash of a password instead of the password itself?",
     "shuffle": true,
     "choices": [
-      "A hash is far shorter than the password, so the users table stays small and every login finishes sooner",
-      "A leaked database then holds only fingerprints nobody can log in with, and salt defeats precomputed guesses",
-      "The server can turn the hash back into the password later, but only while it still holds the matching salt value",
-      "Browsers refuse to send a password to any server that stores it without hashing and salting it first"
+      "Hashes are shorter",
+      "If the database leaks, attackers get fingerprints they cannot log in with — and the salt stops precomputed guessing",
+      "Browsers require it",
+      "It makes login faster"
     ],
     "answer": 1,
     "explain": "The server never needs the password again — only the ability to check a new attempt against the stored fingerprint. Salt makes identical passwords store differently."
@@ -685,8 +378,8 @@ Content-Type: application/json
   <section class="lesson" id="rubric" aria-labelledby="rubric-h">
     <h2 id="rubric-h">How the project is graded</h2>
     <p>One hundred points across the four milestones (20 + 25 + 25 + 30). Within each milestone, the same four questions are asked:</p>
-    <div class="table-wrap"><table class="data-table">
-      <thead><tr><th scope="col">Criterion</th><th scope="col">What earns the points</th></tr></thead>
+    <div class="table-wrap"><table class="data">
+      <thead><tr><th>Criterion</th><th>What earns the points</th></tr></thead>
       <tbody>
         <tr><td>It runs (40%)</td><td>Starts cleanly from the README steps and behaves as specified — routes answer, data persists, logins work</td></tr>
         <tr><td>It is correct (30%)</td><td>The week's concepts are used the way the course teaches them: REST shapes, middleware order, safe queries, hashed passwords, server-side checks</td></tr>

@@ -5,18 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>State, Persistence &amp; Databases · Web Dev II</title>
   <meta name="description" content="Week 3: how websites remember things — cookies, sessions, the file system, and real databases, with the full create, read, update, delete cycle in both MongoDB and MySQL.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=JetBrains+Mono:wght@400;700&display=swap">
   <link rel="stylesheet" href="../assets/css/course.css">
   <script src="../assets/js/course.js"></script>
-  <script src="../assets/js/runner.js"></script>
-  <script src="../assets/js/inspector.js"></script>
   <style>
     /* ===== Week 3 page styles. Every selector is prefixed wk3- ===== */
     .wk3-flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0; }
     .wk3-flow .arr { color: var(--ink-3); font-family: var(--font-mono); }
     .wk3-note { font-size: .88rem; color: var(--ink-2); margin: 6px 0 0; }
     .wk3-doc { font-family: var(--font-mono); font-size: .85rem; }
-    .wk3-tabs .tab-panel > .code-block:first-child { margin-top: 8px; }
-    .wk3-tabs .tab-panel > p + .code-block { margin-top: 14px; }
   </style>
 </head>
 <body data-module="wk3">
@@ -28,10 +27,16 @@
 
   <aside class="callout listen">
     <strong>Listen: the Week 3 audio companion</strong>
-    <p>This episode covers how websites remember things: cookies, sessions, files, and real databases — with the full create, read, update, delete cycle in both MongoDB and MySQL. (The hands-on exercises on this page have been updated since the recording, so follow the page instructions when you reach the activities.)</p>
+    <p>This episode covers how websites remember things: cookies, sessions, files, and real databases — with the full create, read, update, delete cycle in both MongoDB and MySQL.</p>
     <audio controls preload="metadata" src="../audio/wk3.mp3" style="width:100%"></audio>
   <p class="small"><a href="../audio/wk3-transcript.txt">Read the episode transcript</a> (text file).</p>
   </aside>
+
+<aside class="callout tip">
+  <strong>Stuck on setup or an error?</strong>
+  <p>Read <a href="../setup/index.html">Setup &amp; Fix-it</a> before you ask for help — the 5-minute setup check, the course ports, and fixes for the five errors everyone hits, including <code>EADDRINUSE</code> and <code>req.body</code> coming back <code>undefined</code>.</p>
+</aside>
+
 
   <!-- ===================================================== 3.1 -->
   <section class="lesson" id="s3-1">
@@ -64,33 +69,29 @@
     </ul>
     <p>Here is a complete, working example. The server checks each request for a <code>visited</code> cookie. If it is not there, the server sends a friendly first-visit message and sets the cookie. If it is there, the server knows you have been here before:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="cookies.js — remembering a visitor" data-run="server" data-presets='[{"label":"/visit (Click twice!)","method":"GET","path":"/visit"}]'>
-      const express = require('express'); // Load the Express web framework.
-      const app = express(); // Create the Express application instance.
+    <script type="text/plain" class="code" data-lang="js" data-title="cookies.js — remembering a visitor">
+      const express = require('express');
+      const app = express();
 
-      app.get('/visit', (req, res) => { // Handle GET requests to /visit.
+      app.get('/visit', (req, res) => {
         // The browser sends saved cookies in the Cookie header.
-        const cookies = req.headers.cookie || ''; // Read the raw Cookie header, or fall back to an empty string.
+        const cookies = req.headers.cookie || '';
 
-        // Quick check for the demo — the parser below does this properly.
-        if (cookies.includes('visited=yes')) { // Check if the browser sent back our visited cookie.
-          res.send('Welcome back! Your browser sent the visited cookie.'); // Answer as a returning visitor.
-        } else { // No visited cookie arrived, so treat this as a first visit.
+        if (cookies.includes('visited=yes')) {
+          res.send('Welcome back! Your browser sent the visited cookie.');
+        } else {
           // res.cookie() adds a Set-Cookie header to the response.
-          res.cookie('visited', 'yes'); // Ask the browser to save visited=yes.
-          res.send('First visit! We just set a cookie named visited.'); // Answer as a brand-new visitor.
+          res.cookie('visited', 'yes');
+          res.send('First visit! We just set a cookie named visited.');
         }
       });
 
-      app.listen(3000, () => console.log('Listening on port 3000')); // Start the server on port 3000.
+      app.listen(3000, () => console.log('Listening on port 3000'));
     </script>
 
-    <p><strong>Try it right here:</strong> click <strong>▶ Start &amp; test server</strong> above, then click <strong>/visit (Click twice!)</strong>. On the first click, the response carries <code>set-cookie: visited=yes; Path=/</code> and the <strong>Browser cookies</strong> bar saves <code>visited=yes</code>. On the second click, the browser automatically sends that cookie back, and the same route replies <em>"Welcome back!"</em>. Click <strong>Clear cookies</strong> to become a brand-new visitor again. That difference <em>is</em> state.</p>
+    <p>Run it, then ask for the page twice — once with no cookie, once sending the cookie back, exactly as a browser would:</p>
 
-    <details class="reveal">
-      <summary>Optional: test from your terminal with <code>curl</code> (captured output)</summary>
-      <p>In a terminal, <code>-i</code> prints the <code>Set-Cookie</code> response header on the first visit, and <code>-H "Cookie: visited=yes"</code> manually sends it back on the second:</p>
-      <div class="output">$ curl -i http://localhost:3000/visit   (first visit; showing only the interesting headers + body)
+    <div class="output">$ curl -i http://localhost:3000/visit   (first visit; showing only the interesting headers + body)
 HTTP/1.1 200 OK
 Set-Cookie: visited=yes; Path=/
 First visit! We just set a cookie named visited.
@@ -98,8 +99,7 @@ $ curl http://localhost:3000/visit -H "Cookie: visited=yes"
 Welcome back! Your browser sent the visited cookie.
 --- server console ---
 Listening on port 3000</div>
-      <p class="wk3-note">Real output — captured from running this code (Node v26.13.1, Express 5.3.0).</p>
-    </details>
+    <p class="wk3-note">Real output — captured from running this code (Node v26.13.1, Express 5.3.0). Read it line by line: the first response carries the <code>Set-Cookie</code> header, so the browser stores <code>visited=yes</code>. The second request presents it in a <code>Cookie</code> header, and the same route gives a completely different answer. That difference <em>is</em> state.</p>
 
     <aside class="callout tip">
       <strong>See your own cookies</strong>
@@ -131,7 +131,7 @@ Listening on port 3000</div>
           <tr><th scope="row"><code>Path</code></th><td>Which pages on the site the cookie is sent to. <code>Path=/</code> means "everywhere on this site." <code>Path=/account</code> would send it only under <code>/account</code>.</td><td><code>Path=/</code></td></tr>
           <tr><th scope="row"><code>HttpOnly</code></th><td>The browser stores the cookie and sends it, but JavaScript running in the page is <em>not allowed to read it</em>. This protects login cookies: even if malicious script gets into a page, it cannot steal a cookie it cannot read.</td><td><code>HttpOnly</code> (no value — its presence is the switch)</td></tr>
           <tr><th scope="row"><code>Secure</code></th><td>The browser sends this cookie only over HTTPS — the encrypted connection — never over plain HTTP where someone listening on the network could copy it.</td><td><code>Secure</code></td></tr>
-          <tr><th scope="row"><code>SameSite</code></th><td>Controls whether the cookie is sent when a request comes from a <em>different</em> site. Set it explicitly — browsers do not agree on what a missing value means. <code>Lax</code> blocks most cross-site sending (the cookie still travels when a visitor follows an ordinary link to your site), which greatly reduces a common attack where a hostile page tricks your browser into making requests using your login.</td><td><code>SameSite=Lax</code></td></tr>
+          <tr><th scope="row"><code>SameSite</code></th><td>Controls whether the cookie is sent when a request comes from a <em>different</em> site. <code>Lax</code> (the usual default) blocks most cross-site sending, which shuts down a common attack where a hostile page tricks your browser into making requests using your login.</td><td><code>SameSite=Lax</code></td></tr>
         </tbody>
       </table>
     </div>
@@ -139,10 +139,10 @@ Listening on port 3000</div>
     <p>In Express you set attributes in the same <code>res.cookie()</code> call:</p>
 
     <script type="text/plain" class="code" data-lang="js" data-title="Setting a cookie with attributes">
-      res.cookie('theme', 'dark', { // Set a cookie named theme with value dark and security/lifetime options.
+      res.cookie('theme', 'dark', {
         maxAge: 24 * 60 * 60 * 1000, // one day, in milliseconds
-        httpOnly: true, // Block page JavaScript from reading this cookie via document.cookie.
-        sameSite: 'lax' // Skip sending this cookie on most cross-site requests.
+        httpOnly: true,
+        sameSite: 'lax'
       });
     </script>
 
@@ -157,144 +157,55 @@ Path=/        sent to every page on the site
 Max-Age=3600  keep it for 3600 seconds (one hour), then discard it</div>
     <p class="wk3-note">One unit trap: in the header, <code>Max-Age</code> counts <em>seconds</em>, but in <code>res.cookie()</code> the <code>maxAge</code> option counts <em>milliseconds</em> — the one day in the code above is <code>24 * 60 * 60 * 1000</code>, not <code>86400</code>.</p>
 
-    <p><strong>Example — a cookie-driven light/dark theme switcher across HTML, CSS, and Express JS:</strong> a theme preference is the textbook use for a plain cookie (harmless, small, visible to the visitor). Click through all three tabs:</p>
-    <div class="tabs wk3-tabs">
-      <div data-tab="1 · HTML (theme switcher form)">
-        <p>Submitting either button sends a <code>POST /theme</code> request with <code>theme=light</code> or <code>theme=dark</code>; a third form clears the cookie back to the default.</p>
-        <script type="text/plain" class="code" data-lang="html" data-title="theme-controls.html">
-          <form class="theme-bar" method="post" action="/theme"> <!-- Submits the selected theme via POST to /theme. -->
-            <button type="submit" name="theme" value="light">Light mode</button> <!-- Clicking sends theme=light in the form body. -->
-            <button type="submit" name="theme" value="dark">Dark mode</button> <!-- Clicking sends theme=dark in the form body. -->
-          </form>
-        </script>
-      </div>
-      <div data-tab="2 · CSS (custom properties per theme)">
-        <p>The server sets <code>data-theme="dark"</code> or <code>data-theme="light"</code> on <code>&lt;body&gt;</code>; CSS variables swap the whole color palette in one rule.</p>
-        <script type="text/plain" class="code" data-lang="css" data-title="theme.css">
-          :root { /* Default light-theme color variables on the root element. */
-            --bg: #ffffff; /* Page background color in light mode. */
-            --ink: #1f2937; /* Main text color in light mode. */
-            --card: #f8fafc; /* Subtle surface color for buttons and cards. */
-          }
-          body[data-theme="dark"] { /* Override variables when the server sets data-theme="dark". */
-            --bg: #0f172a; /* Deep slate background in dark mode. */
-            --ink: #f1f5f9; /* Light text color for contrast on dark backgrounds. */
-            --card: #1e293b; /* Darker card/button surface in dark mode. */
-          }
-          body { /* Base page styles powered by the theme variables above. */
-            background: var(--bg); /* Read the active theme's background variable. */
-            color: var(--ink); /* Read the active theme's text color variable. */
-            font-family: system-ui, sans-serif; /* Use the visitor's native system font. */
-            padding: 24px; /* Add breathing room around the page content. */
-          }
-          .theme-bar button { /* Style the Light/Dark theme toggle buttons. */
-            padding: 8px 14px; /* Comfortable vertical and horizontal button padding. */
-            border: 1px solid currentColor; /* Outline matching the current theme's text color. */
-            border-radius: 6px; /* Slightly rounded corners. */
-            background: var(--card); /* Use the active theme's card surface color. */
-            color: var(--ink); /* Use the active theme's text color. */
-            font-weight: 700; /* Bold label text. */
-            cursor: pointer; /* Show a hand pointer on hover. */
-          }
-        </script>
-      </div>
-      <div data-tab="3 · Express JS (set, read &amp; clear cookie)">
-        <p>Validates the submitted choice against an allowlist (<code>'dark'</code> or <code>'light'</code>), saves it in a cookie for 30 days, and reads it on future visits.</p>
-        <script type="text/plain" class="code" data-lang="js" data-title="theme-cookie-route.js (Express)" data-run="server" data-harness="wk3-theme-cookie" data-presets='[{"label":"/ (Check theme)","method":"GET","path":"/"},{"label":"Set dark","method":"POST","path":"/theme","headers":{"Content-Type":"application/x-www-form-urlencoded"},"body":"theme=dark"},{"label":"Set light","method":"POST","path":"/theme","headers":{"Content-Type":"application/x-www-form-urlencoded"},"body":"theme=light"},{"label":"Reset cookie","method":"POST","path":"/theme/reset"}]'>
-          app.use(express.urlencoded({ extended: false })); // Parse HTML form bodies (theme=dark) into req.body.
-
-          app.post('/theme', (req, res) => { // Save the visitor's submitted theme preference.
-            // Allowlist check: never copy arbitrary input into HTML attributes
-            const choice = req.body.theme === 'dark' ? 'dark' : 'light'; // Accept only 'dark' or fall back to 'light'.
-            res.cookie('theme', choice, { // Send a Set-Cookie header storing the safe theme string.
-              maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days in milliseconds
-              httpOnly: true, // Keep the cookie unreadable by page JavaScript.
-              sameSite: 'lax' // Limit cross-site cookie sending to safe top-level navigations.
-            });
-            res.redirect('/'); // Send the browser back to / so it renders with the new theme.
-          });
-
-          app.post('/theme/reset', (req, res) => { // Clear the saved theme preference.
-            // Tells the browser to delete the 'theme' cookie immediately
-            res.clearCookie('theme'); // Send an expired Set-Cookie header to remove theme.
-            res.redirect('/'); // Return to / with the default theme restored.
-          });
-        </script>
-      </div>
-      <div data-tab="4 · Browser JS (why HttpOnly hides cookies)">
-        <p>Compare what browser JavaScript can see in <code>document.cookie</code>: a plain preference cookie set <em>without</em> <code>httpOnly</code> is readable, while an <code>HttpOnly</code> cookie is completely invisible to page scripts.</p>
-        <script type="text/plain" class="code" data-lang="js" data-title="cookie-visibility.js (browser JS)">
-          // Suppose the server sent:
-          //   Set-Cookie: ui_density=compact; Path=/
-          //   Set-Cookie: sid=k9f2x; HttpOnly; SameSite=Lax; Path=/
-          console.log(document.cookie); // Logs only non-HttpOnly cookies visible to browser scripts.
-          // Prints: "ui_density=compact"
-          // Notice "sid=k9f2x" is NOT here — HttpOnly hides it from page JS,
-          // even though the browser still attaches it automatically to every request!
-        </script>
-      </div>
-    </div>
-    <p>Trace how all four pieces cooperate. In HTML, putting <code>name="theme"</code> and <code>value="dark"</code> directly on a <code>&lt;button type="submit"&gt;</code> sends only the clicked button's value in the POST body. In Express, checking <code>req.body.theme === 'dark' ? 'dark' : 'light'</code> guarantees only one of two safe strings can ever land in the cookie (so even if a visitor edits the request with curl, they cannot inject unexpected text into <code>&lt;body data-theme="..."&gt;</code>), and <code>res.clearCookie('theme')</code> removes a cookie by sending an expired <code>Set-Cookie</code> header. In CSS, switching <code>body[data-theme="dark"]</code> flips every component built on <code>var(--bg)</code> and <code>var(--ink)</code> at once. And Tab 4 shows why <code>HttpOnly</code> matters in the browser: page JavaScript can inspect non-HttpOnly cookies through <code>document.cookie</code>, while sensitive cookies stay locked out of reach.</p>
-
     <aside class="callout warn">
       <strong>Cookies live on the visitor's machine — never trust them</strong>
       <p>A cookie is stored by the browser, which means the visitor can read it, change it, or delete it. Never store anything secret in a cookie, and never believe an important fact just because a cookie claims it. If a cookie says <code>role=admin</code>, anyone can edit it to say that. Next section you will see the fix: keep the real data on the server, and let the cookie carry only a meaningless ID.</p>
     </aside>
 
-    <h3>Try it: fix the cookie parser</h3>
-    <p>When cookies arrive, they reach your code as one long string: <code>"visited=yes; theme=dark; cart=3"</code>. Pairs are joined by <code>"; "</code>, and each pair is <code>name=value</code>. A parser turns that string into an object you can look values up in. Notice that every value stays a <em>string</em> — <code>cart</code> comes back as <code>"3"</code>, not the number <code>3</code>, because cookies are text.</p>
-    <p>The parser below copes with that tidy string and nothing else. <strong>Your task: fix <code>parseCookies</code> so it handles messy input too.</strong> Three rules, and the checks stay red until all three hold:</p>
-    <ul>
-      <li><strong>Spacing does not matter.</strong> Pairs may be separated by <code>;</code> with no space after it, or with several. Trim the spaces off every name and value.</li>
-      <li><strong>Only the first <code>=</code> separates.</strong> A value can contain <code>=</code> itself, as tokens often do: <code>token=abc=def</code> is the name <code>token</code> with the value <code>abc=def</code>.</li>
-      <li><strong>No <code>=</code>, no cookie.</strong> A piece with no <code>=</code> in it is not a pair. Skip it; do not store it.</li>
-    </ul>
-    <details class="reveal">
-      <summary>Stuck? Three hints</summary>
-      <p>Split on <code>';'</code> alone, then call <code>.trim()</code> on each piece of text you keep. Find the first <code>=</code> with <code>part.indexOf('=')</code> — it answers <code>-1</code> when there is none. Then cut the piece at that position: <code>part.slice(0, eq)</code> is the name and <code>part.slice(eq + 1)</code> is everything after it.</p>
-    </details>
+    <h3>Try it: read a cookie string</h3>
+    <p>When cookies arrive, they reach your code as one long string: <code>"visited=yes; theme=dark; cart=3"</code>. Pairs are joined by <code>"; "</code>, and each pair is <code>name=value</code>. Finish the parser below so it turns that string into an object you can look values up in. Notice that every value stays a <em>string</em> — <code>cart</code> comes back as <code>"3"</code>, not the number <code>3</code>, because cookies are text.</p>
 
-    <div class="playground" data-title="Try it: fix the cookie parser" data-preview="false" data-height="340">
+    <div class="playground" data-title="Try it: parse a cookie string" data-preview="false" data-height="300">
       <textarea data-lang="js">function parseCookies(header) {
   const cookies = {};
-  const parts = String(header).split('; ');
+  const parts = String(header).split(';');
   for (const part of parts) {
-    const pieces = part.split('=');
-    cookies[pieces[0]] = pieces[1];
+    const eq = part.indexOf('=');
+    if (eq === -1) continue; // not a name=value pair: skip it
+    const name = part.slice(0, eq).trim();
+    const value = part.slice(eq + 1).trim();
+    if (name) cookies[name] = value;
   }
   return cookies;
 }
 
-// The tidy string already works:
 const jar = parseCookies('visited=yes; theme=dark; cart=3');
 console.log('theme =', jar.theme);
-console.log('cart =', jar.cart, '(a ' + typeof jar.cart + ')');
+console.log('cart =', jar.cart);
+console.log('Returning visitor?', jar.visited === 'yes');
+console.log('Names:', Object.keys(jar).join(', '));
 
-// Each of these comes out wrong until you fix parseCookies:
-console.log(parseCookies('a=1;b=2'));              // want a: "1", b: "2"
-console.log(parseCookies('token=abc=def').token);  // want abc=def
-console.log(Object.keys(parseCookies('a=1; oops; b=2')).join(', ')); // want a, b</textarea>
+// Your turn: try a value that itself contains an equals sign,
+// like a token. What does parseCookies('token=abc=def') give you?</textarea>
       <script type="application/json" class="checks">
       [
-        {"label": "The tidy string still works: `theme` is `dark`", "test": "return win.parseCookies('visited=yes; theme=dark; cart=3').theme === 'dark'"},
+        {"label": "`parseCookies` is a function", "test": "return typeof win.parseCookies === 'function'"},
+        {"label": "It reads `theme` as `dark`", "test": "return win.parseCookies('visited=yes; theme=dark; cart=3').theme === 'dark'"},
         {"label": "`cart` comes back as the string `3`, not a number", "test": "return win.parseCookies('visited=yes; theme=dark; cart=3').cart === '3'"},
-        {"label": "Pairs work with no space after the semicolon", "test": "var c = win.parseCookies('a=1;b=2'); return c.a === '1' && c.b === '2'"},
-        {"label": "Extra spaces around a pair are trimmed away", "test": "var c = win.parseCookies('  a=1;   b=2  '); return c.a === '1' && c.b === '2'"},
-        {"label": "A value may itself contain `=` signs", "test": "return win.parseCookies('token=abc=def').token === 'abc=def'"},
-        {"label": "A piece with no `=` is skipped, not stored", "test": "return Object.keys(win.parseCookies('a=1; oops; b=2')).join(',') === 'a,b'"}
+        {"label": "Pairs work without a space after the semicolon", "test": "return win.parseCookies('a=1;b=2').b === '2'"},
+        {"label": "A value may itself contain `=` signs", "test": "return win.parseCookies('token=abc=def').token === 'abc=def'"}
       ]
       </script>
     </div>
-    <p class="wk3-note">The <code>console.log</code> lines at the bottom are yours to change — try strings of your own there. The checks call your function with their own inputs, so experimenting cannot break them.</p>
 
     <div class="quiz" data-title="Check your understanding: cookies">
       <script type="application/json">
       [
-        {"q": "Why is HTTP called stateless?", "shuffle": true, "choices": ["The server keeps no memory between requests, so each request arrives as if from a stranger", "A request cannot carry any data of its own, so the server has nothing to tell one visitor from another", "The server handles a single request at a time, so it cannot keep track of two visitors at once", "Pages are fixed files that never change, so every visitor is always sent exactly the same thing"], "answer": 0, "explain": "Stateless means no memory between requests. State — remembering a cart, a login, a preference — has to be built on top of HTTP, which is what cookies and sessions do."},
+        {"q": "Why is HTTP called stateless?", "shuffle": true, "choices": ["The server keeps no memory between requests, so each request arrives as if from a stranger", "HTTP requests are not allowed to carry any data", "A server can only answer one request at a time", "Web pages are not allowed to change"], "answer": 0, "explain": "Stateless means no memory between requests. State — remembering a cart, a login, a preference — has to be built on top of HTTP, which is what cookies and sessions do."},
         {"q": "Which header does a **server** use to ask a browser to store a cookie?", "shuffle": true, "choices": ["`Cookie`", "`Set-Cookie`", "`Store-Cookie`", "`X-Cookie`"], "answer": 1, "explain": "`Set-Cookie` travels in the response: 'browser, please store this.' The browser then sends the stored values back in a `Cookie` header on later requests."},
         {"q": "True or false: a cookie with the `HttpOnly` attribute cannot be read by JavaScript running in the page.", "answer": true, "explain": "True. The browser still stores the cookie and sends it with requests, but page scripts cannot read it — which is why login cookies should be `HttpOnly`."},
-        {"q": "A cookie arrives as `cart=3`. In your code, what type is that `3`?", "shuffle": true, "choices": ["A string, `\"3\"` — cookies are text", "A number, `3` — digits are converted", "`undefined` until it is parsed as JSON", "Whichever type the server stored it as"], "answer": 0, "explain": "Cookies are plain text. If you need a number, convert it yourself with `Number(...)` — and check the result, because the visitor can edit the cookie to say anything."},
-        {"q": "Why should you never store a secret, or trust a claim like `role=admin`, inside a cookie?", "shuffle": true, "choices": ["Cookies are stored on the visitor's machine, so the visitor can read and change them", "Cookies vanish when the browser closes, so anything important in one would soon be lost", "Cookies hold only a few characters, so a secret or a role name would be cut short", "The server can set a cookie but never read it back, so the claim could not be checked"], "answer": 0, "explain": "Whatever sits in a cookie sits under the visitor's control. Keep sensitive data on the server; let the cookie carry only something meaningless, like an ID — which is exactly what sessions do next."}
+        {"q": "A cookie arrives as `cart=3`. In your code, what type is that `3`?", "shuffle": true, "choices": ["A string, `\"3\"` — cookies are text", "A number, `3`", "A boolean", "An object"], "answer": 0, "explain": "Cookies are plain text. If you need a number, convert it yourself with `Number(...)` — and check the result, because the visitor can edit the cookie to say anything."},
+        {"q": "Why should you never store a secret, or trust a claim like `role=admin`, inside a cookie?", "shuffle": true, "choices": ["Cookies are stored on the visitor's machine, so the visitor can read and change them", "Cookies expire too quickly to hold anything", "Cookies can only hold five characters", "The server is not allowed to read cookies"], "answer": 0, "explain": "Whatever sits in a cookie sits under the visitor's control. Keep sensitive data on the server; let the cookie carry only something meaningless, like an ID — which is exactly what sessions do next."}
       ]
       </script>
     </div>
@@ -309,37 +220,30 @@ console.log(Object.keys(parseCookies('a=1; oops; b=2')).join(', ')); // want a, 
     <p>A <strong>session</strong> is a chunk of data the server keeps about one visitor, stored under a random ID. The browser's cookie holds nothing but that ID — a long random string that means nothing on its own, like the number on a coat-check ticket. On every request, the server reads the ID from the cookie, looks up the matching data, and now it "knows" you: your name, your cart, your visit count.</p>
     <p>The most common Express tool for this is the <code>express-session</code> package. Install it with <code>npm install express-session</code>, plug it in as middleware, and every request gains a <code>req.session</code> object you can read and write. Whatever you put there is remembered for that visitor:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="session-demo.js — counting visits with express-session" data-run="server" data-presets='[{"label":"/count (Click repeatedly!)","method":"GET","path":"/count"}]'>
-      const express = require('express'); // Load Express for handling HTTP routes.
-      const session = require('express-session'); // Load server-side session middleware.
-      const app = express(); // Create the Express app.
+    <script type="text/plain" class="code" data-lang="js" data-title="session-demo.js — counting visits with express-session">
+      const express = require('express');
+      const session = require('express-session');
+      const app = express();
 
-      app.use(session({ // Attach session handling to every incoming request.
-        // Signs the session cookie. Demo only — real apps read this
-        // from process.env.SESSION_SECRET (Section 3.6).
-        secret: 'dev-secret-change-me', // Secret key used to sign the session ID cookie.
-        resave: false, // Do not rewrite unchanged sessions back to the store on every request.
-        saveUninitialized: true, // Create and assign a session ID even on a visitor's very first request.
-        // The ID cookie: scripts can't read it, and most cross-site requests
-        // don't carry it. Add secure: true once the site is on HTTPS.
-        cookie: { httpOnly: true, sameSite: 'lax' } // Protect the session ticket cookie in the browser.
+      app.use(session({
+        secret: 'dev-secret-change-me', // signs the session cookie
+        resave: false,
+        saveUninitialized: true,
+        cookie: { httpOnly: true }      // the ID cookie: scripts can't read it
       }));
 
-      app.get('/count', (req, res) => { // Route that counts how many times this visitor has loaded /count.
+      app.get('/count', (req, res) => {
         // req.session is this visitor's private server-side notebook.
-        req.session.visits = (req.session.visits || 0) + 1; // Start at 0 on the first visit, then add 1 each time.
-        res.send(`Visit number ${req.session.visits}`); // Send back the updated count stored on the server.
+        req.session.visits = (req.session.visits || 0) + 1;
+        res.send(`Visit number ${req.session.visits}`);
       });
 
-      app.listen(3000, () => console.log('Listening on port 3000')); // Start listening for requests on port 3000.
+      app.listen(3000, () => console.log('Listening on port 3000'));
     </script>
 
-    <p><strong>Try it live right above:</strong> click <strong>▶ Start &amp; test server</strong>, then click <strong>/count (Click repeatedly!)</strong> three times. Watch the response climb <code>Visit number 1</code> → <code>Visit number 2</code> → <code>Visit number 3</code> while the <strong>Browser cookies</strong> bar holds only a signed <code>connect.sid</code> ticket (with <code>HttpOnly</code> and <code>SameSite=Lax</code> — no count anywhere inside the cookie!). Now click <strong>Clear cookies</strong> and click <strong>/count</strong> again: without the cookie ticket, the server has no session to look up and starts a fresh session back at <code>Visit number 1</code>.</p>
+    <p>Now watch the count behave. <code>curl</code> forgets cookies between runs unless you give it a <strong>cookie jar</strong> — a file where it saves cookies (<code>-c</code>) and sends them back (<code>-b</code>), doing the job a browser normally does:</p>
 
-    <details class="reveal">
-      <summary>Optional: run this from your terminal with a <code>curl</code> cookie jar (captured output)</summary>
-      <p>Unlike a browser, <code>curl</code> forgets cookies between runs unless you give it a <strong>cookie jar</strong> file: <code>-c jar.txt</code> saves cookies the server sets, and <code>-b jar.txt</code> sends saved cookies back on later requests:</p>
-      <div class="output">$ curl -c jar.txt http://localhost:3000/count   (first visit, saves the session cookie)
+    <div class="output">$ curl -c jar.txt http://localhost:3000/count   (first visit, saves the session cookie)
 Visit number 1
 $ curl -b jar.txt http://localhost:3000/count   (same browser jar)
 Visit number 2
@@ -349,8 +253,7 @@ $ curl http://localhost:3000/count   (no cookie: a new session)
 Visit number 1
 --- server console ---
 Listening on port 3000</div>
-      <p class="wk3-note">Real output — captured from running this code (Node v26.13.1, Express 5.3.0). Repeating that last request with <code>-i</code> showed the ticket itself: <code>Set-Cookie: connect.sid=s%3A…; Path=/; HttpOnly; SameSite=Lax</code> — a signed ID, the two attributes from the <code>cookie</code> setting, and no count anywhere.</p>
-    </details>
+    <p class="wk3-note">Real output — captured from running this code (Node v26.13.1, Express 5.3.0). The count climbs 1, 2, 3 while the jar presents the same session ID, because the number itself lives on the server. Drop the cookie and the server has no ticket to look up, so it starts a brand-new session at 1. Notice the visitor never sees the count in their cookie — only the ID travels.</p>
 
     <p><strong>Example — the two sides of one session, side by side:</strong></p>
     <div class="output">IN THE BROWSER — the whole cookie is just the ticket:
@@ -375,78 +278,11 @@ sessions["k9f2x"] = { "visits": 3, "cart": ["Dune", "Emma"] }</div>
         </div>
       </div>
       <ol class="steps">
-        <li>
-          <p><strong>The request arrives.</strong> Your browser asks for a page, like any HTTP request. Nothing about the request itself says who you are.</p>
-          <div class="grid-2">
-            <script type="text/plain" class="code" data-lang="js" data-title="Client — Browser initiates request">
-              // Visitor navigates to /count or calls fetch('/count')
-              const res = await fetch('/count'); // Sends a GET request; HTTP alone carries no memory of past visits.
-            </script>
-            <script type="text/plain" class="code" data-lang="text" data-title="Server — Stateless HTTP arrives">
-              GET /count HTTP/1.1
-              Host: localhost:3000
-              (HTTP itself has no built-in memory of prior visits.)
-            </script>
-          </div>
-        </li>
-        <li>
-          <p><strong>The browser attaches the cookie automatically.</strong> Stored from an earlier <code>Set-Cookie</code>, the cookie carries only the session ID — a long random string. No name, no cart, no personal data travels with it.</p>
-          <div class="grid-2">
-            <script type="text/plain" class="code" data-lang="text" data-title="Client — Cookie header added automatically">
-              GET /count HTTP/1.1
-              Host: localhost:3000
-              Cookie: connect.sid=s%3Ak9f2x.sig...
-              (Page JS never touches this HttpOnly cookie!)
-            </script>
-            <script type="text/plain" class="code" data-lang="js" data-title="Server — Reads cookie header">
-              // express-session extracts & verifies the signature
-              // on req.headers.cookie -> session ID "k9f2x"
-            </script>
-          </div>
-        </li>
-        <li>
-          <p><strong>The session middleware looks the ID up.</strong> Before your route runs, <code>express-session</code> reads the ID and finds the data stored under it on the server. If there is no cookie, or the ID is unknown, it starts a fresh, empty session and arranges for a new ID cookie to be sent back.</p>
-          <div class="grid-2">
-            <script type="text/plain" class="code" data-lang="text" data-title="Client — Waiting for response">
-              Browser holds ONLY the ticket: k9f2x
-              (The actual visit count & cart never sit in the browser.)
-            </script>
-            <script type="text/plain" class="code" data-lang="js" data-title="Server — Session store lookup">
-              // Middleware finds the record in the server store:
-              // store.get('k9f2x') -> { visits: 2, cart: ['Dune'] }
-              // Attaches it to req.session, then calls next()
-            </script>
-          </div>
-        </li>
-        <li>
-          <p><strong>Your code sees <code>req.session</code>.</strong> The stored data appears as an ordinary object. Read from it, write to it — changes are saved under the same ID when the response is sent.</p>
-          <div class="grid-2">
-            <script type="text/plain" class="code" data-lang="text" data-title="Client — Still waiting">
-              Waiting for /count response...
-            </script>
-            <script type="text/plain" class="code" data-lang="js" data-title="Server — Route reads &amp; updates session">
-              app.get('/count', (req, res) => { // Route runs after session middleware has populated req.session.
-                req.session.visits = (req.session.visits || 0) + 1; // Increment this visitor's server-side visit counter.
-                res.send(`Visit number ${req.session.visits}`); // Reply with the new count; only the ID travels in the cookie.
-              });
-            </script>
-          </div>
-        </li>
-        <li>
-          <p><strong>The response goes back.</strong> It may carry a <code>Set-Cookie</code> header if a new session was created. The data itself never leaves the server; only the ticket does.</p>
-          <div class="grid-2">
-            <script type="text/plain" class="code" data-lang="text" data-title="Client — Receives answer (+ cookie if new)">
-              HTTP/1.1 200 OK
-              (Set-Cookie: connect.sid=...; HttpOnly; SameSite=Lax)
-
-              Visit number 3
-            </script>
-            <script type="text/plain" class="code" data-lang="js" data-title="Server — Saved under ID k9f2x">
-              // Updated server-side session record:
-              // sessions['k9f2x'] = { visits: 3, cart: ['Dune'] }
-            </script>
-          </div>
-        </li>
+        <li><p><strong>The request arrives.</strong> Your browser asks for a page, like any HTTP request. Nothing about the request itself says who you are.</p></li>
+        <li><p><strong>The browser attaches the cookie automatically.</strong> Stored from an earlier <code>Set-Cookie</code>, the cookie carries only the session ID — a long random string. No name, no cart, no personal data travels with it.</p></li>
+        <li><p><strong>The session middleware looks the ID up.</strong> Before your route runs, <code>express-session</code> reads the ID and finds the data stored under it on the server. If there is no cookie, or the ID is unknown, it starts a fresh, empty session and arranges for a new ID cookie to be sent back.</p></li>
+        <li><p><strong>Your code sees <code>req.session</code>.</strong> The stored data appears as an ordinary object. Read from it, write to it — changes are saved under the same ID when the response is sent.</p></li>
+        <li><p><strong>The response goes back.</strong> It may carry a <code>Set-Cookie</code> header if a new session was created. The data itself never leaves the server; only the ticket does.</p></li>
       </ol>
     </div>
 
@@ -462,25 +298,24 @@ sessions["k9f2x"] = { "visits": 3, "cart": ["Dune", "Emma"] }</div>
 
     <h3>Persistence in files</h3>
     <p>Sessions remember visitors while the server runs. But what about data that must survive the server stopping — notes, records, a list of books? That is <strong>persistence</strong>: storing data somewhere outside your program's memory, so it is still there when the program restarts. The simplest persistent home is a <strong>file</strong>: an ordinary named chunk of data on the computer's disk, like a text file on your own machine.</p>
-    <p>Node's built-in <code>fs</code> module (short for <em>file system</em> — the part of the operating system that organizes files) reads and writes files. Three functions cover the basics. The <code>Sync</code> versions work step by step, waiting for each write or read to finish before the next line runs, which keeps small examples easy to follow. That waiting has a cost: while a <code>Sync</code> call runs, Node can do nothing else, so inside a route handler it would hold up every other visitor's request. <code>Sync</code> calls are fine at startup and in small scripts like this one; inside a route, use the promise versions from <code>fs/promises</code> with <code>await</code>.</p>
-    <p>Here is the small script:</p>
+    <p>Node's built-in <code>fs</code> module (short for <em>file system</em> — the part of the operating system that organizes files) reads and writes files. Three functions cover the basics. The <code>Sync</code> versions work step by step, waiting for each write or read to finish before the next line runs, which keeps small examples easy to follow:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="fs-demo.js — writing and reading a file" data-run="node">
-      const fs = require('fs'); // Load Node's built-in file system module.
+    <script type="text/plain" class="code" data-lang="js" data-title="fs-demo.js — writing and reading a file">
+      const fs = require('fs');
 
       // CREATE: writeFileSync writes a file, replacing it if it exists.
-      fs.writeFileSync('notes.txt', 'First note\n'); // Create notes.txt with one line ending in a newline.
+      fs.writeFileSync('notes.txt', 'First note\n');
 
       // APPEND: appendFileSync adds to the end without erasing.
-      fs.appendFileSync('notes.txt', 'Second note\n'); // Add a second line to the end of notes.txt.
+      fs.appendFileSync('notes.txt', 'Second note\n');
 
       // READ: readFileSync returns the file's contents as a string.
-      const text = fs.readFileSync('notes.txt', 'utf8'); // Read the whole file as UTF-8 text (not raw bytes).
-      console.log('File contents:'); // Print a heading before showing the file text.
-      console.log(text); // Output the exact contents read from disk.
+      const text = fs.readFileSync('notes.txt', 'utf8');
+      console.log('File contents:');
+      console.log(text);
 
-      const lines = text.trim().split('\n'); // Remove the trailing newline and split into an array of lines.
-      console.log('Lines:', lines.length); // Print how many lines were stored in the file.
+      const lines = text.trim().split('\n');
+      console.log('Lines:', lines.length);
     </script>
 
     <div class="output">File contents:
@@ -490,112 +325,6 @@ Second note
 Lines: 2</div>
     <p class="wk3-note">Real output — captured from running this code (Node v26.13.1). Two details to notice. The <code>\n</code> in each string is a <em>newline</em> — an invisible character meaning "start a new line" — which is why the file holds two lines, and why there is a blank line in the output: the file's text already ends with a newline, and <code>console.log</code> adds one more. And if you stop the program and run it again, the file is still on disk. That survival is the whole point of persistence.</p>
     <p>Watch out for relative paths: when you pass a path like <code>'notes.txt'</code> to an <code>fs</code> call, Node resolves it from the folder you were standing in when you ran <code>node</code> — your <strong>current working directory</strong>, the folder your terminal was in at launch — not from the folder the script lives in, so the same program can read different files depending on where you launch it. The fix is to build the path from the script's own folder instead, with <code>path.join(__dirname, 'notes.txt')</code> in CommonJS (the module system that uses <code>require</code>), where <code>__dirname</code> means "the folder this script lives in."</p>
-
-    <p><strong>Example — two real Express route patterns: a session cart, and non-blocking <code>fs/promises</code> with <code>__dirname</code>:</strong></p>
-    <div class="grid-2">
-      <script type="text/plain" class="code" data-lang="js" data-title="Session shopping cart (Express)" data-run="server" data-harness="wk3-session-cart" data-presets='[{"label":"View cart","method":"GET","path":"/api/cart"},{"label":"Add Dune","method":"POST","path":"/api/cart","headers":{"Content-Type":"application/json"},"body":"{\"title\":\"Dune\"}"},{"label":"Add Emma","method":"POST","path":"/api/cart","headers":{"Content-Type":"application/json"},"body":"{\"title\":\"Emma\"}"}]'>
-        // Stores each visitor's cart on the server in req.session
-        app.post('/api/cart', (req, res) => { // Add a book title to this visitor's session cart.
-          const title = typeof req.body?.title === 'string' ? req.body.title.trim() : ''; // Safely read and trim the title string.
-          if (!title) return res.status(400).json({ error: 'title is required' }); // Reject blank or missing titles with 400.
-
-          // Initialize the array on the visitor's first add
-          if (!req.session.cart) req.session.cart = []; // Give this session its own empty cart array once.
-          req.session.cart.push(title); // Append the new book title to the server-side cart.
-
-          res.status(201).json({ cart: req.session.cart }); // Reply 201 Created with the updated cart array.
-        });
-
-        app.get('/api/cart', (req, res) => { // Return whatever is currently in this visitor's session cart.
-          res.json({ cart: req.session.cart || [] }); // Send the cart, or an empty array if nothing was added yet.
-        });
-      </script>
-      <script type="text/plain" class="code" data-lang="js" data-title="Async file read/write inside routes (fs/promises)" data-run="server" data-harness="wk3-async-notes" data-presets='[{"label":"Read notes","method":"GET","path":"/api/notes"},{"label":"Append note","method":"POST","path":"/api/notes","headers":{"Content-Type":"application/json"},"body":"{\"note\":\"Practice SQL joins\"}"}]'>
-        const fs = require('fs/promises'); // Load the promise-based fs API so routes can await disk work.
-        const path = require('path'); // Load path to build OS-safe file paths.
-        const NOTES_FILE = path.join(__dirname, 'notes.txt'); // Anchor notes.txt to this script's own folder.
-
-        // Non-blocking: other visitors are served while the disk reads
-        app.get('/api/notes', async (req, res) => { // Read all saved notes without blocking Node's event loop.
-          const text = await fs.readFile(NOTES_FILE, 'utf8').catch(() => ''); // Read the file, or treat a missing file as empty text.
-          const lines = text ? text.trim().split('\n') : []; // Split non-empty text into one array entry per line.
-          res.json({ notes: lines }); // Return the notes list as JSON.
-        });
-
-        app.post('/api/notes', async (req, res) => { // Append one new note line to the file on disk.
-          const note = typeof req.body?.note === 'string' ? req.body.note.trim() : ''; // Safely extract and trim the incoming note.
-          if (!note) return res.status(400).json({ error: 'note is required' }); // Reject empty submissions with 400.
-          await fs.appendFile(NOTES_FILE, note + '\n', 'utf8'); // Append the note plus a newline asynchronously.
-          res.status(201).json({ saved: note }); // Confirm creation with 201 Created.
-        });
-      </script>
-    </div>
-    <p>Compare the two patterns line by line. On the left, <code>if (!req.session.cart) req.session.cart = []</code> initializes a private cart array per session so Visitor A's books never mix with Visitor B's, and the cookie still carries only the session ID. On the right, requiring <code>'fs/promises'</code> lets you <code>await fs.readFile(...)</code> and <code>await fs.appendFile(...)</code> without blocking the event loop; <code>path.join(__dirname, 'notes.txt')</code> locks the file path to the script's own folder regardless of which terminal directory launched Node; and <code>.catch(() =&gt; '')</code> treats a not-yet-created file as an empty list instead of crashing with <code>ENOENT</code>.</p>
-
-    <p><strong>The client side of that session cart (HTML, CSS &amp; Browser JS):</strong> notice that browser code <em>never</em> reads or sends the session ID itself — the browser attaches the <code>HttpOnly</code> session cookie automatically on every same-origin <code>fetch()</code> call:</p>
-    <div class="tabs wk3-tabs">
-      <div data-tab="1 · Client HTML (cart widget)">
-        <p>Buttons trigger <code>POST /api/cart</code>, and the badge + list redraw from the server's session response.</p>
-        <script type="text/plain" class="code" data-lang="html" data-title="cart-client.html">
-          <section class="cart-box"> <!-- Container for the session-backed book cart widget. -->
-            <div class="cart-head"> <!-- Header row aligning the title and item-count badge. -->
-              <h2>Book Cart</h2> <!-- Widget heading. -->
-              <span id="cart-count" class="cart-badge">0 items</span> <!-- Updated by JS with the current cart item count. -->
-            </div>
-            <div class="cart-actions"> <!-- Button bar for adding sample books to the session cart. -->
-              <button type="button" data-add="Dune">Add Dune</button> <!-- data-add carries the title sent to POST /api/cart. -->
-              <button type="button" data-add="Emma">Add Emma</button> <!-- type="button" prevents accidental form submission. -->
-            </div>
-            <ul id="cart-items" class="cart-list"></ul> <!-- Empty list populated dynamically from the server's cart array. -->
-          </section>
-        </script>
-      </div>
-      <div data-tab="2 · Client CSS (cart layout &amp; badge)">
-        <p>Aligns the heading with the item-count pill and styles the add buttons and cart list cleanly.</p>
-        <script type="text/plain" class="code" data-lang="css" data-title="cart-client.css">
-          .cart-box { max-width: 440px; padding: 18px; border: 1px solid #cbd5e1; border-radius: 10px; background: #ffffff; font-family: system-ui, sans-serif; } /* Outer cart card with max width, soft border, and rounded corners. */
-          .cart-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; } /* Place the heading on the left and the count pill on the right. */
-          .cart-badge { padding: 3px 10px; border-radius: 99px; background: #eef4ff; color: #1f4fd1; font-weight: 700; font-size: 0.85rem; } /* Pill-shaped counter badge in soft blue. */
-          .cart-actions { display: flex; gap: 8px; margin-bottom: 12px; } /* Lay out the Add buttons side by side with an 8px gap. */
-          .cart-actions button { padding: 8px 12px; border: 0; border-radius: 6px; background: #1f4fd1; color: #ffffff; font-weight: 700; cursor: pointer; } /* Primary blue action buttons. */
-          .cart-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; } /* Remove bullets and stack cart items with uniform spacing. */
-          .cart-list li { padding: 8px 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; } /* Subtle bordered row for each book in the cart. */
-        </script>
-      </div>
-      <div data-tab="3 · Client JS (talking to /api/cart)">
-        <p>Loads the visitor's existing session cart on startup and sends new additions via JSON POST — reload the page and the server's session still remembers every item.</p>
-        <script type="text/plain" class="code" data-lang="js" data-title="cart-client.js (browser JS)">
-          const countEl = document.getElementById('cart-count'); // Reference to the item-count badge element.
-          const listEl = document.getElementById('cart-items'); // Reference to the <ul> that lists cart books.
-
-          function renderCart(items) { // Redraw the badge and book list from a cart array.
-            countEl.textContent = `${items.length} ${items.length === 1 ? 'item' : 'items'}`; // Show singular "1 item" or plural "N items".
-            listEl.replaceChildren(); // Clear previous <li> rows before re-rendering.
-            items.forEach((title) => { // Build one list item for each book title in the cart.
-              const li = document.createElement('li'); // Create a fresh <li> element.
-              li.textContent = title; // Insert the title safely as plain text (never HTML).
-              listEl.appendChild(li); // Add the row to the cart list.
-            });
-          }
-
-          // Load whatever is already in this visitor's server-side session
-          fetch('/api/cart').then((r) => r.json()).then((d) => renderCart(d.cart)); // Browser automatically sends the HttpOnly session cookie.
-
-          document.querySelectorAll('[data-add]').forEach((btn) => { // Wire up every button that has a data-add attribute.
-            btn.addEventListener('click', async () => { // Send the clicked book to the server when pressed.
-              const res = await fetch('/api/cart', { // POST to the session cart endpoint on the same origin.
-                method: 'POST', // Use POST because we are adding a new item.
-                headers: { 'Content-Type': 'application/json' }, // Tell Express the request body is JSON.
-                body: JSON.stringify({ title: btn.dataset.add }) // Serialize the button's data-add title as JSON.
-              });
-              const data = await res.json(); // Parse the server's JSON response containing the updated cart.
-              renderCart(data.cart); // Refresh the UI with the server's authoritative cart array.
-            });
-          });
-        </script>
-      </div>
-    </div>
-    <p>Follow the full round trip: click <strong>Add Dune</strong>, refresh the browser tab, and <code>fetch('/api/cart')</code> still gets back <code>["Dune"]</code>. Nothing was saved in <code>localStorage</code> and no item names went into the cookie — the browser silently presented its <code>connect.sid</code> ticket, and Express looked up <code>req.session.cart</code> on the server.</p>
 
     <h3>Why files stop being enough</h3>
     <p>Files are a fine first step, and for small tools they may be all you need. But watch what breaks as a site grows:</p>
@@ -622,20 +351,20 @@ Lines: 2</div>
     <p>You need a program whose whole job is storing data well: keeping it safe, finding any piece of it quickly, and serving many programs at once. That program is a database, and it is where this week goes next.</p>
 
     <aside class="callout listen">
-      <strong>Hear it explained: Sessions</strong>
-      <p>About four minutes on the coat check: your cookie carries a ticket number, never your data.</p>
-      <audio controls preload="metadata" src="../audio/wk3-sessions.mp3" style="width:100%"></audio>
-      <p class="small"><a href="../audio/wk3-sessions-transcript.txt">Read the transcript</a> (text file).</p>
-    </aside>
+  <strong>Hear it explained: Sessions</strong>
+  <p>About four minutes on the coat check: your cookie carries a ticket number, never your data.</p>
+  <audio controls preload="metadata" src="../audio/wk3-sessions.mp3" style="width:100%"></audio>
+  <p class="small"><a href="../audio/wk3-sessions-transcript.txt">Read the transcript</a> (text file).</p>
+</aside>
 
-    <div class="quiz" data-title="Check your understanding: sessions and files">
+  <div class="quiz" data-title="Check your understanding: sessions and files">
       <script type="application/json">
       [
-        {"q": "In a session-based app, what does the visitor's cookie actually contain?", "shuffle": true, "choices": ["Only a random session ID — the real data stays on the server", "The session data itself, scrambled so the visitor cannot read it", "The visitor's username and password, sent again on each request", "A full copy of the session data, kept in step with the server"], "answer": 0, "explain": "The cookie is just a ticket. The data lives server-side under that ID, so the cookie holds nothing to read or edit. The ID itself still has to be protected (`HttpOnly`, `Secure`), because anyone who copies it is treated as that visitor."},
-        {"q": "In the captured output, why did the visit count restart at 1 on the last request?", "shuffle": true, "choices": ["The request sent no cookie, so the server could not find the old session and started a new one", "The server had been restarted just before that request, which wiped the sessions held in its memory", "A session lasts for three requests only, so the fourth one always begins again from the start", "Running `curl` without the jar told the server to delete the session it had been counting in"], "answer": 0, "explain": "No cookie means no session ID, and no ID means no lookup. As far as the server can tell, a brand-new visitor arrived."},
+        {"q": "In a session-based app, what does the visitor's cookie actually contain?", "shuffle": true, "choices": ["Only a random session ID — the real data stays on the server", "The visitor's full profile and cart", "A copy of the server's database", "The visitor's password, encrypted"], "answer": 0, "explain": "The cookie is just a ticket. The data lives server-side under that ID, so there is nothing worth stealing or editing in the cookie itself."},
+        {"q": "In the captured output, why did the visit count restart at 1 on the last request?", "shuffle": true, "choices": ["The request sent no cookie, so the server could not find the old session and started a new one", "The server was restarted between requests", "The count resets after 3 on purpose", "`curl` deleted the session data from the server"], "answer": 0, "explain": "No cookie means no session ID, and no ID means no lookup. As far as the server can tell, a brand-new visitor arrived."},
         {"q": "True or false: data stored in a file with `fs.writeFileSync` is still there after the Node program exits and runs again.", "answer": true, "explain": "True — that is persistence. The file lives on disk, independent of the program's memory, which is emptied every time the program stops."},
-        {"q": "What does `appendFileSync` do differently from `writeFileSync`?", "shuffle": true, "choices": ["It adds to the end of the file; `writeFileSync` replaces the whole file", "It adds to the start of the file; `writeFileSync` adds to the end of it", "It works only if the file already exists; `writeFileSync` creates it", "It returns before the write is finished; `writeFileSync` waits for the disk"], "answer": 0, "explain": "`writeFileSync` starts the file over. `appendFileSync` keeps what is there and adds to the end — which is how the demo file ended up with two notes."},
-        {"q": "Which of these is a real reason files stop working as a site grows?", "shuffle": true, "choices": ["Each server has its own copy of the file, so copies disagree and nothing is shared", "A file is erased whenever the Node program stops, so the data is lost on every restart", "Node can read a file only once per run, so later requests would see no data at all", "The `fs` module works only on your own computer, so a deployed server cannot use it"], "answer": 0, "explain": "A file belongs to one machine. Add a second server, or a second program writing at once, and the single-file approach falls apart — the problem databases exist to solve."}
+        {"q": "What does `appendFileSync` do differently from `writeFileSync`?", "shuffle": true, "choices": ["It adds to the end of the file; `writeFileSync` replaces the whole file", "It writes the file twice as fast", "It only works on empty files", "It reads the file instead of writing it"], "answer": 0, "explain": "`writeFileSync` starts the file over. `appendFileSync` keeps what is there and adds to the end — which is how the demo file ended up with two notes."},
+        {"q": "Which of these is a real reason files stop working as a site grows?", "shuffle": true, "choices": ["Each server has its own copy of the file, so copies disagree and nothing is shared", "Files cannot hold more than ten lines", "Browsers refuse to talk to servers that use files", "Node deletes files older than a day"], "answer": 0, "explain": "A file belongs to one machine. Add a second server, or a second program writing at once, and the single-file approach falls apart — the problem databases exist to solve."}
       ]
       </script>
     </div>
@@ -677,27 +406,6 @@ Lines: 2</div>
     </div>
     <p>That <code>author_id</code> is the link in action: to find who wrote <em>Emma</em>, read its <code>author_id</code> — 2 — then look up row 2 in <code>authors</code>. The name itself is stored exactly once, in the <code>authors</code> table, and every book points at it.</p>
 
-    <p><strong>Example — how SQL declares that link (<code>FOREIGN KEY</code>) and reads both tables together (<code>JOIN</code>):</strong></p>
-    <script type="text/plain" class="code" data-lang="sql" data-title="SQL — linking authors and books with a foreign key" data-run="sql" data-harness="wk3-sql-authors">
-      CREATE TABLE authors ( -- Define the parent table that stores each author once.
-        id INT AUTO_INCREMENT PRIMARY KEY, -- Unique whole-number ID assigned automatically to each author.
-        name VARCHAR(120) NOT NULL -- Author name (up to 120 characters); required on every row.
-      );
-
-      CREATE TABLE books ( -- Define the child table whose rows point back to authors.
-        id INT AUTO_INCREMENT PRIMARY KEY, -- Unique whole-number ID assigned automatically to each book.
-        title VARCHAR(200) NOT NULL, -- Book title (up to 200 characters); cannot be missing/NULL.
-        author_id INT NOT NULL, -- Stores the author's ID instead of duplicating their name.
-        FOREIGN KEY (author_id) REFERENCES authors(id) -- Enforces that author_id must match a real row in authors.
-      );
-
-      -- Reassemble each book title with its author's name in one query:
-      SELECT books.id, books.title, authors.name AS author -- Pick columns from both tables and alias authors.name as author.
-      FROM books -- Start with every row in the books table.
-      JOIN authors ON books.author_id = authors.id; -- Stitch each book to the matching author row by ID.
-    </script>
-    <p>Read the two key clauses carefully. <code>FOREIGN KEY (author_id) REFERENCES authors(id)</code> tells the database to <em>enforce</em> the link: inserting a book with <code>author_id = 999</code> fails immediately if no author <code>999</code> exists. Later, <code>JOIN authors ON books.author_id = authors.id</code> stitches each book row together with its matching author row on the fly, returning tidy rows like <code>{ id: 2, title: 'Emma', author: 'Jane Austen' }</code> even though the author's name is stored in only one place.</p>
-
     <h3>Non-relational: data in documents</h3>
     <p>A <strong>non-relational database</strong> stores data as <strong>documents</strong> instead of rows. A document is a self-contained bundle of named fields and values — the same shape as a JavaScript object, or the JSON you have been sending all course. Documents that belong together live in a <strong>collection</strong>, the document world's rough equivalent of a table.</p>
     <p>There is usually no strict schema. Two documents in one collection can carry different fields: one book can have a <code>subtitle</code> and another need not. Each document still gets a unique ID — in MongoDB, the database you will use in Section 3.4, it is stored in a field named <code>_id</code> and generated automatically if you do not supply one.</p>
@@ -705,13 +413,13 @@ Lines: 2</div>
     <p><strong>Example — one book as a document, with data nested inside it:</strong></p>
     <script type="text/plain" class="code" data-lang="js" data-title="One book document">
       {
-        _id: 'bk-1042', // Unique identifier for this document inside its collection.
-        title: 'Dune', // Book title stored as a plain string field.
-        author: 'Frank Herbert', // Author name kept right on the document.
-        genres: ['Science fiction', 'Adventure'], // Nested array holding multiple values in a single field.
-        editions: { // Nested object grouping format-specific details inside the same document.
-          paperback: { pages: 688, inStock: true }, // Paperback sub-document with its own page count.
-          ebook: { format: 'EPUB', inStock: true } // Ebook sub-document with different fields (format instead of pages).
+        _id: 'bk-1042',
+        title: 'Dune',
+        author: 'Frank Herbert',
+        genres: ['Science fiction', 'Adventure'],
+        editions: {
+          paperback: { pages: 688, inStock: true },
+          ebook: { format: 'EPUB', inStock: true }
         }
       }
     </script>
@@ -739,50 +447,11 @@ Lines: 2</div>
       <div data-tab="As MongoDB documents">
         <p>One collection, three documents. Each is a JSON-shaped object with its own <code>_id</code>, and each <em>could</em> carry extra fields the others do not have:</p>
         <script type="text/plain" class="code" data-lang="js" data-title="The same three books as documents">
-          // Three self-contained book documents inside one MongoDB collection (each has its own unique _id):
           { "_id": 1, "title": "Dune", "author": "Frank Herbert" }
           { "_id": 2, "title": "Emma", "author": "Jane Austen" }
           { "_id": 3, "title": "The Hobbit", "author": "J.R.R. Tolkien" }
         </script>
         <p>Ask for a book and you get back the whole document, fields and all. (Real MongoDB <code>_id</code> values are long generated identifiers, not small numbers — small numbers are used here so the two tabs line up.)</p>
-      </div>
-      <div data-tab="Client UI (same HTML/CSS/JS for either DB)">
-        <p>Your front end never talks to MySQL or MongoDB directly — it only receives JSON from Express, so the exact same HTML, CSS, and browser JS renders books from <em>either</em> database:</p>
-        <script type="text/plain" class="code" data-lang="html" data-title="book-card.html (database-agnostic client)">
-          <ul id="catalog" class="book-grid"></ul> <!-- Empty grid container populated by JS from either MySQL or MongoDB JSON. -->
-        </script>
-        <script type="text/plain" class="code" data-lang="css" data-title="book-card.css">
-          .book-grid { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; } /* Responsive card grid that fits as many 200px+ columns as space allows. */
-          .book-tile { padding: 14px; border: 1px solid #cbd5e1; border-radius: 10px; background: #ffffff; } /* Individual book card with border and rounded corners. */
-          .book-tile .tag { display: inline-block; margin-top: 6px; padding: 2px 8px; border-radius: 99px; background: #eef4ff; color: #1f4fd1; font-size: 0.78rem; } /* Small pill badge for optional nested genre tags. */
-        </script>
-        <script type="text/plain" class="code" data-lang="js" data-title="render-book.js (works with MySQL OR MongoDB JSON)">
-          function renderBooks(books) { // Render an array of book objects regardless of which database stored them.
-            const grid = document.getElementById('catalog'); // Grab the grid <ul> in the page.
-            grid.replaceChildren(); // Clear any previously rendered book cards.
-            books.forEach((book) => { // Build one card per book object from the API response.
-              const li = document.createElement('li'); // Create the card's <li> container.
-              li.className = 'book-tile'; // Apply the card styling class.
-              // Handles either MySQL's id or MongoDB's _id cleanly
-              li.dataset.id = book.id ?? book._id; // Use id if present, otherwise fall back to MongoDB's _id.
-
-              const title = document.createElement('strong'); // Create a bold element for the book title.
-              title.textContent = book.title; // Set the title safely as plain text.
-              const author = document.createElement('div'); // Create a block line for the author name.
-              author.textContent = book.author; // Set the author safely as plain text.
-              li.append(title, author); // Insert both title and author into the card.
-
-              // Optional nested field (common in MongoDB documents)
-              (book.genres || []).forEach((g) => { // Loop through genres if present, or skip cleanly if missing.
-                const tag = document.createElement('span'); // Create a pill badge element for one genre.
-                tag.className = 'tag'; // Apply pill styling.
-                tag.textContent = g; // Set the genre name safely as plain text.
-                li.appendChild(tag); // Append the genre tag to the card.
-              });
-              grid.appendChild(li); // Add the completed card into the catalog grid.
-            });
-          }
-        </script>
       </div>
     </div>
 
@@ -793,7 +462,7 @@ Lines: 2</div>
         <ul>
           <li>Every record truly has the same shape, and you want the database to <em>enforce</em> that shape.</li>
           <li>Your data is full of connections — orders belong to customers, payments belong to orders — and you need those links to stay consistent.</li>
-          <li>Several records must change together or not at all — money leaving one account and arriving in another, stock dropping as an order is placed. That all-or-nothing change is called a <strong>transaction</strong>, and relational databases are built around it.</li>
+          <li>Getting a number exactly right matters more than anything: money, inventory counts, grades.</li>
         </ul>
       </div>
       <div class="card">
@@ -838,38 +507,38 @@ Lines: 2</div>
     </div>
 
     <h3>Try it: which home for this data?</h3>
-    <p>Sort each scenario into the family that fits it best. Read each one and ask: is the shape fixed, with linked records that must change together, or does the shape vary from record to record?</p>
+    <p>Sort each scenario into the family that fits it best. Read each one and ask: is the shape fixed and the accuracy critical, or does the shape vary from record to record?</p>
 
     <div class="buckets" data-title="Relational or document?">
       <script type="application/json">
       {"buckets": ["Relational", "Document"],
        "items": [
-         ["A bank ledger: every transfer has the same fields, links two accounts, and must take money from one and add it to the other together or not at all", "Relational"],
+         ["A bank ledger: every transfer has the same fields, amounts must be exact, and transfers link accounts together", "Relational"],
          ["A product catalog: shirts have sizes and colors, laptops have processors and memory, books have page counts", "Document"],
          ["Blog comments: each comment carries its own author, text and time, and some have replies nested inside", "Document"],
          ["Inventory counts: one row per product, a count that must never disagree with the orders table", "Relational"],
-         ["Student grades: every grade links one student to one course, and a grade for a student or course that does not exist must be refused", "Relational"],
+         ["Student grades: every grade links one student, one course and one score, and totals must add up exactly", "Relational"],
          ["A feed of activity events: clicks, views and purchases, each with different extra details attached", "Document"]
        ],
-       "explain": "The pattern: **fixed shape, links the database enforces, records that must change together** point to relational. **Varying fields and self-contained bundles** point to documents. Real systems can argue some of these either way — what matters is the reason you give."}
+       "explain": "The pattern: **fixed shape, linked records, exact numbers** point to relational. **Varying fields and self-contained bundles** point to documents. Real systems can argue some of these either way — what matters is the reason you give."}
       </script>
     </div>
 
     <aside class="callout listen">
-      <strong>Hear it explained: Relational vs Non-Relational</strong>
-      <p>About four minutes on where a fact lives, and why that decides what it costs to change it.</p>
-      <audio controls preload="metadata" src="../audio/wk3-relational.mp3" style="width:100%"></audio>
-      <p class="small"><a href="../audio/wk3-relational-transcript.txt">Read the transcript</a> (text file).</p>
-    </aside>
+  <strong>Hear it explained: Relational vs Non-Relational</strong>
+  <p>About four minutes on where a fact lives, and why that decides what it costs to change it.</p>
+  <audio controls preload="metadata" src="../audio/wk3-relational.mp3" style="width:100%"></audio>
+  <p class="small"><a href="../audio/wk3-relational-transcript.txt">Read the transcript</a> (text file).</p>
+</aside>
 
-    <div class="quiz" data-title="Check your understanding: two families of database">
+  <div class="quiz" data-title="Check your understanding: two families of database">
       <script type="application/json">
       [
-        {"q": "What is a schema?", "shuffle": true, "choices": ["The plan declared in advance that says what columns a table has and what kind of value each holds", "The language used to ask a relational database for rows, built from statements such as `SELECT`", "The column whose value is different in every row, so that any one row can be picked out exactly", "The rows a table holds right now, saved to disk so that they are still there after a restart"], "answer": 0, "explain": "A schema is the structure declared up front. A relational database enforces it: data that does not fit the plan is rejected."},
-        {"q": "In a relational table, what does a primary key guarantee?", "shuffle": true, "choices": ["Each row has a value no other row shares, so any single row can be pointed at exactly", "Every column in a row has been filled in, so no row can be stored with a value missing", "Rows come back sorted by that column, so the newest row is always the last one returned", "Only the table's owner may change that column, so visitors cannot edit or delete a row"], "answer": 0, "explain": "The primary key uniquely identifies a row. It says nothing about the other columns — it is purely the row's unmistakable ID."},
+        {"q": "What is a schema?", "shuffle": true, "choices": ["The plan declared in advance that says what columns a table has and what kind of value each holds", "A backup copy of the database", "The password for the database server", "A report the database prints each night"], "answer": 0, "explain": "A schema is the structure declared up front. A relational database enforces it: data that does not fit the plan is rejected."},
+        {"q": "In a relational table, what does a primary key guarantee?", "shuffle": true, "choices": ["Each row has a value no other row shares, so any single row can be pointed at exactly", "The rows are stored in alphabetical order", "The table can never be deleted", "Every column is filled in"], "answer": 0, "explain": "The primary key uniquely identifies a row. It says nothing about the other columns — it is purely the row's unmistakable ID."},
         {"q": "True or false: in MongoDB, every document in a collection must have exactly the same fields.", "answer": false, "explain": "False — that flexibility is the point of documents. One book can carry a `subtitle` field and the next need not. (You can add validation rules if you want them, as Section 3.6 discusses.)"},
-        {"q": "What is a document, in the non-relational sense?", "shuffle": true, "choices": ["A self-contained bundle of named fields and values, shaped like a JavaScript object", "A group of related records kept together inside a database, roughly what a table is in SQL", "One named fact about a record, such as its title, roughly what a column is in SQL", "A text file on the server's disk that holds every record as one long string"], "answer": 0, "explain": "A document is data shaped like the objects your code already uses: `{ title: 'Dune', author: 'Frank Herbert' }`, plus a unique `_id`."},
-        {"q": "Your data is a set of payments: every payment must link to exactly one account, and a payment and its account balance must change together or not at all. Which family fits best?", "shuffle": true, "choices": ["Relational — fixed shape, enforced links, changes made together", "Document — payments are small, so each one fits in a document", "Neither — records that link together belong in a text file", "Either — the two families give exactly the same guarantees"], "answer": 0, "explain": "Fixed shape, links the database enforces, and records that must change together are the relational home ground. A document database can hold payments too, but the links between records are yours to check — the database does not enforce them for you."}
+        {"q": "What is a document, in the non-relational sense?", "shuffle": true, "choices": ["A self-contained bundle of named fields and values, shaped like a JavaScript object", "A Word file stored on the server", "A printed report from the database", "One column of a table"], "answer": 0, "explain": "A document is data shaped like the objects your code already uses: `{ title: 'Dune', author: 'Frank Herbert' }`, plus a unique `_id`."},
+        {"q": "Your data is a set of payments where every record must link to exactly one account and every amount must be exact. Which family fits best?", "shuffle": true, "choices": ["Relational — fixed shape, linked records, exact numbers", "Document — because payments are small", "Neither — use a text file", "Whichever one, it makes no difference"], "answer": 0, "explain": "Fixed shape plus links between tables plus numbers that must be right is the relational home ground. A document store could hold payments, but you would be rebuilding the guarantees yourself."}
       ]
       </script>
     </div>
@@ -887,37 +556,37 @@ Lines: 2</div>
     <p>And one idea you already know runs this whole section: <strong>CRUD</strong> — the four basic things you can do to stored data. <strong>C</strong>reate it, <strong>R</strong>ead it, <strong>U</strong>pdate it, <strong>D</strong>elete it. You built all four against an in-memory list in Week 2. A database changes <em>where</em> the data lives, not <em>what</em> the four operations are.</p>
 
     <h3>Connect first</h3>
-    <p>Install the driver with <code>npm install mongodb</code>. Then a program connects, picks a database and a collection, and works. Connecting takes time — the server is another program, possibly on another machine — so database calls are <strong>asynchronous</strong>: they finish later, and you mark them with <code>await</code> inside an <code>async</code> function, the way you did with <code>fetch()</code> in Week 2 (Section 2.5):</p>
+    <p>Install the driver with <code>npm install mongodb</code>. Then a program connects, picks a database and a collection, and works. Connecting takes time — the server is another program, possibly on another machine — so database calls are <strong>asynchronous</strong>: they finish later, and you mark them with <code>await</code> inside an <code>async</code> function, the way you have since Week 1:</p>
 
     <script type="text/plain" class="code" data-lang="js" data-title="Connecting to MongoDB">
-      const { MongoClient } = require('mongodb'); // Import MongoClient from the official MongoDB Node driver.
+      const { MongoClient } = require('mongodb');
 
-      // One client for the whole app — it manages a pool of connections.
-      const client = new MongoClient('mongodb://localhost:27017'); // Point the client at a local MongoDB server.
+      // One client = one connection to the MongoDB server.
+      const client = new MongoClient('mongodb://localhost:27017');
 
-      async function main() { // Wrap database work in an async function so we can use await.
-        await client.connect(); // Open the network connection to MongoDB before querying.
+      async function main() {
+        await client.connect();
         const db = client.db('bookstore');      // the database
         const books = db.collection('books');   // the collection
 
         // ... CRUD happens here (next examples) ...
 
-        await client.close(); // Close the connection cleanly when a standalone script finishes.
+        await client.close();
       }
 
-      main().catch(console.error); // Run main() and log any unexpected connection or query error.
+      main().catch(console.error);
     </script>
     <p class="wk3-note">The address <code>mongodb://localhost:27017</code> is a MongoDB server running on your own machine (27017 is MongoDB's usual port). In a deployed app the address — and any password — comes from configuration, never typed into the code; Section 3.6 shows how.</p>
 
     <h3>Create: <code>insertOne</code></h3>
     <p>Hand <code>insertOne</code> a plain object and it becomes a document. You do not create the collection first — MongoDB creates it the moment the first document lands:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="CREATE — insertOne" data-run="node" data-harness="wk3-mongo-crud">
-      const result = await books.insertOne({ // Insert one new book document and wait for MongoDB's confirmation.
-        title: 'The Hobbit', // Book title field stored in the new document.
-        author: 'J.R.R. Tolkien' // Author field; MongoDB generates _id automatically.
+    <script type="text/plain" class="code" data-lang="js" data-title="CREATE — insertOne">
+      const result = await books.insertOne({
+        title: 'The Hobbit',
+        author: 'J.R.R. Tolkien'
       });
-      console.log('Inserted a document.'); // Confirm the write succeeded (result.insertedId holds the new _id).
+      console.log('Inserted a document.');
     </script>
     <p>What comes back (the <code>insertedId</code> is generated fresh on every run — yours will differ):</p>
     <div class="output">{ acknowledged: true, insertedId: new ObjectId("6a05f1c2b8d4e5f60718293a") }</div>
@@ -926,15 +595,15 @@ Lines: 2</div>
     <h3>Read: <code>find</code> and <code>findOne</code></h3>
     <p>Reading is a <strong>query</strong>: a description of the documents you want. The simplest query is an object naming fields and the values they must match — <code>{ author: 'Jane Austen' }</code> means "documents whose author is Jane Austen," and <code>{}</code> (empty) means "all of them." <code>find</code> returns a <em>cursor</em> — a handle you walk through to get the documents — and calling <code>.toArray()</code> on it collects them into an ordinary array:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="READ — find and findOne" data-run="node" data-harness="wk3-mongo-read">
+    <script type="text/plain" class="code" data-lang="js" data-title="READ — find and findOne">
       // Every document in the collection:
-      const all = await books.find().toArray(); // Fetch every book document and collect the cursor into an array.
+      const all = await books.find().toArray();
 
       // Every document matching a query:
-      const byAusten = await books.find({ author: 'Jane Austen' }).toArray(); // Match only documents whose author equals 'Jane Austen'.
+      const byAusten = await books.find({ author: 'Jane Austen' }).toArray();
 
       // Just the first match (or null if there is none):
-      const one = await books.findOne({ title: 'Dune' }); // Return the first matching document, or null when not found.
+      const one = await books.findOne({ title: 'Dune' });
     </script>
 
     <p>With the three course books stored, <code>find().toArray()</code> hands your code an array of the documents themselves:</p>
@@ -952,8 +621,8 @@ Lines: 2</div>
     <h3>Update: <code>updateOne</code> with <code>$set</code></h3>
     <p>Updating takes two arguments: a query that picks the document, and a description of the change. The change uses <code>$set</code>, which names the fields to change and leaves every other field alone:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="UPDATE — updateOne with $set" data-run="node" data-harness="wk3-mongo-crud">
-      await books.updateOne( // Update the first document matching the filter below.
+    <script type="text/plain" class="code" data-lang="js" data-title="UPDATE — updateOne with $set">
+      await books.updateOne(
         { title: 'Dune' },                        // which document
         { $set: { title: 'Dune (revised)' } }     // what to change
       );
@@ -964,8 +633,8 @@ Lines: 2</div>
 
     <h3>Delete: <code>deleteOne</code></h3>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="DELETE — deleteOne" data-run="node" data-harness="wk3-mongo-crud">
-      await books.deleteOne({ title: 'Emma' }); // Remove the first document whose title is 'Emma'.
+    <script type="text/plain" class="code" data-lang="js" data-title="DELETE — deleteOne">
+      await books.deleteOne({ title: 'Emma' });
     </script>
     <p>What comes back:</p>
     <div class="output">{ acknowledged: true, deletedCount: 1 }</div>
@@ -976,19 +645,19 @@ Lines: 2</div>
 
     <div class="table-wrap">
       <table class="data-table">
-        <thead><tr><th scope="col">CRUD</th><th scope="col">REST route (Week 2)</th><th scope="col">MongoDB driver</th><th scope="col">What it does</th></tr></thead>
+        <thead><tr><th scope="col">CRUD</th><th scope="col">REST (Week 2)</th><th scope="col">MongoDB driver</th><th scope="col">What it does</th></tr></thead>
         <tbody>
           <tr><th scope="row">Create</th><td><code>POST /api/books</code></td><td><code>insertOne(doc)</code></td><td>Store a new document; the database gives it an <code>_id</code></td></tr>
-          <tr><th scope="row">Read</th><td><code>GET /api/books</code>, <code>GET /api/books/:id</code></td><td><code>find(query)</code>, <code>findOne({ _id: id })</code></td><td>Fetch every document matching the query, or the one with that <code>_id</code></td></tr>
-          <tr><th scope="row">Update</th><td><code>PUT /api/books/:id</code></td><td><code>updateOne({ _id: id }, { $set: {...} })</code></td><td>Change the named fields on the matching document</td></tr>
-          <tr><th scope="row">Delete</th><td><code>DELETE /api/books/:id</code></td><td><code>deleteOne({ _id: id })</code></td><td>Remove the matching document</td></tr>
+          <tr><th scope="row">Read</th><td><code>GET /api/books</code>, <code>GET /api/books/2</code></td><td><code>find(query)</code>, <code>findOne(query)</code></td><td>Fetch every document matching the query, or the first one</td></tr>
+          <tr><th scope="row">Update</th><td><code>PUT /api/books/1</code></td><td><code>updateOne(query, { $set: {...} })</code></td><td>Change the named fields on the matching document</td></tr>
+          <tr><th scope="row">Delete</th><td><code>DELETE /api/books/2</code></td><td><code>deleteOne(query)</code></td><td>Remove the matching document</td></tr>
         </tbody>
       </table>
     </div>
 
     <aside class="callout try">
       <strong>Picture the API, upgraded</strong>
-      <p>Take your Week 2 books API in your head and swap each array operation for the driver call beside it in the table: <code>books.push(...)</code> becomes <code>insertOne</code>, the <code>find</code> over the array becomes the driver's <code>find</code>, and so on. The route shapes and most of the code around them stay. Two things change. The id is no longer a small number you hand out yourself: it is the <code>_id</code> MongoDB generates, which shows up in JSON as a 24-character string. So the JSON carries <code>_id</code> where Week 2 had <code>id</code>, and the URL carries that string where Week 2 had <code>/2</code>. And an id that is not a well-formed <code>_id</code> earns a new answer, <code>400</code> — the routes below show it. Beyond that, only the storage got serious: the data now survives restarts and can be shared by every copy of your server.</p>
+      <p>Take your Week 2 books API in your head and swap each array operation for the driver call beside it in the table: <code>books.push(...)</code> becomes <code>insertOne</code>, the <code>find</code> over the array becomes the driver's <code>find</code>, and so on. The routes, the JSON and the status codes do not change at all. Only the storage got serious — the data now survives restarts and can be shared by every copy of your server.</p>
     </aside>
 
     <div class="match" data-title="Match each MongoDB operation to its effect">
@@ -1004,45 +673,16 @@ Lines: 2</div>
     </div>
 
     <h3>From driver calls to routes</h3>
-    <p>So far the driver calls have lived in a standalone program. In your Week 2 API they live inside route handlers, and the route's job is translating between HTTP and the database: an HTTP request comes in, a driver call goes out, and the result becomes an HTTP response.</p>
-    <p>One thing has to move first. In the standalone program, <code>books</code> was a variable inside <code>main()</code>, and the program closed the client when it finished. A server never finishes, and every route needs <code>books</code>. So a server connects <strong>once</strong>, when it starts, keeps <code>books</code> where every route can reach it, and only then starts listening. No route connects, and no route calls <code>client.close()</code> — the one client stays open for as long as the server runs, sharing its pool of connections among all the requests:</p>
+    <p>So far the driver calls have lived in a standalone program. In your Week 2 API they live inside route handlers, and the route's job is translating between HTTP and the database: an HTTP request comes in, a driver call goes out, and the result becomes an HTTP response. The list route is the direct swap — run <code>find().toArray()</code>, then answer with the documents as JSON using <code>res.json(...)</code>, which sends a value back as a JSON response:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="Startup pattern — connect once, then listen">
-      const express = require('express'); // Load Express for the HTTP server.
-      const { MongoClient } = require('mongodb'); // Load the MongoDB client driver.
+    <script type="text/plain" class="code" data-lang="js" data-title="GET /api/books — the driver call inside a route">
+      const { ObjectId } = require('mongodb'); // alongside MongoClient, from earlier
 
-      const app = express(); // Create the Express app.
-      app.use(express.json()); // Parse incoming JSON request bodies into req.body.
-
-      // One client for the whole app — it manages a pool of connections.
-      const client = new MongoClient('mongodb://localhost:27017'); // Configure one shared client for the server's lifetime.
-      let books; // filled in once at startup, then used by every route
-
-      // ... the routes go here (next examples) — they all use books ...
-
-      async function start() { // Connect to MongoDB first, then accept HTTP traffic.
-        await client.connect();                  // once, when the server starts
-        books = client.db('bookstore').collection('books'); // Save the collection handle for all routes to reuse.
-        app.listen(3000, () => console.log('Listening on port 3000')); // Start listening only after books is ready.
-      }
-
-      start().catch((err) => { // Handle startup failures (like MongoDB not running).
-        console.error('Could not reach MongoDB:', err.message); // Print a clear diagnostic message.
-        process.exit(1); // Exit with a non-zero error code instead of serving broken routes.
-      });
-    </script>
-    <p class="wk3-note">This is a pattern to follow, not a captured run. The order is the point: <code>app.listen</code> runs only after the connection is ready, so no request can arrive while <code>books</code> is still empty. If the database cannot be reached, the server says so and stops instead of limping along.</p>
-
-    <p>With that in place, the list route is the direct swap — run <code>find().toArray()</code>, then answer with the documents as JSON using <code>res.json(...)</code>, which sends a value back as a JSON response:</p>
-
-    <script type="text/plain" class="code" data-lang="js" data-title="GET /api/books — the driver call inside a route" data-run="server" data-harness="wk3-mongo-routes-list" data-presets='[{"label":"/api/books","method":"GET","path":"/api/books"}]'>
-      const { ObjectId } = require('mongodb'); // alongside MongoClient, at the top
-
-      app.get('/api/books', async (req, res, next) => { // List every book stored in MongoDB.
-        try { // Catch database or network errors so Express can handle them cleanly.
-          const docs = await books.find().toArray(); // Read all documents from the books collection as an array.
-          res.json(docs); // Send the documents back to the client as JSON.
-        } catch (err) { // If MongoDB fails, forward the error instead of crashing.
+      app.get('/api/books', async (req, res, next) => {
+        try {
+          const docs = await books.find().toArray();
+          res.json(docs);
+        } catch (err) {
           next(err); // database failed: let the error middleware answer 500
         }
       });
@@ -1050,23 +690,23 @@ Lines: 2</div>
 
     <p>Reading one book adds a translation step. An id arrives in the URL as a <em>string</em> — every URL is text — but MongoDB stores <code>_id</code> values in its own type, <code>ObjectId</code>, so you convert the string with <code>new ObjectId(id)</code> before you search. That conversion sits in its own <code>try/catch</code> (code that tries a step and catches an error it throws, instead of crashing) because an invalid id string makes <code>new ObjectId(...)</code> throw — and a bad id is the visitor's mistake, not the database's:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="GET /api/books/:id — bad id, not found, and database failure" data-run="server" data-harness="wk3-mongo-routes" data-presets='[{"label":"Valid id (200 Dune)","method":"GET","path":"/api/books/65f000000000000000000001"},{"label":"Unknown ObjectId (404)","method":"GET","path":"/api/books/65f000000000000000000099"},{"label":"Malformed id (400)","method":"GET","path":"/api/books/not-an-id"}]'>
-      app.get('/api/books/:id', async (req, res, next) => { // Look up one book by its MongoDB _id from the URL.
-        let id; // Will hold the parsed ObjectId once validated.
-        try { // Converting a malformed string throws, so isolate it in its own try/catch.
-          id = new ObjectId(req.params.id); // Convert the 24-character URL string into a MongoDB ObjectId.
-        } catch { // Invalid format is the caller's mistake, not a server crash.
+    <script type="text/plain" class="code" data-lang="js" data-title="GET /api/books/:id — bad id, not found, and database failure">
+      app.get('/api/books/:id', async (req, res, next) => {
+        let id;
+        try {
+          id = new ObjectId(req.params.id);
+        } catch {
           // Not a valid ObjectId string at all: a bad request.
-          return res.status(400).json({ error: 'Invalid book id' }); // Stop and answer 400 Bad Request.
+          return res.status(400).json({ error: 'Invalid book id' });
         }
-        try { // Query MongoDB using the validated ObjectId.
-          const doc = await books.findOne({ _id: id }); // Search for the single document matching _id.
-          if (!doc) { // findOne returns null when no document has that ID.
+        try {
+          const doc = await books.findOne({ _id: id });
+          if (!doc) {
             // Valid id, but no document has it.
-            return res.status(404).json({ error: 'Book not found' }); // Answer 404 Not Found.
+            return res.status(404).json({ error: 'Book not found' });
           }
-          res.json(doc); // Send the matching book document as JSON.
-        } catch (err) { // Any error here came from the database itself.
+          res.json(doc);
+        } catch (err) {
           next(err); // database failed: let the error middleware answer 500
         }
       });
@@ -1074,137 +714,14 @@ Lines: 2</div>
 
     <p>Notice that one route gives three different failure answers, because three different things went wrong. "Bad id" is <code>400</code> — the request itself was malformed. "Not found" is <code>404</code> — the request was fine, but no such book exists, which is why the handler checks for the <code>null</code> that <code>findOne</code> returns. "Database down" is <code>500</code> — your server failed — and the handler does not answer that one itself: passing the error on with <code>next(err)</code> hands it to the error-handling middleware from Week 2, which sends the 500. Keeping those three apart is what makes an API's answers mean something to whoever called it.</p>
 
-    <p><strong>Completing CRUD in Express — <code>POST</code>, <code>PUT</code>, and <code>DELETE</code> with MongoDB:</strong> here are the three write routes that sit right beside the two <code>GET</code> routes above (pattern sketch):</p>
-    <script type="text/plain" class="code" data-lang="js" data-title="MongoDB POST, PUT &amp; DELETE routes (pattern)" data-run="server" data-harness="wk3-mongo-routes" data-presets='[{"label":"List books","method":"GET","path":"/api/books"},{"label":"Add book (201)","method":"POST","path":"/api/books","headers":{"Content-Type":"application/json"},"body":"{\"title\":\"Beloved\",\"author\":\"Toni Morrison\"}"},{"label":"Update Dune (200)","method":"PUT","path":"/api/books/65f000000000000000000001","headers":{"Content-Type":"application/json"},"body":"{\"title\":\"Dune (revised)\",\"author\":\"Frank Herbert\"}"},{"label":"Delete Emma (204)","method":"DELETE","path":"/api/books/65f000000000000000000002"}]'>
-      // CREATE — POST /api/books (returns 201 + the new document with _id)
-      app.post('/api/books', async (req, res, next) => { // Create a new book document in MongoDB.
-        const { title, author } = req.body || {}; // Safely pull title and author out of req.body.
-        if (typeof title !== 'string' || !title.trim() || typeof author !== 'string' || !author.trim()) { // Require non-empty strings for both fields.
-          return res.status(400).json({ error: 'title and author are required' }); // Reject bad input with 400 Bad Request.
-        }
-        try { // Insert the cleaned document into MongoDB.
-          const doc = { title: title.trim(), author: author.trim() }; // Build a clean object with only allowed, trimmed fields.
-          const result = await books.insertOne(doc); // Save to MongoDB and receive the generated insertedId.
-          res.status(201).json({ _id: result.insertedId, ...doc }); // Reply 201 Created with the full saved document.
-        } catch (err) { // Forward unexpected database errors to Express error middleware.
-          next(err); // Hand the error to the 500 error handler.
-        }
-      });
-
-      // UPDATE — PUT /api/books/:id (400 bad id, 404 not found, 200 updated)
-      app.put('/api/books/:id', async (req, res, next) => { // Update an existing book document by _id.
-        let id; // Holds the validated ObjectId.
-        try { id = new ObjectId(req.params.id); } catch { return res.status(400).json({ error: 'Invalid book id' }); } // Reject malformed IDs with 400.
-        const { title, author } = req.body || {}; // Extract replacement title and author from req.body.
-        if (typeof title !== 'string' || !title.trim() || typeof author !== 'string' || !author.trim()) { // Ensure both fields are non-empty strings.
-          return res.status(400).json({ error: 'title and author are required' }); // Reject invalid updates with 400.
-        }
-        try { // Apply the update using $set so _id and any other fields stay intact.
-          const result = await books.updateOne( // Match one book by _id and update its fields.
-            { _id: id }, // Filter: find the document with this exact _id.
-            { $set: { title: title.trim(), author: author.trim() } } // Update only title and author.
-          );
-          if (result.matchedCount === 0) return res.status(404).json({ error: 'Book not found' }); // No document matched that _id -> 404.
-          res.json({ _id: id, title: title.trim(), author: author.trim() }); // Reply 200 OK with the updated book.
-        } catch (err) { // Forward database failures to Express error middleware.
-          next(err); // Let the 500 handler respond.
-        }
-      });
-
-      // DELETE — DELETE /api/books/:id (400 bad id, 404 not found, 204 deleted)
-      app.delete('/api/books/:id', async (req, res, next) => { // Delete one book document by _id.
-        let id; // Holds the validated ObjectId.
-        try { id = new ObjectId(req.params.id); } catch { return res.status(400).json({ error: 'Invalid book id' }); } // Reject malformed IDs with 400.
-        try { // Remove the matching document from MongoDB.
-          const result = await books.deleteOne({ _id: id }); // Delete at most one document with this _id.
-          if (result.deletedCount === 0) return res.status(404).json({ error: 'Book not found' }); // Nothing deleted means no book had that ID -> 404.
-          res.status(204).send(); // Reply 204 No Content to confirm deletion.
-        } catch (err) { // Forward database failures to Express error middleware.
-          next(err); // Let the 500 handler respond.
-        }
-      });
-    </script>
-    <p>Walk through the three driver reports doing the work here. In <code>POST</code>, <code>{ _id: result.insertedId, ...doc }</code> merges the database-generated <code>_id</code> with the validated fields and answers <code>201 Created</code>. In <code>PUT</code>, checking <code>result.matchedCount === 0</code> (rather than <code>modifiedCount</code>) is a crucial subtlety: if a user saves the same title twice, <code>matchedCount</code> is <code>1</code> (the book exists) while <code>modifiedCount</code> is <code>0</code> (nothing changed) — checking <code>matchedCount</code> prevents falsely returning <code>404</code>. In <code>DELETE</code>, <code>result.deletedCount === 0</code> means no document had that <code>_id</code> (<code>404</code>); otherwise <code>204 No Content</code> confirms removal.</p>
-
-    <p><strong>The client side talking to MongoDB routes (HTML, CSS &amp; Browser JS):</strong> the one adjustment your front end makes when moving from an in-memory array to MongoDB is reading the 24-character string <code>book._id</code> instead of a numeric <code>book.id</code>:</p>
-    <div class="tabs wk3-tabs">
-      <div data-tab="1 · Client HTML">
-        <p>Each rendered card stores MongoDB's string <code>_id</code> on <code>data-id</code> so Rename and Delete buttons know which document URL to call.</p>
-        <script type="text/plain" class="code" data-lang="html" data-title="mongo-books-client.html">
-          <section class="shelf"> <!-- Main wrapper for the MongoDB bookstore UI. -->
-            <h2>Bookstore (MongoDB)</h2> <!-- Section heading. -->
-            <p id="mongo-err" class="err-box" role="alert" hidden></p> <!-- Hidden alert box shown if a DELETE request returns an error. -->
-            <ul id="mongo-books" class="shelf-list"></ul> <!-- Empty list populated by JS with one <li> per book document. -->
-          </section>
-        </script>
-      </div>
-      <div data-tab="2 · Client CSS">
-        <p>Spaces the book details and action buttons cleanly on one row with clear button contrast.</p>
-        <script type="text/plain" class="code" data-lang="css" data-title="mongo-books-client.css">
-          .shelf { max-width: 560px; font-family: system-ui, sans-serif; } /* Constrain width and set clean system typography. */
-          .shelf-list { list-style: none; padding: 0; display: grid; gap: 8px; } /* Remove bullets and stack book rows with an 8px gap. */
-          .shelf-list li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 8px; background: #ffffff; } /* Flex row putting book text on the left and buttons on the right. */
-          .shelf-btns { display: flex; gap: 6px; } /* Group action buttons horizontally with a small gap. */
-          .shelf-btns button { padding: 5px 10px; border-radius: 6px; border: 1px solid #94a3b8; background: #f8fafc; cursor: pointer; } /* Neutral outlined button style for row actions. */
-          .err-box { padding: 8px 12px; border-radius: 6px; background: #fef2f2; border: 1px solid #ef4444; color: #991b1b; font-weight: 700; } /* High-contrast red banner for API error messages. */
-        </script>
-      </div>
-      <div data-tab="3 · Client JS (using book._id)">
-        <p>Uses <code>book._id</code> in <code>DELETE /api/books/${book._id}</code> and updates state by comparing string IDs (<code>b._id !== id</code>).</p>
-        <script type="text/plain" class="code" data-lang="js" data-title="mongo-books-client.js (browser JS)">
-          let books = []; // Client-side array holding the book documents loaded from the API.
-          const list = document.getElementById('mongo-books'); // Reference to the <ul> that displays books.
-          const errBox = document.getElementById('mongo-err'); // Reference to the error alert paragraph.
-
-          async function loadBooks() { // Fetch all books from Express and render them.
-            const res = await fetch('/api/books'); // Request the JSON list of MongoDB book documents.
-            books = await res.json(); // Store the parsed array in local state.
-            render(); // Draw the list on screen.
-          }
-
-          async function removeBook(id) { // Delete one book by its MongoDB _id string.
-            errBox.hidden = true; // Hide any previous error message before retrying.
-            // id is MongoDB's 24-character string _id (e.g. "66f1c2a4...")
-            const res = await fetch(`/api/books/${encodeURIComponent(id)}`, { method: 'DELETE' }); // Call DELETE with a URL-safe _id.
-            if (!res.ok) { // Handle 400, 404, or 500 responses from the server.
-              const data = await res.json().catch(() => ({})); // Read the JSON error body if present.
-              errBox.textContent = data.error || 'Delete failed'; // Show the server's error message safely as text.
-              errBox.hidden = false; // Reveal the alert banner.
-              return; // Stop so we do not remove the book from the UI on failure.
-            }
-            books = books.filter((b) => b._id !== id); // Remove the deleted document from the local array by string _id.
-            render(); // Redraw the updated book list.
-          }
-
-          function render() { // Rebuild the <ul> from the current books array.
-            list.replaceChildren(); // Clear old list items before re-rendering.
-            books.forEach((b) => { // Create one row per book document.
-              const li = document.createElement('li'); // Row container.
-              const info = document.createElement('span'); // Text container for title and author.
-              info.textContent = `${b.title} — ${b.author}`; // Set text safely without HTML injection.
-              const del = document.createElement('button'); // Create the row's Delete button.
-              del.type = 'button'; // Prevent accidental form submission.
-              del.textContent = 'Delete'; // Button label.
-              del.addEventListener('click', () => removeBook(b._id)); // Pass MongoDB's string _id when clicked.
-              li.append(info, del); // Place the text and button side by side inside the row.
-              list.appendChild(li); // Add the row to the list in the DOM.
-            });
-          }
-
-          loadBooks(); // Fetch and display books as soon as the page script runs.
-        </script>
-      </div>
-    </div>
-    <p>Notice why <code>encodeURIComponent(id)</code> and <code>b._id !== id</code> work seamlessly here: MongoDB's <code>ObjectId</code> serializes to a plain string in JSON, so the browser passes that exact string back in the URL and Express converts it back with <code>new ObjectId(req.params.id)</code>.</p>
-
     <div class="quiz" data-title="Check your understanding: MongoDB CRUD">
       <script type="application/json">
       [
-        {"q": "In MongoDB's vocabulary, what is a collection?", "shuffle": true, "choices": ["A group of related documents inside a database — roughly a table for documents", "One record made of named fields and values — roughly a row in a relational table", "A named store on the server that holds many groups of documents — the top level", "The handle that `find` returns — you walk through it to reach each document"], "answer": 0, "explain": "Database, then collection, then document: the `books` collection holds book documents inside the `bookstore` database."},
-        {"q": "What does the query `{ author: 'Jane Austen' }` mean when passed to `find`?", "shuffle": true, "choices": ["Documents whose `author` field equals `Jane Austen`", "Documents sorted so that `Jane Austen` comes first", "Documents that have an `author` field, whatever it holds", "Documents with `Jane Austen` in any one of their fields"], "answer": 0, "explain": "A query object describes the documents you want by naming fields and the values they must match. An empty query `{}` matches everything."},
-        {"q": "Why does `find()` need `.toArray()` in the examples?", "shuffle": true, "choices": ["`find` returns a cursor — a handle you walk through — and `toArray()` collects the documents into an array", "`find` returns only the first matching document, and `toArray()` goes back to the server to fetch all the rest", "`find` returns one long JSON string, and `toArray()` parses that text into separate JavaScript objects", "`find` returns the documents in no fixed order, and `toArray()` sorts them by `_id` before you use them"], "answer": 0, "explain": "The cursor lets big results stream through a few at a time. For a small collection, `.toArray()` is the simple way to get everything at once."},
+        {"q": "In MongoDB's vocabulary, what is a collection?", "shuffle": true, "choices": ["A group of related documents inside a database — roughly a table for documents", "A backup of the whole server", "A list of database passwords", "One field inside a document"], "answer": 0, "explain": "Database, then collection, then document: the `books` collection holds book documents inside the `bookstore` database."},
+        {"q": "What does the query `{ author: 'Jane Austen' }` mean when passed to `find`?", "shuffle": true, "choices": ["Documents whose `author` field equals `Jane Austen`", "Sort the documents by author", "Delete every author named Jane Austen", "Create a new author field"], "answer": 0, "explain": "A query object describes the documents you want by naming fields and the values they must match. An empty query `{}` matches everything."},
+        {"q": "Why does `find()` need `.toArray()` in the examples?", "shuffle": true, "choices": ["`find` returns a cursor — a handle you walk through — and `toArray()` collects the documents into an array", "`find` returns a string that must be converted", "MongoDB cannot return more than one document without it", "It sorts the results alphabetically"], "answer": 0, "explain": "The cursor lets big results stream through a few at a time. For a small collection, `.toArray()` is the simple way to get everything at once."},
         {"q": "True or false: in `updateOne(query, { $set: { title: 'Dune (revised)' } })`, every field not named in `$set` is erased.", "answer": false, "explain": "False. `$set` changes only the fields it names. The author, the `_id` and anything else on the document stay exactly as they were."},
-        {"q": "You insert a document without an `_id`. What happens?", "shuffle": true, "choices": ["MongoDB generates one and adds it as the document's `_id`; the driver hands it back as `insertedId`", "The insert is rejected with an error; nothing is stored until you supply a unique `_id` of your own", "The document is stored with no `_id` at all; later it can only be found by its other fields", "MongoDB copies the `title` into `_id`; two books with the same title cannot both be stored"], "answer": 0, "explain": "Generated IDs are the normal path. Every document ends up with a unique `_id` whether you supplied it or not."}
+        {"q": "You insert a document without an `_id`. What happens?", "shuffle": true, "choices": ["MongoDB generates one and adds it as the document's `_id`; the driver hands it back as `insertedId`", "The insert fails until you invent an ID yourself", "The document is stored but can never be found again", "MongoDB uses the title as the ID"], "answer": 0, "explain": "Generated IDs are the normal path. Every document ends up with a unique `_id` whether you supplied it or not."}
       ]
       </script>
     </div>
@@ -1218,32 +735,32 @@ Lines: 2</div>
     <h3>SQL: the four statements are CRUD</h3>
     <p>Start with the schema. This statement creates the <code>books</code> table from Section 3.3, declaring every column and its type. <code>INT</code> is a whole number, <code>VARCHAR(200)</code> is text up to 200 characters, <code>NOT NULL</code> means "a value is required," and <code>AUTO_INCREMENT PRIMARY KEY</code> makes <code>id</code> the unique row identifier, filled in by the database with the next number each time:</p>
 
-    <script type="text/plain" class="code" data-lang="sql" data-title="SQL — create the table" data-run="sql">
-      CREATE TABLE books ( -- Declare a new table named books with a strict schema.
-        id INT AUTO_INCREMENT PRIMARY KEY, -- Unique integer ID auto-numbered by the database (1, 2, 3...).
-        title VARCHAR(200) NOT NULL, -- Required text column for the book title (up to 200 chars).
-        author VARCHAR(120) NOT NULL -- Required text column for the author name (up to 120 chars).
+    <script type="text/plain" class="code" data-lang="js" data-title="SQL — create the table">
+      CREATE TABLE books (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(200) NOT NULL,
+        author VARCHAR(120) NOT NULL
       );
     </script>
 
     <p>With the table in place, the four CRUD operations are four SQL verbs. <strong>Create</strong> is <code>INSERT</code> — name the columns, then the values that fill them:</p>
 
-    <script type="text/plain" class="code" data-lang="sql" data-title="SQL — INSERT (Create)" data-run="sql" data-harness="wk3-sql-books-empty">
-      INSERT INTO books (title, author) VALUES ('Dune', 'Frank Herbert'); -- Insert row 1; id is filled automatically as 1.
-      INSERT INTO books (title, author) VALUES ('Emma', 'Jane Austen'); -- Insert row 2; id is filled automatically as 2.
-      INSERT INTO books (title, author) VALUES ('The Hobbit', 'J.R.R. Tolkien'); -- Insert row 3; id is filled automatically as 3.
+    <script type="text/plain" class="code" data-lang="js" data-title="SQL — INSERT (Create)">
+      INSERT INTO books (title, author) VALUES ('Dune', 'Frank Herbert');
+      INSERT INTO books (title, author) VALUES ('Emma', 'Jane Austen');
+      INSERT INTO books (title, author) VALUES ('The Hobbit', 'J.R.R. Tolkien');
     </script>
     <p>Notice there is no <code>id</code> in those statements: <code>AUTO_INCREMENT</code> assigns 1, 2 and 3 itself. <strong>Read</strong> is <code>SELECT</code> — name the columns you want, the table to take them from, and optionally a <code>WHERE</code> clause, a condition that filters which rows come back:</p>
 
-    <script type="text/plain" class="code" data-lang="sql" data-title="SQL — SELECT (Read)" data-run="sql" data-harness="wk3-sql-books">
-      SELECT * FROM books; -- Read every column (*) of every row in the books table.
-      SELECT * FROM books WHERE id = 2; -- Filter down to only the single row where id equals 2.
-      SELECT title, author FROM books WHERE author = 'Jane Austen'; -- Read only title and author for Jane Austen's books.
+    <script type="text/plain" class="code" data-lang="js" data-title="SQL — SELECT (Read)">
+      SELECT * FROM books;
+      SELECT * FROM books WHERE id = 2;
+      SELECT title, author FROM books WHERE author = 'Jane Austen';
     </script>
     <p>The <code>*</code> means "every column." <strong>Update</strong> is <code>UPDATE</code> with a <code>SET</code> clause — and a <code>WHERE</code>, always a <code>WHERE</code>:</p>
 
-    <script type="text/plain" class="code" data-lang="sql" data-title="SQL — UPDATE (Update)" data-run="sql" data-harness="wk3-sql-books">
-      UPDATE books SET title = 'Dune (revised)' WHERE id = 1; -- Rename only the row matching WHERE id = 1.
+    <script type="text/plain" class="code" data-lang="js" data-title="SQL — UPDATE (Update)">
+      UPDATE books SET title = 'Dune (revised)' WHERE id = 1;
     </script>
 
     <aside class="callout warn">
@@ -1253,8 +770,8 @@ Lines: 2</div>
 
     <p><strong>Delete</strong> is <code>DELETE</code> — the same shape, the same warning:</p>
 
-    <script type="text/plain" class="code" data-lang="sql" data-title="SQL — DELETE (Delete)" data-run="sql" data-harness="wk3-sql-books">
-      DELETE FROM books WHERE id = 2; -- Remove only the single row matching WHERE id = 2.
+    <script type="text/plain" class="code" data-lang="js" data-title="SQL — DELETE (Delete)">
+      DELETE FROM books WHERE id = 2;
     </script>
 
     <h3>What the queries hand back</h3>
@@ -1262,26 +779,17 @@ Lines: 2</div>
 
     <div class="table-wrap">
       <table class="data-table">
-        <caption>Result of <code>SELECT * FROM books;</code> after the three inserts</caption>
+        <caption>Result of <code>SELECT * FROM books;</code> after the inserts (top) and after the update and delete (bottom). Verified: while this site was being finished, these exact statements were run against a real MySQL-compatible server (MariaDB 10.11) through the mysql2 driver, and the rows matched this table exactly.</caption>
         <thead><tr><th scope="col">id</th><th scope="col">title</th><th scope="col">author</th></tr></thead>
         <tbody>
           <tr><td>1</td><td>Dune</td><td>Frank Herbert</td></tr>
           <tr><td>2</td><td>Emma</td><td>Jane Austen</td></tr>
           <tr><td>3</td><td>The Hobbit</td><td>J.R.R. Tolkien</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="table-wrap">
-      <table class="data-table">
-        <caption>Result of the same <code>SELECT * FROM books;</code> after the update and the delete</caption>
-        <thead><tr><th scope="col">id</th><th scope="col">title</th><th scope="col">author</th></tr></thead>
-        <tbody>
           <tr><td>1</td><td>Dune (revised)</td><td>Frank Herbert</td></tr>
           <tr><td>3</td><td>The Hobbit</td><td>J.R.R. Tolkien</td></tr>
         </tbody>
       </table>
     </div>
-    <p class="wk3-note">Verified: while this site was being finished, these exact statements were run against a real MySQL-compatible server (MariaDB 10.11) through the mysql2 driver, and the rows matched these two tables exactly. Notice that id 2 is simply gone from the second table — deleting a row does not renumber the others.</p>
     <p>And <code>SELECT * FROM books WHERE id = 2;</code>, run before the delete, returns exactly one row: <code>2 · Emma · Jane Austen</code> — the same book your Week 2 API answered for <code>GET /api/books/2</code>.</p>
 
     <p>When MySQL answers a <code>SELECT</code> through the Node driver in the next example, each row arrives as a plain JavaScript object whose properties are the column names — <code>{ id: 2, title: 'Emma', author: 'Jane Austen' }</code>. That is no accident: it is the same book your API has been returning as JSON all along, which is why wiring a real database under a REST API changes so little of the code around it.</p>
@@ -1295,71 +803,51 @@ Lines: 2</div>
     <div class="output">{ affectedRows: 1, insertId: 4 }</div>
 
     <h3>Sending SQL from Node: mysql2 and placeholders</h3>
-    <p>From Node, the package is <code>mysql2</code> — install it with <code>npm install mysql2</code> — and its <code>/promise</code> version lets you <code>await</code> each query. Here is the full CRUD cycle, run against the table as the three <code>INSERT</code> statements above left it: Dune, Emma and The Hobbit, ids 1 to 3. It adds a fourth book, reads, then makes the same update and delete you just wrote by hand. Read the queries closely: none of them glue values into the SQL text. Wherever a value belongs, the SQL has a <code>?</code> instead, and the value travels separately, in an array:</p>
+    <p>From Node, the package is <code>mysql2</code> — install it with <code>npm install mysql2</code> — and its <code>/promise</code> version lets you <code>await</code> each query. Here is the full CRUD cycle. Read the queries closely: none of them glue values into the SQL text. Wherever a value belongs, the SQL has a <code>?</code> instead, and the value travels separately, in an array:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="MySQL CRUD from Node — mysql2/promise" data-run="node" data-harness="wk3-sql-books">
-      const mysql = require('mysql2/promise'); // Load the promise-based MySQL driver so we can use await.
+    <script type="text/plain" class="code" data-lang="js" data-title="MySQL CRUD from Node — mysql2/promise">
+      const mysql = require('mysql2/promise');
 
-      async function main() { // Wrap async database queries inside main().
-        const db = await mysql.createConnection({ // Open one connection to the MySQL server.
-          host: 'localhost', // Database server hostname (this machine).
-          user: 'root', // MySQL account username.
-          password: process.env.DB_PASSWORD, // set outside the code — Section 3.6 shows how
-          database: 'bookstore' // Name of the database holding our books table.
+      async function main() {
+        const db = await mysql.createConnection({
+          host: 'localhost',
+          user: 'root',
+          password: process.env.DB_PASSWORD, // from configuration, not code
+          database: 'bookstore'
         });
 
         // CREATE — the values ride separately, matched to the ? marks.
-        // An INSERT returns a report, not rows. insertId is the new row's id.
-        const [created] = await db.execute( // Destructure the first element: the write report object.
-          'INSERT INTO books (title, author) VALUES (?, ?)', // SQL template with ? placeholders instead of glued strings.
-          ['Beloved', 'Toni Morrison'] // Values safely bound to the two ? placeholders in order.
+        const [created] = await db.execute(
+          'INSERT INTO books (title, author) VALUES (?, ?)',
+          ['The Hobbit', 'J.R.R. Tolkien']
         );
-        console.log('New book id:', created.insertId); // 4
+        console.log('New book id:', created.insertId);
 
-        // READ — a SELECT returns an array of rows. Here, all four books.
-        const [all] = await db.execute('SELECT * FROM books'); // Fetch every book row as an array of objects.
-        console.log(all); // Print all four book objects.
-
-        // READ one row by id. Still an array: one match, one item.
-        const [rows] = await db.execute( // Query for a single book using a ? placeholder.
-          'SELECT * FROM books WHERE id = ?', // Parameterized WHERE clause.
-          [2] // Value 2 replaces the ? placeholder safely.
+        // READ — every row, then one row by id.
+        const [all] = await db.execute('SELECT * FROM books');
+        console.log(all);
+        const [rows] = await db.execute(
+          'SELECT * FROM books WHERE id = ?',
+          [2]
         );
-        console.log(rows[0]); // { id: 2, title: 'Emma', author: 'Jane Austen' }
+        console.log(rows[0]); // the single matching row
 
         // UPDATE — change the title of book 1.
-        // The report's affectedRows counts the rows the WHERE matched.
-        const [updated] = await db.execute( // Run a parameterized UPDATE and capture the report.
-          'UPDATE books SET title = ? WHERE id = ?', // Both the new title and target id use ? placeholders.
-          ['Dune (revised)', 1] // First ? gets the revised title; second ? gets id 1.
+        await db.execute(
+          'UPDATE books SET title = ? WHERE id = ?',
+          ['Dune (revised)', 1]
         );
-        console.log('Rows updated:', updated.affectedRows); // 1
 
-        // DELETE — remove book 2. Same kind of report.
-        const [deleted] = await db.execute('DELETE FROM books WHERE id = ?', [2]); // Delete book 2 safely via placeholder.
-        console.log('Rows deleted:', deleted.affectedRows); // 1
+        // DELETE — remove book 2.
+        await db.execute('DELETE FROM books WHERE id = ?', [2]);
 
-        await db.end(); // Close the connection cleanly when this standalone script finishes.
+        await db.end();
       }
 
-      main().catch(console.error); // Execute main() and log any connection or SQL error.
+      main().catch(console.error);
     </script>
 
-    <div class="output">New book id: 4
-[
-  { id: 1, title: 'Dune', author: 'Frank Herbert' },
-  { id: 2, title: 'Emma', author: 'Jane Austen' },
-  { id: 3, title: 'The Hobbit', author: 'J.R.R. Tolkien' },
-  { id: 4, title: 'Beloved', author: 'Toni Morrison' }
-]
-{ id: 2, title: 'Emma', author: 'Jane Austen' }
-Rows updated: 1
-Rows deleted: 1</div>
-    <p class="wk3-note">Real output — captured from running this code (Node v26.13.1, mysql2) against a MySQL 9.7 server holding the three-book table built by the statements above. Each line is one <code>console.log</code>, in order: the new id, all four rows, the single row, then the two reports.</p>
-
-    <p>Notice the pattern in lines like <code>const [rows] = await db.execute(...)</code>: mysql2 hands back a pair, <code>[rows, fields]</code> — the rows you asked for, plus a description of the columns (the <em>fields</em>) — and the destructuring keeps only the first item, the rows. For an <code>INSERT</code>, <code>UPDATE</code> or <code>DELETE</code> there are no rows to return, so that first item is a small report object instead.</p>
-    <p>One signal to read every time: when nothing matches, MySQL does not raise an error. A <code>SELECT</code> hands back an empty array, so <code>rows.length === 0</code>, and an <code>UPDATE</code> or <code>DELETE</code> reports <code>affectedRows === 0</code>. In a route, that is your cue to answer <code>404</code> — the same job the <code>null</code> from <code>findOne</code> did in the MongoDB section.</p>
-    <p>And in a real Express server, the <code>db</code> connection — or better, a <strong>connection pool</strong>, a small set of reusable connections the driver manages for you — is created once, when the server starts, and shared by every request; you never open a new connection per request, because opening one is slow work that only needs doing once.</p>
+    <p>Notice the pattern in lines like <code>const [rows] = await db.execute(...)</code>: mysql2 hands back a pair, <code>[rows, fields]</code> — the rows you asked for, plus a description of the columns (the <em>fields</em>) — and the destructuring keeps only the first item, the rows. And in a real Express server, that connection — or better, a <strong>connection pool</strong>, a small set of reusable connections the driver manages for you — is created once, when the server starts, and shared by every request; you never open a new connection per request, because opening one is slow work that only needs doing once.</p>
 
     <p>Those <code>?</code> marks are called <strong>placeholders</strong>, and the style is called a <strong>parameterized query</strong> — the values are <em>parameters</em>, passed alongside the SQL instead of inside it. This is not a style preference. It is one of the most important habits in this course, for two reasons:</p>
     <ul>
@@ -1371,131 +859,6 @@ Rows deleted: 1</div>
       <strong>Never glue user input into a SQL string</strong>
       <p>Every value that comes from a request — a route parameter, a form field, a JSON body — goes into a query through a <code>?</code> placeholder. No exceptions, even for values that "look like numbers." The day you make an exception is the day the input is not what you assumed.</p>
     </aside>
-
-    <h3>Wiring a MySQL pool into Express routes</h3>
-    <p>Just like MongoDB's single shared <code>MongoClient</code>, an Express server using MySQL creates <strong>one connection pool</strong> with <code>mysql.createPool(...)</code> at startup and reuses it across every route (pattern sketch):</p>
-    <script type="text/plain" class="code" data-lang="js" data-title="mysql-book-routes.js — pool + parameterized Express CRUD (pattern)" data-run="server" data-harness="wk3-sql-books-server" data-presets='[{"label":"List books","method":"GET","path":"/api/books"},{"label":"Book #1","method":"GET","path":"/api/books/1"},{"label":"Bad id abc (400)","method":"GET","path":"/api/books/abc"},{"label":"Add book (201)","method":"POST","path":"/api/books","headers":{"Content-Type":"application/json"},"body":"{\"title\":\"Beloved\",\"author\":\"Toni Morrison\"}"},{"label":"Delete #2 (204)","method":"DELETE","path":"/api/books/2"}]'>
-      const express = require('express'); // Load Express for HTTP routing.
-      const mysql = require('mysql2/promise'); // Load the promise-based MySQL driver.
-
-      const app = express(); // Create the Express application.
-      app.use(express.json()); // Parse JSON request bodies into req.body.
-
-      // One pool for the whole app — manages up to 10 reusable connections
-      const pool = mysql.createPool({ // Create a shared connection pool instead of connecting per request.
-        host: process.env.DB_HOST || 'localhost', // Database host from env, defaulting to localhost.
-        user: process.env.DB_USER || 'root', // Database user from env, defaulting to root.
-        password: process.env.DB_PASSWORD, // Secret password read strictly from the environment.
-        database: process.env.DB_NAME || 'bookstore', // Target database name, defaulting to bookstore.
-        connectionLimit: 10 // Reuse up to 10 simultaneous open connections.
-      });
-
-      app.get('/api/books', async (req, res, next) => { // Return every book ordered by numeric id.
-        try { // Wrap async SQL work so errors reach Express error middleware.
-          const [rows] = await pool.execute('SELECT id, title, author FROM books ORDER BY id'); // Fetch all rows sorted by id.
-          res.json(rows); // Send the array of row objects as JSON.
-        } catch (err) { next(err); } // Forward database errors to the 500 error handler.
-      });
-
-      app.get('/api/books/:id', async (req, res, next) => { // Return one book by its numeric id.
-        const id = Number(req.params.id); // Convert the URL path parameter from text to a number.
-        if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid book id' }); // Reject non-positive/non-integer IDs with 400.
-        try { // Query MySQL using a ? placeholder for the validated id.
-          const [rows] = await pool.execute('SELECT id, title, author FROM books WHERE id = ?', [id]); // Look up the single matching row.
-          if (rows.length === 0) return res.status(404).json({ error: 'Book not found' }); // Empty result array means no such book -> 404.
-          res.json(rows[0]); // Return the single matching book object.
-        } catch (err) { next(err); } // Forward database errors to the 500 handler.
-      });
-
-      app.post('/api/books', async (req, res, next) => { // Insert a new book row and return it with its new id.
-        const { title, author } = req.body || {}; // Safely destructure title and author from req.body.
-        if (typeof title !== 'string' || !title.trim() || typeof author !== 'string' || !author.trim()) { // Require non-empty strings for both fields.
-          return res.status(400).json({ error: 'title and author are required' }); // Reject invalid input with 400.
-        }
-        try { // Insert trimmed values via ? placeholders.
-          const [result] = await pool.execute( // Run INSERT and destructure the write report.
-            'INSERT INTO books (title, author) VALUES (?, ?)', // Parameterized INSERT statement.
-            [title.trim(), author.trim()] // Bind trimmed title and author separately from the SQL.
-          );
-          res.status(201).json({ id: result.insertId, title: title.trim(), author: author.trim() }); // Reply 201 Created with the auto-assigned id.
-        } catch (err) { next(err); } // Forward database errors to the 500 handler.
-      });
-
-      app.delete('/api/books/:id', async (req, res, next) => { // Delete one book row by numeric id.
-        const id = Number(req.params.id); // Parse the URL parameter as a number.
-        if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: 'Invalid book id' }); // Reject malformed IDs before querying MySQL.
-        try { // Execute the parameterized DELETE statement.
-          const [result] = await pool.execute('DELETE FROM books WHERE id = ?', [id]); // Delete the row matching id.
-          if (result.affectedRows === 0) return res.status(404).json({ error: 'Book not found' }); // 0 affected rows means no book matched -> 404.
-          res.status(204).send(); // Reply 204 No Content to confirm deletion.
-        } catch (err) { next(err); } // Forward database errors to the 500 handler.
-      });
-    </script>
-    <p>Trace how every lesson in this section shows up in those four routes: <code>mysql.createPool</code> hands out idle connections automatically so you never call <code>createConnection</code> or <code>end</code> per request; <code>Number.isInteger(id) &amp;&amp; id &gt;= 1</code> rejects non-numeric IDs with <code>400</code> before touching MySQL; every query uses <code>?</code> placeholders; <code>rows.length === 0</code> and <code>result.affectedRows === 0</code> turn misses into <code>404</code>; and database errors flow to <code>next(err)</code>.</p>
-
-    <p><strong>The client side querying and rendering MySQL rows (HTML, CSS &amp; Browser JS):</strong> watch how an author name with an apostrophe like <code>O'Brien</code> travels safely from an HTML search input, through <code>fetch()</code> and a parameterized MySQL <code>?</code> placeholder, back into a styled HTML table:</p>
-    <div class="tabs wk3-tabs">
-      <div data-tab="1 · Client HTML (search &amp; table)">
-        <p>Uses a semantic <code>&lt;table&gt;</code> with <code>&lt;thead&gt;</code> and an empty <code>&lt;tbody id="book-rows"&gt;</code> that browser JavaScript populates from MySQL's row objects.</p>
-        <script type="text/plain" class="code" data-lang="html" data-title="mysql-table-client.html">
-          <form id="author-search" class="author-bar"> <!-- Search form that queries /api/books by author. -->
-            <label for="author-q">Filter by author</label> <!-- Accessible label linked to the search box via for/id. -->
-            <input id="author-q" name="author" type="search" placeholder="e.g. Jane Austen or O'Brien"> <!-- Accepts author text; apostrophes stay safe with placeholders. -->
-            <button type="submit">Search</button> <!-- Submits the filter query (intercepted by JS). -->
-          </form>
-
-          <table class="sql-table"> <!-- Semantic HTML table mirroring the SQL rows and columns. -->
-            <thead> <!-- Header group for column names. -->
-              <tr><th scope="col">ID</th><th scope="col">Title</th><th scope="col">Author</th></tr> <!-- Column headers matching id, title, and author. -->
-            </thead>
-            <tbody id="book-rows"></tbody> <!-- Empty body populated by JS with one <tr> per SQL row. -->
-          </table>
-        </script>
-      </div>
-      <div data-tab="2 · Client CSS (striped table)">
-        <p>Uses <code>border-collapse: collapse</code> and <code>tbody tr:nth-child(even)</code> striping so relational rows are easy to scan.</p>
-        <script type="text/plain" class="code" data-lang="css" data-title="mysql-table-client.css">
-          .author-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; font-family: system-ui, sans-serif; } /* Horizontal wrapping bar for the search label, input, and button. */
-          .author-bar input { padding: 7px 10px; border: 1px solid #94a3b8; border-radius: 6px; font: inherit; } /* Rounded search input inheriting the bar's font. */
-          .sql-table { width: 100%; max-width: 560px; border-collapse: collapse; font-family: system-ui, sans-serif; } /* Full-width table (up to 560px) with crisp single borders. */
-          .sql-table th, .sql-table td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #cbd5e1; } /* Left-aligned cells with subtle horizontal row dividers. */
-          .sql-table thead th { background: #f1f5f9; font-size: 0.85rem; text-transform: uppercase; } /* Tinted uppercase header row to separate labels from data. */
-          .sql-table tbody tr:nth-child(even) { background: #f8fafc; } /* Zebra-stripe every even row for easier scanning. */
-        </script>
-      </div>
-      <div data-tab="3 · Client JS (fetching &amp; building rows)">
-        <p>URL-encodes the search value, receives the array of MySQL row objects <code>[{ id, title, author }]</code>, and fills each <code>&lt;td&gt;</code> safely with <code>textContent</code>.</p>
-        <script type="text/plain" class="code" data-lang="js" data-title="mysql-table-client.js (browser JS)">
-          const form = document.getElementById('author-search'); // Reference to the author filter form.
-          const tbody = document.getElementById('book-rows'); // Reference to the table body where rows are inserted.
-
-          async function loadRows(author = '') { // Fetch books (all or filtered by author) and render table rows.
-            const url = author ? '/api/books?author=' + encodeURIComponent(author) : '/api/books'; // URL-encode the author so spaces and apostrophes travel safely.
-            const res = await fetch(url); // Send GET request to Express.
-            const rows = await res.json(); // Parse the JSON array of MySQL row objects.
-
-            tbody.replaceChildren(); // Clear previous table rows before rendering new results.
-            rows.forEach((row) => { // Build one <tr> per SQL row returned by the API.
-              const tr = document.createElement('tr'); // Create a new table row element.
-              [row.id, row.title, row.author].forEach((val) => { // Fill the three cells in column order.
-                const td = document.createElement('td'); // Create one table data cell.
-                td.textContent = String(val); // Insert the value safely as plain text (never innerHTML).
-                tr.appendChild(td); // Add the cell to the row.
-              });
-              tbody.appendChild(tr); // Add the completed row to the table body.
-            });
-          }
-
-          form.addEventListener('submit', (e) => { // Intercept form submission to filter without reloading the page.
-            e.preventDefault(); // Stop the browser's default full-page submit.
-            loadRows(form.elements.author.value.trim()); // Re-fetch rows using the trimmed search box text.
-          });
-
-          loadRows(); // Load the full book table as soon as the page opens.
-        </script>
-      </div>
-    </div>
-    <p>Follow the apostrophe in <code>O'Brien</code> end to end: <code>encodeURIComponent</code> safely encodes it in the URL, Express decodes it into <code>req.query.author</code>, MySQL's <code>?</code> placeholder treats it strictly as data (never breaking quotes or allowing SQL injection), and <code>td.textContent</code> renders it safely in the browser table without parsing markup.</p>
 
     <h3>Try it: complete the SELECT</h3>
     <p>Fill in the blanks to write the query that reads the title and author of the book with <code>id</code> 3:</p>
@@ -1511,9 +874,9 @@ Rows deleted: 1</div>
       [
         {"q": "Which SQL statement reads data from a table?", "shuffle": true, "choices": ["`SELECT`", "`INSERT`", "`UPDATE`", "`FETCH`"], "answer": 0, "explain": "`SELECT` is Read in CRUD. `INSERT` creates, `UPDATE` changes, `DELETE` removes."},
         {"q": "What happens if you run `DELETE FROM books;` with no `WHERE` clause?", "shuffle": true, "choices": ["Every row in the table is deleted", "Only the first row is deleted", "MySQL refuses to run it", "Nothing — a `WHERE` is required by the language"], "answer": 0, "explain": "No `WHERE` means no filter, so the statement applies to all rows. The same is true of `UPDATE`. Check the `WHERE` before you run either."},
-        {"q": "In `db.execute('SELECT * FROM books WHERE id = ?', [2])`, what is the `?`?", "shuffle": true, "choices": ["A placeholder: the value `2` is sent separately and treated as data, never as SQL", "A wildcard: it matches any `id` at all, and the `[2]` limits the answer to two rows", "An optional marker: the `WHERE` clause is skipped whenever the array is empty", "A position number: the `[2]` tells MySQL to compare the second column, not `id`"], "answer": 0, "explain": "Placeholders keep values out of the SQL text. That makes quoting automatic (correctness) and stops visitor input from ever being read as instructions (security)."},
+        {"q": "In `db.execute('SELECT * FROM books WHERE id = ?', [2])`, what is the `?`?", "shuffle": true, "choices": ["A placeholder: the value `2` is sent separately and treated as data, never as SQL", "A wildcard that matches any column", "A comment character", "A typo the driver ignores"], "answer": 0, "explain": "Placeholders keep values out of the SQL text. That makes quoting automatic (correctness) and stops visitor input from ever being read as instructions (security)."},
         {"q": "True or false: building a query by gluing request values into a string, like `'... WHERE id = ' + req.params.id`, is safe as long as the value looks like a number.", "answer": false, "explain": "False. 'Looks like' is doing all the work in that sentence — the visitor controls the value, and the one time it is not a number, it becomes part of your SQL. Placeholders have no exceptions."},
-        {"q": "What does `AUTO_INCREMENT PRIMARY KEY` on the `id` column give you?", "shuffle": true, "choices": ["The database assigns each new row the next unique ID automatically", "The database renumbers every row from 1 each time a row is deleted", "The database adds 1 to a row's `id` every time that row is updated", "The database sorts the rows by title and numbers them in that order"], "answer": 0, "explain": "Your `INSERT` statements never mention `id` — the database fills it in with 1, 2, 3, …, guaranteeing every row a unique primary key."}
+        {"q": "What does `AUTO_INCREMENT PRIMARY KEY` on the `id` column give you?", "shuffle": true, "choices": ["The database assigns each new row the next unique ID automatically", "The table sorts itself alphabetically", "Rows are backed up every night", "The `id` column can hold text"], "answer": 0, "explain": "Your `INSERT` statements never mention `id` — the database fills it in with 1, 2, 3, …, guaranteeing every row a unique primary key."}
       ]
       </script>
     </div>
@@ -1529,142 +892,33 @@ Rows deleted: 1</div>
     <p>But browser checks are a courtesy, not a guard. Your server does not only hear from your tidy web page. Anyone can send your API a hand-made request with <code>curl</code>, skipping your form — and its JavaScript — entirely. Worse, everything arriving in a request was assembled on someone else's machine: bodies can be edited, cookies rewritten, fields deleted. So the rule is absolute: <strong>every rule that matters is checked again on the server</strong>, at the moment the data arrives, before it touches your database. The browser check is for the visitor's convenience. The server check is for your data's survival.</p>
     <p>Here is a small server-style validator for the course's book. It takes the object from a request body and returns a list of problems — an empty list means the book is acceptable:</p>
 
-    <script type="text/plain" class="code" data-lang="js" data-title="validateBook — checking a book before it is stored" data-run="node" data-harness="wk3-validate-fn">
-      function validateBook(book) { // Validate an incoming book object and return an array of error messages.
-        const errors = []; // Collect every rule violation so the caller sees all problems at once.
-        if (!book || typeof book !== 'object') return ['Send a book object.']; // Guard against null, primitives, or missing bodies.
+    <script type="text/plain" class="code" data-lang="js" data-title="validateBook — checking a book before it is stored">
+      function validateBook(book) {
+        const errors = [];
+        if (!book || typeof book !== 'object') return ['Send a book object.'];
 
-        if (typeof book.title !== 'string' || book.title.trim() === '') { // Check type before calling .trim(), and reject blank titles.
-          errors.push('Title is required.'); // Record missing or non-string title.
-        } else if (book.title.trim().length > 100) { // Enforce maximum title length after trimming spaces.
-          errors.push('Title must be 100 characters or fewer.'); // Record overly long title.
+        if (typeof book.title !== 'string' || book.title.trim() === '') {
+          errors.push('Title is required.');
+        } else if (book.title.trim().length > 100) {
+          errors.push('Title must be 100 characters or fewer.');
         }
 
-        if (typeof book.author !== 'string' || book.author.trim() === '') { // Check type first, then ensure author is not blank.
-          errors.push('Author is required.'); // Record missing or non-string author.
-        } else if (book.author.trim().length > 60) { // Enforce maximum author length after trimming.
-          errors.push('Author must be 60 characters or fewer.'); // Record overly long author.
+        if (typeof book.author !== 'string' || book.author.trim() === '') {
+          errors.push('Author is required.');
+        } else if (book.author.trim().length > 60) {
+          errors.push('Author must be 60 characters or fewer.');
         }
 
         return errors; // empty array = the book is fine
       }
     </script>
 
-    <p>Three habits in that code are worth stealing. It checks the <em>type</em> first (<code>typeof ... !== 'string'</code>), because a title sent as the number <code>42</code> has no <code>.trim()</code> to call. Checking that a value is a string is also what stops a visitor sending an object such as <code>{"$ne": null}</code> where your MongoDB query expects text — an attack called <strong>NoSQL injection</strong>, in which the database reads that object as a query instruction instead of a value. It trims before judging emptiness, so a title of three spaces counts as missing. And it collects <em>every</em> problem instead of stopping at the first, so the visitor fixes everything in one trip. In a route, you would use it like this: if the list is not empty, answer <code>400</code> with the errors and store nothing.</p>
+    <p>Three habits in that code are worth stealing. It checks the <em>type</em> first (<code>typeof ... !== 'string'</code>), because a title sent as the number <code>42</code> has no <code>.trim()</code> to call. It trims before judging emptiness, so a title of three spaces counts as missing. And it collects <em>every</em> problem instead of stopping at the first, so the visitor fixes everything in one trip. In a route, you would use it like this: if the list is not empty, answer <code>400</code> with the errors and store nothing.</p>
 
-    <p><strong>Example — both sides of validation together (HTML5 attributes, CSS invalid styling, and Express server guard):</strong></p>
-    <div class="tabs wk3-tabs">
-      <div data-tab="1 · HTML (courtesy checks in browser)">
-        <p>Built-in attributes (<code>required</code>, <code>maxlength</code>, <code>min</code>/<code>max</code>) catch obvious mistakes immediately before the request even leaves the browser.</p>
-        <script type="text/plain" class="code" data-lang="html" data-title="book-form.html">
-          <form id="book-form" class="book-form" method="post" action="/api/books"> <!-- Form that submits a new book to POST /api/books. -->
-            <label for="b-title">Title</label> <!-- Label linked to the title input. -->
-            <input id="b-title" name="title" type="text" required maxlength="100" placeholder="Dune"> <!-- Courtesy browser rule: required text, max 100 chars. -->
+    <h3>Try it: break the validator</h3>
+    <p>The same function runs below. The good book passes. Now experiment: delete the author, make the title a number, paste a title longer than 100 characters, and watch the error list change. Try to find an input the validator handles badly — that hunting instinct is the job.</p>
 
-            <label for="b-author">Author</label> <!-- Label linked to the author input. -->
-            <input id="b-author" name="author" type="text" required maxlength="60" placeholder="Frank Herbert"> <!-- Courtesy browser rule: required text, max 60 chars. -->
-
-            <label for="b-year">Year published</label> <!-- Label linked to the publication year input. -->
-            <input id="b-year" name="year" type="number" required min="1000" max="2100" step="1" placeholder="1965"> <!-- Whole number (step="1") between 1000 and 2100. -->
-
-            <ul id="form-errors" class="error-list" role="alert" hidden></ul> <!-- Hidden list revealed to show 400 validation errors from the server. -->
-            <button type="submit">Save book</button> <!-- Triggers submit (handled by JS to send typed JSON). -->
-          </form>
-        </script>
-      </div>
-      <div data-tab="2 · CSS (highlighting invalid fields)">
-        <p><code>:user-invalid</code> styles a field red <em>only after</em> the visitor has interacted with it (unlike <code>:invalid</code>, which flashes red on a brand-new empty form!), and <code>.error-list</code> displays every problem returned by the server.</p>
-        <script type="text/plain" class="code" data-lang="css" data-title="validation.css">
-          .book-form { max-width: 440px; display: grid; gap: 10px; font-family: system-ui, sans-serif; } /* Vertical stacked form grid with 10px gaps. */
-          .book-form label { font-weight: 700; font-size: 0.9rem; } /* Bold, slightly compact field labels. */
-          .book-form input { /* Base styling for all text and number inputs in the form. */
-            padding: 8px 10px; /* Comfortable inner spacing for typing. */
-            border: 1.5px solid #94a3b8; /* Neutral slate border when valid or untouched. */
-            border-radius: 6px; /* Slightly rounded input corners. */
-            font: inherit; /* Match the form's system font instead of browser defaults. */
-          }
-          .book-form input:user-invalid { /* Highlight invalid fields only after the visitor interacts with them. */
-            border-color: #dc2626; /* Red border signaling a validation problem. */
-            background: #fef2f2; /* Soft red tint inside the invalid input. */
-          }
-          .error-list { /* Alert box listing every validation error returned by the server. */
-            margin: 4px 0; /* Small vertical spacing above and below the list. */
-            padding: 10px 14px 10px 28px; /* Room on the left for bullet markers. */
-            background: #fef2f2; /* Light red background matching the invalid input tint. */
-            border: 1px solid #ef4444; /* Crisp red border around the error list. */
-            border-radius: 8px; /* Rounded box corners. */
-            color: #991b1b; /* Dark red text for strong readability. */
-          }
-        </script>
-      </div>
-      <div data-tab="3 · Browser JS (sending JSON &amp; showing 400 errors)">
-        <p>Converts the year input to a real number with <code>Number(...)</code> before sending JSON, and renders every server error message returned in <code>data.errors</code> inside <code>#form-errors</code>.</p>
-        <script type="text/plain" class="code" data-lang="js" data-title="validate-client.js (browser JS)">
-          const form = document.getElementById('book-form'); // Reference to the book submission form.
-          const errList = document.getElementById('form-errors'); // Reference to the <ul> showing server validation errors.
-
-          form.addEventListener('submit', async (event) => { // Handle submission with fetch() instead of a full page reload.
-            event.preventDefault(); // Stop the browser's default form navigation.
-            errList.hidden = true; // Hide any old error banner before sending.
-            errList.replaceChildren(); // Clear previous error items.
-
-            const payload = { // Build a typed JSON object from the form fields.
-              title: form.elements.title.value.trim(), // Trim surrounding whitespace from the title.
-              author: form.elements.author.value.trim(), // Trim surrounding whitespace from the author.
-              year: Number(form.elements.year.value) // Convert the input string into a real JS number for JSON.
-            };
-
-            const res = await fetch('/api/books', { // Send the book to Express for server-side validation and saving.
-              method: 'POST', // Use POST to create a new book.
-              headers: { 'Content-Type': 'application/json' }, // Declare that the body is JSON.
-              body: JSON.stringify(payload) // Serialize the payload object into a JSON string.
-            });
-            const data = await res.json(); // Parse the server's JSON response (saved book or error list).
-
-            if (!res.ok && Array.isArray(data.errors)) { // If the server returned 400 with an errors array, display every message.
-              data.errors.forEach((msg) => { // Append one <li> per validation error.
-                const li = document.createElement('li'); // Create a list item for this error.
-                li.textContent = msg; // Insert the message safely as plain text.
-                errList.appendChild(li); // Add it to the error list.
-              });
-              errList.hidden = false; // Reveal the error banner to the visitor.
-              return; // Keep the visitor's inputs intact so they can fix mistakes.
-            }
-            form.reset(); // Clear the form after a successful save.
-          });
-        </script>
-      </div>
-      <div data-tab="4 · Express JS (the real guard)">
-        <p>Calls <code>validateBook(req.body)</code> before touching the database; if any error came back, stops with <code>400 Bad Request</code> and returns the whole <code>errors</code> array as JSON.</p>
-        <script type="text/plain" class="code" data-lang="js" data-title="validate-in-route.js (Express)" data-run="server" data-harness="wk3-validate-route" data-presets='[{"label":"Valid book (201)","method":"POST","path":"/api/books","headers":{"Content-Type":"application/json"},"body":"{\"title\":\"  Dune  \",\"author\":\"Frank Herbert\",\"year\":1965}"},{"label":"Invalid book (400)","method":"POST","path":"/api/books","headers":{"Content-Type":"application/json"},"body":"{\"title\":\"   \",\"author\":\"\"}"}]'>
-          app.post('/api/books', async (req, res, next) => { // Server-side route that enforces validation before saving.
-            const errors = validateBook(req.body); // Run the validator on the untrusted request body.
-            if (errors.length > 0) { // Stop immediately if any validation rule failed.
-              return res.status(400).json({ errors }); // Answer 400 Bad Request with every error message.
-            }
-            // Only validated, trimmed values ever reach the database:
-            const cleanBook = { // Copy only the three allowed fields so extra unexpected fields are ignored.
-              title: req.body.title.trim(), // Save the trimmed book title.
-              author: req.body.author.trim(), // Save the trimmed author name.
-              year: req.body.year // Save the validated publication year.
-            };
-            const saved = await saveBook(cleanBook); // Persist the clean book record to the database.
-            res.status(201).json(saved); // Reply 201 Created with the newly saved record.
-          });
-        </script>
-      </div>
-    </div>
-    <p>Notice the clean separation of duties across all four tabs: HTML attributes give instant feedback while typing, CSS <code>:user-invalid</code> and <code>.error-list</code> make problems visually unmistakable, browser JS sends typed JSON (converting <code>year</code> with <code>Number(...)</code>) and displays every item in <code>data.errors</code>, and Express's <code>validateBook(req.body)</code> enforces the exact same rules on the server — building a fresh <code>cleanBook</code> object with only the three allowed properties so unexpected extra fields (like <code>role: 'admin'</code>) are ignored.</p>
-
-    <h3>Try it: add a rule to the validator</h3>
-    <p>The same function runs below, and it already does its job for <code>title</code> and <code>author</code>. Now the shop wants every book to carry the year it was published. <strong>Your task: add a third rule to <code>validateBook</code>, so that <code>year</code> must be a whole number from 1000 to 2100.</strong> Both ends are allowed.</p>
-    <p>A missing year, a year sent as the text <code>"1965"</code>, a year like <code>1965.5</code> and a year like <code>3000</code> must each add exactly one error to the list. JSON can carry real numbers, so the API insists on one. Keep the habits from above: type first, and collect every problem. Do not stop at the first.</p>
-    <details class="reveal">
-      <summary>Stuck? A hint</summary>
-      <p><code>Number.isInteger(value)</code> answers <code>true</code> only for a real whole number. It answers <code>false</code> for the text <code>"1965"</code>, for <code>1965.5</code>, and for a value that is missing. Test that first, then test the range in an <code>else if</code>, the same shape the title rule uses.</p>
-    </details>
-
-    <div class="playground" data-title="Try it: add a year rule" data-preview="false" data-height="400">
+    <div class="playground" data-title="Try it: validate a book" data-preview="false" data-height="340">
       <textarea data-lang="js">function validateBook(book) {
   const errors = [];
   if (!book || typeof book !== 'object') return ['Send a book object.'];
@@ -1681,32 +935,23 @@ Rows deleted: 1</div>
     errors.push('Author must be 60 characters or fewer.');
   }
 
-  // Your rule for book.year goes here.
-
   return errors; // empty array = the book is fine
 }
 
-// These two already behave:
-console.log('Good book:', validateBook({ title: 'Dune', author: 'Frank Herbert', year: 1965 }));
-console.log('Blank author:', validateBook({ title: 'Emma', author: '   ', year: 1815 }));
-
-// Each of these should report one problem once your rule is in:
-console.log('No year:', validateBook({ title: 'The Hobbit', author: 'J.R.R. Tolkien' }));
-console.log('Year as text:', validateBook({ title: 'The Hobbit', author: 'J.R.R. Tolkien', year: '1937' }));
-console.log('Year too big:', validateBook({ title: 'The Hobbit', author: 'J.R.R. Tolkien', year: 3000 }));</textarea>
+console.log('Good book:', validateBook({ title: 'Dune', author: 'Frank Herbert' }));
+console.log('Missing title:', validateBook({ author: 'Jane Austen' }));
+console.log('Blank author:', validateBook({ title: 'Emma', author: '   ' }));
+console.log('Wrong type:', validateBook({ title: 42, author: 'J.R.R. Tolkien' }));</textarea>
       <script type="application/json" class="checks">
       [
-        {"label": "A good book with a year passes with no errors", "test": "return win.validateBook({ title: 'Dune', author: 'Frank Herbert', year: 1965 }).length === 0"},
-        {"label": "The old rules still work: a blank author gives exactly one error", "test": "return win.validateBook({ title: 'Emma', author: '   ', year: 1815 }).length === 1"},
-        {"label": "A missing year gives exactly one error", "test": "return win.validateBook({ title: 'Dune', author: 'Frank Herbert' }).length === 1"},
-        {"label": "A year sent as the text `\"1965\"` gives exactly one error", "test": "return win.validateBook({ title: 'Dune', author: 'Frank Herbert', year: '1965' }).length === 1"},
-        {"label": "A year that is not a whole number, like `1965.5`, gives exactly one error", "test": "return win.validateBook({ title: 'Dune', author: 'Frank Herbert', year: 1965.5 }).length === 1"},
-        {"label": "Years outside 1000 to 2100 give one error; 1000 and 2100 themselves pass", "test": "var n = function (y) { return win.validateBook({ title: 'Dune', author: 'Frank Herbert', year: y }).length; }; return n(999) === 1 && n(2101) === 1 && n(3000) === 1 && n(1000) === 0 && n(2100) === 0"},
-        {"label": "An empty object gives three errors — every field reported", "test": "return win.validateBook({}).length === 3"}
+        {"label": "A good book passes with no errors", "test": "return win.validateBook({ title: 'Dune', author: 'Frank Herbert' }).length === 0"},
+        {"label": "A missing title gives exactly one error", "test": "return win.validateBook({ author: 'Jane Austen' }).length === 1"},
+        {"label": "A blank (spaces-only) author gives exactly one error", "test": "return win.validateBook({ title: 'Emma', author: '   ' }).length === 1"},
+        {"label": "An empty object gives two errors — both fields reported", "test": "return win.validateBook({}).length === 2"},
+        {"label": "A title over 100 characters gives exactly one error", "test": "return win.validateBook({ title: 'x'.repeat(101), author: 'A' }).length === 1"}
       ]
       </script>
     </div>
-    <p class="wk3-note">When every check passes, keep going: change the <code>console.log</code> lines to try inputs of your own, and hunt for one the validator handles badly. That hunting instinct is the job. The checks call your function with their own inputs, so experimenting there cannot break them.</p>
 
     <p>What do good rules look like? They are specific to each field, and each one names a failure you have actually seen or can picture:</p>
 
@@ -1757,19 +1002,16 @@ console.log('Year too big:', validateBook({ title: 'The Hobbit', author: 'J.R.R.
 
     <script type="text/plain" class="code" data-lang="js" data-title="Reading configuration from the environment">
       // Use the port the host provides, or 3000 on your own machine.
-      const port = process.env.PORT || 3000; // Read PORT from environment variables, falling back to 3000 locally.
-      app.listen(port, () => console.log('Listening on port ' + port)); // Start the server on the configured port.
+      const port = process.env.PORT || 3000;
+      app.listen(port, () => console.log('Listening on port ' + port));
 
       // A database password is configuration too:
-      const dbPassword = process.env.DB_PASSWORD; // Pull secrets from process.env instead of hard-coding them.
-
-      // ...and so is the session secret from Section 3.2:
-      // session({ secret: process.env.SESSION_SECRET, ... })
+      const dbPassword = process.env.DB_PASSWORD;
     </script>
 
-    <p>While developing, you collect these in a <strong><code>.env</code> file</strong> — a plain text file in your project folder, one <code>NAME=value</code> per line. Node loads it for you when you start the app with <code>node --env-file=.env server.js</code>: every line becomes an entry in <code>process.env</code> before your code runs. (Calling <code>process.loadEnvFile()</code> at the top of your entry file does the same from inside the program.) In existing projects you will also meet the older way, the <code>dotenv</code> package — <code>npm install dotenv</code>, then <code>require('dotenv').config();</code> at the top of the entry file — which did the same job before Node could read the file itself. A typical <code>.env</code> file looks like this:</p>
+    <p>While developing, you collect these in a <strong><code>.env</code> file</strong> — a plain text file in your project folder, one <code>NAME=value</code> per line, loaded when the app starts (commonly with the <code>dotenv</code> package: <code>npm install dotenv</code>, then <code>require('dotenv').config();</code> at the top of your entry file):</p>
 
-    <script type="text/plain" class="code" data-lang="text" data-title=".env — local development settings">
+    <script type="text/plain" class="code" data-lang="js" data-title=".env — local development settings">
       PORT=3000
       DB_PASSWORD=the-real-password-goes-here
       SESSION_SECRET=a-long-random-string
@@ -1781,30 +1023,21 @@ console.log('Year too big:', validateBook({ title: 'The Hobbit', author: 'J.R.R.
     </aside>
     <p>A <code>.gitignore</code> file — a plain list of names Git should leave out of commits — keeps <code>node_modules</code> and <code>.env</code> out of Git: you commit a <code>.env.example</code> file with the variable names and placeholder values, never the real values.</p>
 
-    <p><strong>Example — a project's <code>.gitignore</code> and safe <code>.env.example</code> side by side:</strong></p>
-    <div class="grid-2">
-      <script type="text/plain" class="code" data-lang="text" data-title=".gitignore — what stays out of Git">
-        node_modules/
-        .env
-      </script>
-      <script type="text/plain" class="code" data-lang="text" data-title=".env.example — safe template to commit">
-        PORT=3000
-        DB_HOST=localhost
-        DB_USER=root
-        DB_PASSWORD=replace-with-your-local-password
-        SESSION_SECRET=replace-with-random-64-char-hex
-      </script>
-    </div>
-    <p>Two lines in <code>.gitignore</code> keep dependencies and your real <code>.env</code> out of Git, while committing <code>.env.example</code> documents every variable name a teammate (or your instructor) needs to copy into their own local <code>.env</code> file before running <code>node --env-file=.env server.js</code>.</p>
+    <p><strong>Example — a project's <code>.gitignore</code>, complete:</strong></p>
+    <script type="text/plain" class="code" data-title=".gitignore — what stays out of Git">
+      node_modules/
+      .env
+    </script>
+    <p>Two lines do the whole job: dependencies are never committed (they are rebuilt from <code>package.json</code>), and the real <code>.env</code> — with its real password and secret — never leaves your machine.</p>
 
     <div class="quiz" data-title="Check your understanding: validation, consistency, configuration">
       <script type="application/json">
       [
-        {"q": "Your form already validates in the browser. Why must the server validate the same data again?", "shuffle": true, "choices": ["Requests can be sent without your page at all — with `curl`, for instance — so the browser's checks can simply be skipped", "Browser checks run only after the data has been sent, so the server is the first place a bad value can be caught at all", "HTTPS scrambles the data on its way, so the server has to validate it again to be sure it arrived in one piece", "The database refuses anything the server has not validated itself, so the second check is what lets the data be stored"], "answer": 0, "explain": "Your page is only one possible sender. Anything can talk to your API, and everything in a request was assembled on someone else's machine. Server-side validation is the check that cannot be bypassed."},
-        {"q": "Why does `validateBook` check `typeof book.title !== 'string'` before calling `.trim()`?", "shuffle": true, "choices": ["A title sent as a number has no `.trim()` method — checking the type first keeps the validator itself from crashing", "A title sent as a number is already trimmed — checking the type first lets the validator skip work it does not need", "`.trim()` turns a number into a string — checking the type first stops a number like `42` slipping through as a title", "Digits are never allowed in a book title — checking the type first rejects any title containing one, like `1984`"], "answer": 0, "explain": "Incoming JSON can hold any type. Type first, then string methods — otherwise the validator throws an error on exactly the bad input it exists to catch."},
-        {"q": "What does 'one source of truth' mean for stored data?", "shuffle": true, "choices": ["Each fact is stored in exactly one place, and everything else refers to it there", "Each fact is copied into every table that uses it, so that no lookup is ever needed", "Only one program may write to the database, so two changes can never collide", "The database keeps one backup copy, and that copy wins if the two disagree"], "answer": 0, "explain": "Copies of a fact drift apart when one is updated and the other is not. Store it once — like an email in the customers table, referenced by key everywhere else — and it can never disagree with itself."},
+        {"q": "Your form already validates in the browser. Why must the server validate the same data again?", "shuffle": true, "choices": ["Requests can be sent without your page at all — with `curl`, for instance — so the browser's checks can simply be skipped", "Browser validation is illegal for APIs", "The server cannot read form data without validating it first", "It uses up spare server time productively"], "answer": 0, "explain": "Your page is only one possible sender. Anything can talk to your API, and everything in a request was assembled on someone else's machine. Server-side validation is the check that cannot be bypassed."},
+        {"q": "Why does `validateBook` check `typeof book.title !== 'string'` before calling `.trim()`?", "shuffle": true, "choices": ["A title sent as a number has no `.trim()` method — checking the type first keeps the validator itself from crashing", "Numbers are not allowed in book titles", "`trim()` only works on Tuesdays", "It makes the function run faster"], "answer": 0, "explain": "Incoming JSON can hold any type. Type first, then string methods — otherwise the validator throws an error on exactly the bad input it exists to catch."},
+        {"q": "What does 'one source of truth' mean for stored data?", "shuffle": true, "choices": ["Each fact is stored in exactly one place, and everything else refers to it there", "Only one person is allowed to edit the database", "The database keeps one backup copy", "Every table must have exactly one row"], "answer": 0, "explain": "Copies of a fact drift apart when one is updated and the other is not. Store it once — like an email in the customers table, referenced by key everywhere else — and it can never disagree with itself."},
         {"q": "True or false: it is fine to commit a `.env` file to Git as long as the repository is private today.", "answer": false, "explain": "False. Repositories get shared, forked and made public, and committed history is hard to scrub. `.env` belongs in `.gitignore`, and a secret that reached a commit is treated as leaked and replaced."},
-        {"q": "In `const port = process.env.PORT || 3000;`, when does the `3000` get used?", "shuffle": true, "choices": ["When no `PORT` environment variable is set — for example, on your own machine", "Always — a value written in the code takes priority over the environment", "When `PORT` is set as well — `||` picks the right-hand value if both exist", "Only after a crash — 3000 is the spare port the server restarts on afterwards"], "answer": 0, "explain": "`process.env.PORT` is `undefined` when nothing sets it, so the `||` falls back to 3000. A host that assigns a port sets the variable, and the same code obeys it with no edits."}
+        {"q": "In `const port = process.env.PORT || 3000;`, when does the `3000` get used?", "shuffle": true, "choices": ["When no `PORT` environment variable is set — for example, on your own machine", "Always — environment variables are ignored", "Only when the server crashes", "When `PORT` is set to `3000`"], "answer": 0, "explain": "`process.env.PORT` is `undefined` when nothing sets it, so the `||` falls back to 3000. A host that assigns a port sets the variable, and the same code obeys it with no edits."}
       ]
       </script>
     </div>
@@ -1825,56 +1058,9 @@ console.log('Year too big:', validateBook({ title: 'The Hobbit', author: 'J.R.R.
           <tr><th scope="row">Session</th><td>Server-side, behind the cookie's ID</td><td>Only if the store is persistent</td><td>Logins, carts, per-visitor state</td></tr>
           <tr><th scope="row">File</th><td>One server's disk</td><td>Yes</td><td>Small, simple, single-server data</td></tr>
           <tr><th scope="row">MongoDB</th><td>A database server, as documents</td><td>Yes</td><td>Records with varying fields, JSON-shaped data</td></tr>
-          <tr><th scope="row">MySQL</th><td>A database server, as tables</td><td>Yes</td><td>Fixed-shape, linked records; changes that must happen together</td></tr>
+          <tr><th scope="row">MySQL</th><td>A database server, as tables</td><td>Yes</td><td>Fixed-shape, linked records; exact numbers</td></tr>
         </tbody>
       </table>
-    </div>
-
-    <h3>Week 3 code quick-reference: state, storage &amp; validation</h3>
-    <p>Keep these four Week 3 templates side by side when upgrading your Milestone 2 API to real persistence:</p>
-    <div class="tabs wk3-tabs">
-      <div data-tab="Session Setup (Express)">
-        <p>Reads the secret from <code>process.env</code> and protects the session cookie with <code>httpOnly</code> and <code>sameSite</code>.</p>
-        <script type="text/plain" class="code" data-lang="js" data-title="session-setup.js">
-          const session = require('express-session'); // Load Express session middleware.
-
-          app.use(session({ // Enable server-side sessions for every route.
-            secret: process.env.SESSION_SECRET, // Sign session cookies using a secret from the environment.
-            resave: false, // Skip resaving sessions that were not modified during the request.
-            saveUninitialized: false, // Wait to create a session cookie until the route actually stores data.
-            cookie: { httpOnly: true, sameSite: 'lax', maxAge: 1000 * 60 * 60 } // HttpOnly, SameSite=Lax cookie lasting 1 hour (in ms).
-          }));
-        </script>
-      </div>
-      <div data-tab="MongoDB CRUD">
-        <p>The four driver calls side by side — remember <code>new ObjectId(id)</code> inside <code>try / catch</code> for URL ids.</p>
-        <script type="text/plain" class="code" data-lang="js" data-title="mongo-crud-cheatsheet.js">
-          const { insertedId } = await books.insertOne({ title, author }); // CREATE: insert one document and capture its new _id.
-          const all = await books.find().toArray(); // READ (all): collect every document in the collection into an array.
-          const one = await books.findOne({ _id: new ObjectId(id) }); // READ (one): fetch a single document by ObjectId (or null).
-          await books.updateOne({ _id: new ObjectId(id) }, { $set: { title } }); // UPDATE: change only the fields listed in $set.
-          await books.deleteOne({ _id: new ObjectId(id) }); // DELETE: remove the single document matching _id.
-        </script>
-      </div>
-      <div data-tab="MySQL Parameterized CRUD">
-        <p>Every user value travels in the second-argument array, matched to <code>?</code> placeholders.</p>
-        <script type="text/plain" class="code" data-lang="js" data-title="mysql-crud-cheatsheet.js">
-          const [created] = await pool.execute('INSERT INTO books (title, author) VALUES (?, ?)', [title, author]); // CREATE: insert safely with ? placeholders.
-          const [rows] = await pool.execute('SELECT id, title, author FROM books WHERE id = ?', [id]); // READ: fetch matching rows into an array.
-          const [updated] = await pool.execute('UPDATE books SET title = ? WHERE id = ?', [title, id]); // UPDATE: update only the row matching WHERE id = ?.
-          const [deleted] = await pool.execute('DELETE FROM books WHERE id = ?', [id]); // DELETE: remove only the row matching WHERE id = ?.
-        </script>
-      </div>
-      <div data-tab="HTML + CSS Validated Field">
-        <p>Client-side hints for instant feedback (always paired with server-side validation).</p>
-        <script type="text/plain" class="code" data-lang="html" data-title="validated-field.html">
-          <label for="title">Title</label> <!-- Connects the visible label to the input with id="title". -->
-          <input id="title" name="title" type="text" required maxlength="100"> <!-- Instant browser checks; always enforce the same rules on the server. -->
-        </script>
-        <script type="text/plain" class="code" data-lang="css" data-title="validated-field.css">
-          input:user-invalid { border-color: #dc2626; background: #fef2f2; } /* Turn the field border and tint red only after the visitor edits it. */
-        </script>
-      </div>
     </div>
 
     <div class="flashcards" data-title="Week 3 key terms" data-front="Term" data-back="Meaning">
@@ -1899,21 +1085,21 @@ console.log('Year too big:', validateBook({ title: 'The Hobbit', author: 'J.R.R.
 
     <aside class="callout project">
       <strong>Put it together</strong>
-      <p>Take your Week 2 books API and give it a real memory: move the array into one of this week's databases, connecting once at startup rather than in every route, keep the same routes and status codes, validate every book on the server before it is stored, and read the database password from the environment. Then restart your server and watch the books survive — that restart is the moment this week was about.</p>
+      <p>Take your Week 2 books API and give it a real memory: move the array into one of this week's databases, keep the same routes and status codes, validate every book on the server before it is stored, and read the database password from the environment. Then restart your server and watch the books survive — that restart is the moment this week was about.</p>
     </aside>
 
     <div class="quiz" data-pass="0.8" data-title="Week 3 quiz">
       <script type="application/json">
       [
-        {"q": "Nothing in HTTP links two requests from the same browser. What actually lets a server recognize a returning visitor?", "shuffle": true, "choices": ["A cookie: the browser sends back what the server asked it to store, and the server reads it", "The IP address: every device has a permanent one of its own, so the server just matches it up", "The connection: the browser keeps one open the whole time, so the server knows who is on it", "The URL: the browser adds the visitor's name to each address, and the server reads it"], "answer": 0, "explain": "Nothing in HTTP links two requests. Recognition is entirely your app's doing: the browser presents the ticket it was given, and the server reads it and looks up what it points to."},
-        {"q": "Which attribute stops JavaScript in the page from reading a cookie, while the browser still sends it?", "shuffle": true, "choices": ["`HttpOnly`", "`Secure`", "`SameSite`", "`Max-Age`"], "answer": 0, "explain": "`HttpOnly` hides the cookie from page scripts. `Secure` restricts it to HTTPS, `SameSite` limits cross-site sending, and `Max-Age` sets its lifetime."},
-        {"q": "In the session demo, the count reached 3 with a cookie jar and restarted at 1 without one. Where was the number 3 stored?", "shuffle": true, "choices": ["On the server, in the session data stored under the ID in the cookie", "Inside the cookie, as a value the browser sends back on each request", "In the `curl` jar file, which the server opens and reads on each request", "In a file on the server's disk, written by `fs` after every visit"], "answer": 0, "explain": "The cookie carried only the session ID. The count lived server-side in `req.session` — which is why dropping the cookie made the server start over."},
+        {"q": "A visitor's browser sends a `Cookie` header with every request, yet the server still treats a first-time visitor as new. Why?", "shuffle": true, "choices": ["HTTP itself is stateless — memory exists only because the cookie's contents let the server recognize the visitor", "Cookies expire after one request", "The server deletes cookies it does not like", "The `Cookie` header is encrypted so the server cannot use it"], "answer": 0, "explain": "Nothing in HTTP links two requests. Recognition is entirely your app's doing: read the ticket, look up what it points to."},
+        {"q": "Which attribute stops JavaScript in the page from reading a cookie, while the browser still sends it?", "shuffle": true, "choices": ["`HttpOnly`", "`Secure`", "`Path`", "`Max-Age`"], "answer": 0, "explain": "`HttpOnly` hides the cookie from page scripts. `Secure` restricts it to HTTPS, `Path` to part of the site, and `Max-Age` sets its lifetime."},
+        {"q": "In the session demo, the count reached 3 with a cookie jar and restarted at 1 without one. Where was the number 3 stored?", "shuffle": true, "choices": ["On the server, in the session data stored under the ID in the cookie", "Inside the cookie, as the value `3`", "In the `curl` jar file, which the server reads", "In the browser's local storage"], "answer": 0, "explain": "The cookie carried only the session ID. The count lived server-side in `req.session` — which is why dropping the cookie made the server start over."},
         {"q": "True or false: a text file written with Node's `fs` module is a good shared store once your app runs on two servers.", "answer": false, "explain": "False. Each server's disk holds its own copy, and the copies disagree. Shared, searchable, guarded storage is exactly what a database adds."},
-        {"q": "A catalog where one product has sizes, the next has a processor speed, and a third has page counts fits which family best?", "shuffle": true, "choices": ["Document — records naturally carry different fields", "Relational — a schema lets each row add its own columns", "Relational — a catalog is a table by definition", "Neither — data that varies cannot be stored at all"], "answer": 0, "explain": "Varying fields per record is the document family's home ground. A relational schema would force every product into the same columns, most of them empty."},
-        {"q": "Which MongoDB call changes only the `title` field of the Dune document?", "shuffle": true, "choices": ["`updateOne({ title: 'Dune' }, { $set: { title: 'Dune (revised)' } })`", "`insertOne({ title: 'Dune (revised)', author: 'Frank Herbert' })`", "`findOne({ title: 'Dune' }, { $set: { title: 'Dune (revised)' } })`", "`updateOne({ title: 'Dune (revised)' }, { $set: { title: 'Dune' } })`"], "answer": 0, "explain": "`updateOne` with `$set` modifies the named fields and leaves the rest of the document — author, `_id` — untouched. `insertOne` would add a second book, `findOne` only reads, and the last call looks for a title no document has yet."},
+        {"q": "A catalog where one product has sizes, the next has a processor speed, and a third has page counts fits which family best?", "shuffle": true, "choices": ["Document — records naturally carry different fields", "Relational — all catalogs are tables", "Neither — catalogs cannot be stored", "A session — products are temporary"], "answer": 0, "explain": "Varying fields per record is the document family's home ground. A relational schema would force every product into the same columns, most of them empty."},
+        {"q": "Which MongoDB call changes only the `title` field of the Dune document?", "shuffle": true, "choices": ["`updateOne({ title: 'Dune' }, { $set: { title: 'Dune (revised)' } })`", "`insertOne({ title: 'Dune (revised)' })`", "`find({ title: 'Dune (revised)' })`", "`deleteOne({ title: 'Dune' })`"], "answer": 0, "explain": "`updateOne` with `$set` modifies the named fields and leaves the rest of the document — author, `_id` — untouched."},
         {"q": "Which SQL statement is the Read of CRUD?", "answer": ["SELECT"], "explain": "`SELECT ... FROM ... WHERE ...` reads rows. `INSERT` creates, `UPDATE` changes, `DELETE` removes."},
-        {"q": "A route builds SQL like this: `'SELECT * FROM books WHERE id = ' + req.params.id`. What is the correct fix?", "shuffle": true, "choices": ["Use a placeholder: `'SELECT * FROM books WHERE id = ?'` with `[req.params.id]` passed separately", "Check it first: glue the value in whenever it looks like a number, since a number can do no harm", "Add quotes: wrap the value in `'` marks inside the SQL so MySQL reads it as text, not as code", "Hide the value: read the id from the request body, not the URL, so visitors cannot change it"], "answer": 0, "explain": "Parameterized queries keep visitor input as data, never SQL. Eyeballing the value is not a defense, quotes can be closed by the visitor's own text, and a request body is as easy to edit as a URL."},
-        {"q": "Your orders table stores a copy of each customer's email, and a customer changes theirs in the customers table. What principle did the design break, and what happens?", "shuffle": true, "choices": ["One source of truth — the copies now disagree, and nothing says which email is right", "Statelessness — the server forgets the customer, and the old email is lost for good", "The schema — an orders table may not hold text, and the database rejects the change", "Persistence — the new email lives only in memory, and it vanishes at the next restart"], "answer": 0, "explain": "Storing one fact in two places invites inconsistency. Store the email once, and let orders point at the customer by key."},
+        {"q": "A route builds SQL like this: `'SELECT * FROM books WHERE id = ' + req.params.id`. What is the correct fix?", "shuffle": true, "choices": ["Use a placeholder: `'SELECT * FROM books WHERE id = ?'` with `[req.params.id]` passed separately", "Check that the value looks like a number before gluing", "Wrap the value in extra quotes", "Move the code to the browser, where it is safe"], "answer": 0, "explain": "Parameterized queries keep visitor input as data, never SQL. Eyeballing the value is not a defense — the one time it is not a number, it becomes part of your query."},
+        {"q": "Your orders table stores a copy of each customer's email, and a customer changes theirs in the customers table. What principle did the design break, and what happens?", "shuffle": true, "choices": ["One source of truth — the copies now disagree, and nothing says which email is right", "Statelessness — the server forgot the customer", "The schema — emails are not allowed in orders", "Nothing — copies are always safer"], "answer": 0, "explain": "Storing one fact in two places invites inconsistency. Store the email once, and let orders point at the customer by key."},
         {"q": "True or false: if your HTML form validates a book's title, your API route can safely store whatever it receives.", "answer": false, "explain": "False. Requests can bypass your page entirely. Validation that matters happens again on the server, before anything reaches the database."}
       ]
       </script>

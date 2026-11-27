@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Setup &amp; Fix-it · Web Dev II</title>
+  <meta name="description" content="The 5-minute setup check, the ports this course uses, and fixes for the errors you will actually hit: EADDRINUSE, req.body undefined, Cannot GET, npm install failures, and changes that seem not to work.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=JetBrains+Mono:wght@400;700&display=swap">
+  <link rel="stylesheet" href="../assets/css/course.css">
+  <script src="../assets/js/course.js"></script>
+</head>
+<body data-page="setup">
+<main id="main">
+  <header class="module-hero">
+    <h1>Setup &amp; Fix-it</h1>
+    <p class="lede">Read this before you ask for help. Most setup problems in this course are one of the five errors below, and each one has a short fix. Work through the 5-minute check first — it catches nearly all of them before they cost you an evening.</p>
+  </header>
+
+  <section class="lesson" id="setup-check">
+    <h2>1. The 5-minute setup check</h2>
+    <p>Steps 1–2 each print a version. Steps 3–4 happen in your project folder; step 5 is in your browser.</p>
+    <ol>
+      <li><code>node --version</code> → expect <code>v26.x</code>. If it shows an older major version (v20, v22), upgrade to Node 26 LTS before starting. If the command is "not found" (Windows says "is not recognized as an internal or external command"), Node is not installed — or the terminal was open before you installed it. Close and reopen the terminal (and VS Code) after installing.</li>
+      <li><code>npm --version</code> → expect a number, no error. <strong>Windows PowerShell trap:</strong> if <code>node</code> works but <code>npm</code> fails with "running scripts is disabled on this system," switch to Command Prompt or Git Bash, or run <code>Set-ExecutionPolicy -Scope CurrentUser RemoteSigned</code> in PowerShell once.</li>
+      <li>In your project folder: <code>npm install</code> → finishes with no red <code>npm error</code> block. Yellow <code>npm warn</code> lines and a "N vulnerabilities" notice are normal — they do not mean the install failed. Never run <code>npm audit fix --force</code>; it can jump your packages to new major versions.</li>
+      <li>Start the server: <code>npm start</code>. If that fails with <code>Missing script: "start"</code>, your <code>package.json</code> has no start script — run <code>node server.js</code> instead (<code>server.js</code> stands for whatever your entry file is called). Success looks like your listening line — <code>Server running on port 30xx</code> — <em>and the terminal staying busy</em>. If the listening line prints and you immediately get your prompt back, the server is <strong>not</strong> running: startup failed quietly. See Fix-it #1. While the server runs, that terminal is occupied — open a second terminal for other commands.</li>
+      <li>Browser: <code>http://localhost:30xx</code>, where your port is 3000 + the last two digits of your student ID. Example: ID ending in <code>07</code> → <code>http://localhost:3007</code>; ID ending in <code>42</code> → <code>http://localhost:3042</code>. Type <code>http://</code>, not <code>https://</code>. If the browser says "This site can't be reached" (<code>ERR_CONNECTION_REFUSED</code>), either the server is not running (go back to step 4) or the URL's port doesn't match the port your server printed.</li>
+    </ol>
+    <p>Doing the Week 1 homework? Part B runs its own plain-Node server on port 3000; your personal 30xx port is for the Express app in Part D.</p>
+  </section>
+
+  <section class="lesson" id="ports">
+    <h2>2. Ports used in this course</h2>
+    <table class="data-table">
+      <thead><tr><th scope="col">Port</th><th scope="col">What uses it</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">30xx</th><td>Your own Express app (3000 + last two digits of your ID)</td></tr>
+        <tr><th scope="row">5173</th><td>Vite dev server (Vue front end, Weeks 2+) — if 5173 is busy, Vite picks another port; use the URL Vite prints</td></tr>
+        <tr><th scope="row">3306</th><td>MySQL</td></tr>
+        <tr><th scope="row">27017</th><td>MongoDB</td></tr>
+      </tbody>
+    </table>
+    <p>If a page loads but shows an older version of your code, you may be looking at a stale server on a different port — or at your server on the same port that was never restarted after an edit. See Fix-its #1 and #5.</p>
+  </section>
+
+  <section class="lesson" id="fixits">
+    <h2>3. Fix-it: the errors you will actually hit</h2>
+
+    <h3>#1 <code>EADDRINUSE: address already in use</code></h3>
+    <p><strong>What it means:</strong> a copy of your server is already running on that port — usually the one from your last terminal.</p>
+    <p><strong>Fix:</strong> find the first server's terminal and stop it with Ctrl+C, then start one copy. In Express 5 a taken port can also fail <em>silently</em>: the listening line prints, then the program exits and you get your prompt back. That prompt is the giveaway — in Week 1, where your app holds nothing else open, a running server never gives it back.</p>
+    <p><strong>Lost the old terminal?</strong> End the leftover Node.js process in Task Manager (Windows) or Activity Monitor (Mac), or from a terminal — Mac/Linux: <code>lsof -i :3007</code> — the PID is in the <code>PID</code> column — then <code>kill 1234</code> (with that number). Windows, in Command Prompt or PowerShell: <code>netstat -ano | findstr :3007</code> — the PID is the last number on the line — then <code>taskkill /PID 1234 /F</code>. Use your own port, and don't type the placeholder brackets. (In Git Bash the slashes get rewritten as file paths; use <code>taskkill //PID 1234 //F</code> there, or switch shells.)</p>
+    <p><strong>The trap:</strong> changing the port "fixes" the error but leaves two servers running two versions of your code on two ports, and you no longer know which one the browser is talking to. The bug you then chase is your own stale server.</p>
+
+    <h3>#2 Form submits, then a 500: <code>Cannot read properties of undefined</code></h3>
+    <p>You will see errors like <code>Cannot read properties of undefined (reading 'name')</code> or <code>Cannot destructure property 'name' of 'req.body' as it is undefined</code>. Both mean the same thing: your route read <code>req.body</code>, and <code>req.body</code> was <code>undefined</code> because this request's body was never parsed. In Express 5, an unparsed body leaves <code>req.body</code> as <code>undefined</code> — it is not an empty object. That happens when:</p>
+    <ul>
+      <li>the body-parsing middleware line is missing, deleted, or commented out;</li>
+      <li>the middleware is registered <em>after</em> the route that reads <code>req.body</code>;</li>
+      <li>the form was sent as GET (no <code>method="POST"</code>) — GET data arrives in <code>req.query</code>, not <code>req.body</code>;</li>
+      <li>the body's format doesn't match the parser — form data needs <code>express.urlencoded()</code>; JSON sent by <code>fetch</code> needs <code>express.json()</code>.</li>
+    </ul>
+    <p><strong>The line that should be near the top of your app, before your routes:</strong></p>
+    <div class="output">app.use(express.urlencoded({ extended: true }));</div>
+    <p><strong>Check:</strong> log <code>req.body</code> at the top of the route. <code>undefined</code> = one of the four causes above. An object that is empty, or missing your field, = parsing worked, but the input's <code>name="…"</code> attribute is missing (an <code>id</code> alone doesn't send the value) or spelled differently from what your route reads — <code>name="userName"</code> in the form and <code>req.body.username</code> in the code do not meet. An object with your field names = parsing is fine; look elsewhere.</p>
+
+    <h3>#3 Browser shows <code>Cannot GET /nope</code> (or <code>Cannot POST …</code>)</h3>
+    <p><strong>What it means:</strong> Express reached the end of your routes with no match and answered with its built-in 404 text. This is Express working correctly — there is simply no route for that path <em>and method</em>. A POST to a path you only defined with <code>app.get</code> shows <code>Cannot POST /path</code>; a form with no <code>method="POST"</code> submits as GET and can show <code>Cannot GET</code> even when your <code>app.post</code> route exists. Letter case and a trailing slash don't matter — Express ignores both by default. What matters is the method and the path segments. And if you just added the route, restart the server first (Fix-it #5) — a running server only knows the routes it started with.</p>
+    <aside class="callout warn">
+      <strong>Do not copy the old custom-404 pattern</strong>
+      <p>Tutorials written for Express 4 use <code>app.get('*', …)</code>. In Express 5 that crashes at startup with a <code>TypeError: Missing parameter name …</code> error (the same happens with <code>'/*'</code>). Custom 404 handling is Week 2 material and uses the Express 5 way.</p>
+    </aside>
+
+    <h3>#4 <code>npm install</code> fails, or the app says a package is missing</h3>
+    <p><strong>Fix sequence:</strong></p>
+    <ol>
+      <li>Confirm you are in the folder that contains <code>package.json</code> (<code>ls</code> / <code>dir</code> should list it).</li>
+      <li>Read the module name in the error. <code>Cannot find module 'express'</code> = the package isn't installed: if it's listed in <code>package.json</code>, run <code>npm install</code> in the project folder; if it was never added, <code>npm install express</code> installs it and records it. <code>Cannot find module './something'</code> = a local file: check the filename and path in your <code>require</code>/<code>import</code>.</li>
+      <li>Still stuck? Delete <code>node_modules</code> and run <code>npm install</code> again. <strong>Keep <code>package-lock.json</code></strong> — it pins the exact versions you installed; deleting it lets npm pick newer ones and your app quietly changes underneath you.</li>
+      <li>Only if npm reports a version-not-found (<code>ETARGET</code>) error, check the version range in <code>package.json</code>: <code>^5.3.0</code> accepts 5.3.0 up to (not including) 6.0.0; an exact version accepts only itself. (For 0.x versions, <code>^</code> allows patch updates only.)</li>
+    </ol>
+
+    <h3>#5 The page loads but your change "doesn't work"</h3>
+    <p><strong>Fix sequence, in this order:</strong></p>
+    <ol>
+      <li><strong>Is the file saved?</strong> An unsaved editor tab (look for the dot on the tab) is the most common cause of all.</li>
+      <li><strong>Did you restart the server?</strong> Your server never reloads when you save — however you started it (<code>npm start</code> or <code>node server.js</code>), it is still running the code from when it started. Stop it with Ctrl+C and run it again — or start it as <code>node --watch server.js</code> so Node restarts it for you.</li>
+      <li><strong>Does the browser URL's port match</strong> the port your <em>current</em> server printed?</li>
+      <li><strong>Hard-refresh the browser</strong> (Ctrl+Shift+R; on Mac, Cmd+Shift+R) — cached JS/CSS is the next suspect.</li>
+      <li>Only then re-read the code.</li>
+    </ol>
+  </section>
+
+  <section class="lesson" id="ask">
+    <h2>4. Before you ask for help</h2>
+    <p>Include these six things — they are what any answer will ask for first:</p>
+    <ol>
+      <li>The exact command you ran</li>
+      <li>The full error text, copied as text (not a photo of your screen)</li>
+      <li>Your operating system (Windows or Mac) and your Node version (<code>node --version</code>)</li>
+      <li>The exact URL and method (GET or POST) you tried</li>
+      <li>The code for the route involved</li>
+      <li>What you expected to happen instead</li>
+    </ol>
+  </section>
+</main>
+</body>
+</html>
